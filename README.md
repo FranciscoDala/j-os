@@ -88,3 +88,29 @@ pnpm start
     pip install -e .
     # agora tenta
     uvicorn jos_api.main:app --reload --port 8000
+
+
+
+# subir o projecto no git
+    # 1. Inicia
+        git init
+
+    # 2. Vê o que tem
+        git status
+
+    # 3. Cria .gitignore se não tem (na raiz A:\j-os\.gitignore)
+
+    # 4. Adiciona tudo
+        git add .
+
+    # 5. Primeiro commit
+        git commit -m "primeiro commit j-os: api + web funcionando local"
+
+    # 6. Cria repo no GitHub (vai em github.com > New repository > j-os > Create SEM README)
+
+    # 7. Conecta (troca SEU_USER)
+        git branch -M main
+        git remote add origin https://github.com/SEU_USER/j-os.git
+
+    # 8. Sobe
+        git push -u origin main

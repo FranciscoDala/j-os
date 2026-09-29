@@ -1,8 +1,26 @@
+# python
 venv/
 __pycache__/
 *.pyc
-.env
+*.egg-info/
+apps/api/src/jos_api.egg-info/
+
+# nextjs
+.next/
+out/
+.next
+apps/web/.next/
+apps/web/out/
+
+# node
 node_modules/
-dist/
+apps/web/node_modules/
+
+# env
+.env
+.env.local
+
+# os
+.DS_Store
 .idea/
 .vscode/
