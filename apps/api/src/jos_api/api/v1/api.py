@@ -6,7 +6,7 @@ from jos_api.modules.produto.routes import router as produto_router
 from jos_api.modules.venda.routes import router as venda_router
 from jos_api.modules.venda.routes import mesa_router
 from jos_api.modules.caixa.routes import router as caixa_router
-from jos_api.modules.atividade.routes import router as atividade_router # <-- NOVO
+from jos_api.modules.atividade.routes import router as atividade_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router, prefix="/api/v1")
@@ -16,4 +16,4 @@ api_router.include_router(produto_router, prefix="/api/v1")
 api_router.include_router(venda_router, prefix="/api/v1")
 api_router.include_router(mesa_router, prefix="/api/v1")
 api_router.include_router(caixa_router, prefix="/api/v1")
-api_router.include_router(atividade_router, prefix="/api/v1") # <-- NOVO
+api_router.include_router(atividade_router, prefix="/api/v1")

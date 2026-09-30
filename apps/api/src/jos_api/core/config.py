@@ -11,9 +11,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "J-OS_JENATH_2026_SUPER_SECRET_MUDE_EM_PROD_@123"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080
-    TEMP_TOKEN_EXPIRE_MINUTES: int = 10 # Novo: para seleção de loja
+    TEMP_TOKEN_EXPIRE_MINUTES: int = 10
 
-    ALLOWED_ORIGINS: str = "https://jenath.vercel.app,http://localhost:3000,http://localhost:3001,http://localhost:5173"
+    ALLOWED_ORIGINS: str = "https://jenath.vercel.app,https://jenath-sys.onrender.com,https://j-os.onrender.com,https://jenath-sys.vercel.app,http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:3000"
+
     BASE_URL: str = "http://localhost:8000"
 
     CLOUDINARY_CLOUD_NAME: str = "d7dtiurw"
