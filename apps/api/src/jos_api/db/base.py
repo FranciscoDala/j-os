@@ -6,6 +6,8 @@ class Base(DeclarativeBase):
 # REGISTRO CENTRAL - só adiciona linha nova aqui
 from jos_api.modules.auth.models import User, UserEmpresa # noqa: F401
 from jos_api.modules.empresa.models import Empresa # noqa: F401
+from jos_api.modules.empresa.perfis_models import Perfil # noqa: F401 - NOVO
+from jos_api.modules.entidades.models import Entidade # noqa: F401 - NOVO
 from jos_api.modules.produto.models import Product # noqa: F401
 from jos_api.modules.mesa.models import Mesa # noqa: F401
 from jos_api.modules.venda.models import Venda, VendaItem # noqa: F401
