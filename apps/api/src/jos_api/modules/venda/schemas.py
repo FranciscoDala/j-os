@@ -7,6 +7,7 @@ from decimal import Decimal
 class VendaItemCreate(BaseModel):
     produto_id: UUID
     quantidade: Decimal
+    observacao: Optional[str] = None
 
 class VendaCreateRequest(BaseModel):
     itens: List[VendaItemCreate]
@@ -37,6 +38,8 @@ class VendaItemResponse(BaseModel):
     subtotal: Decimal
     iva_valor: Decimal
     total: Decimal
+    status: str
+    observacao: Optional[str] = None
     class Config:
         from_attributes = True
 
@@ -58,3 +61,14 @@ class VendaResponse(BaseModel):
     itens: List[VendaItemResponse]
     class Config:
         from_attributes = True
+
+class AddItemRequest(BaseModel):
+    produto_id: UUID
+    quantidade: Decimal
+    observacao: Optional[str] = None
+
+class TransferirMesaRequest(BaseModel):
+    nova_mesa_id: UUID
+
+class UpdateItemStatusRequest(BaseModel):
+    status: str # PENDENTE, EM_PREPARO, PRONTO, ENTREGUE, CANCELADO
