@@ -3,13 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from jos_api.core.config import settings
 from jos_api.api.v1.api import api_router
 
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    version="1.0.0",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
-)
+app = FastAPI(title=settings.PROJECT_NAME, version="1.0.0")
 
-# CORS FIX DEFINITIVO
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins_list,
@@ -17,21 +12,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():
-    return {
-        "system": "J-OS",
-        "owner": "Jenath",
-        "status": "online",
-        "docs": "/docs",
-        "env": settings.ENV,
-        "cors_allowed": settings.origins_list
-    }
+    return {"status": "online", "docs": "/docs", "routes": "/api/v1/auth/login"}
 
 @app.get("/health")
 def health():

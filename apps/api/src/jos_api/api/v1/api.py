@@ -9,11 +9,12 @@ from jos_api.modules.caixa.routes import router as caixa_router
 from jos_api.modules.atividade.routes import router as atividade_router
 
 api_router = APIRouter()
-api_router.include_router(auth_router, prefix="/api/v1")
-api_router.include_router(empresa_router, prefix="/api/v1")
-api_router.include_router(entidades_router, prefix="/api/v1")
-api_router.include_router(produto_router, prefix="/api/v1")
-api_router.include_router(venda_router, prefix="/api/v1")
-api_router.include_router(mesa_router, prefix="/api/v1")
-api_router.include_router(caixa_router, prefix="/api/v1")
-api_router.include_router(atividade_router, prefix="/api/v1")
+
+api_router.include_router(auth_router)
+api_router.include_router(empresa_router)
+api_router.include_router(entidades_router)
+api_router.include_router(produto_router)
+api_router.include_router(venda_router)
+api_router.include_router(mesa_router)
+api_router.include_router(caixa_router)
+api_router.include_router(atividade_router)
