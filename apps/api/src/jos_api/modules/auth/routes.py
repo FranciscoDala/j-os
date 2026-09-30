@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from jos_api.db.session import get_db
 from jos_api.core.deps import get_current_user
@@ -7,18 +7,22 @@ from.models import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+def _get_ip(request: Request) -> str | None:
+    return request.client.host if request.client else None
+
 @router.post("/register", response_model=schemas.UserOut)
-def register(dados: schemas.UserCreate, db: Session = Depends(get_db)):
-    return service.criar_usuario(db, dados)
+def register(dados: schemas.UserCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # pega quem criou
+    return service.criar_usuario(db, dados, criado_por_id=current_user.id, criado_por_nome=getattr(current_user, 'nome', 'Sistema'), ip=_get_ip(request))
 
 @router.post("/login", response_model=schemas.LoginResponse)
-def login(dados: schemas.UserLogin, db: Session = Depends(get_db)):
-    result = service.autenticar(db, dados)
+def login(dados: schemas.UserLogin, request: Request, db: Session = Depends(get_db)):
+    result = service.autenticar(db, dados, ip=_get_ip(request))
     return result
 
 @router.post("/select-empresa", response_model=schemas.LoginResponse)
-def select_empresa(dados: schemas.SelectEmpresaRequest, db: Session = Depends(get_db)):
-    return service.selecionar_empresa(db, dados)
+def select_empresa(dados: schemas.SelectEmpresaRequest, request: Request, db: Session = Depends(get_db)):
+    return service.selecionar_empresa(db, dados, ip=_get_ip(request))
 
 @router.get("/me", response_model=schemas.UserOut)
 def me(current_user: User = Depends(get_current_user)):

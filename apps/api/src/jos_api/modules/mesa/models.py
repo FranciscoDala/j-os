@@ -20,6 +20,6 @@ class Mesa(Base):
     empresa_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True, nullable=False)
     numero: Mapped[str] = mapped_column(String(20), nullable=False)
     capacidade: Mapped[int] = mapped_column(sa.Integer, default=4, nullable=False, server_default="4")
-    status: Mapped[MesaStatus] = mapped_column(SAEnum(MesaStatus, name="mesastatus"), default=MesaStatus.LIVRE, nullable=False, server_default="LIVRE")
+    status: Mapped[MesaStatus] = mapped_column(SAEnum(MesaStatus, name="mesastatus", create_type=False), default=MesaStatus.LIVRE, nullable=False, server_default="LIVRE")
     ativa: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default=sa.text('true'))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, server_default=sa.func.now())

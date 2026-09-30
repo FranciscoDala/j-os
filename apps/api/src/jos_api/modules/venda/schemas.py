@@ -27,6 +27,7 @@ class MesaResponse(BaseModel):
         from_attributes = True
 
 class VendaItemResponse(BaseModel):
+    id: UUID
     produto_id: UUID
     nome_produto: str
     quantidade: Decimal
@@ -42,6 +43,7 @@ class VendaItemResponse(BaseModel):
 class VendaResponse(BaseModel):
     id: UUID
     empresa_id: UUID
+    caixa_id: UUID
     numero: int
     tipo: str
     mesa_id: Optional[UUID] = None
