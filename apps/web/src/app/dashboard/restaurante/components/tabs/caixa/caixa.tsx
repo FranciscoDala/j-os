@@ -15,7 +15,6 @@ async function apiFetch(path: string, options: RequestInit = {}) {
     const d = await res.json().catch(() => ({})); if (!res.ok) throw d; return d;
 }
 const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
 const todayISO = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -71,14 +70,12 @@ export function CaixaTab() {
     useEffect(()=>{ (async()=>{ setLoading(true); await loadAll(); setLoading(false); })(); }, []);
 
     const findCaixaForDate = (date: string) => {
-        // Se tem caixa aberto e a data selecionada é >= data que abriu, esse caixa vale pra essa data
         if (status?.aberto && status?.caixa_atual?.aberto_em) {
             const abertura = getDatePart(status.caixa_atual.aberto_em);
             if (date >= abertura && date <= todayISO()) {
                 return status.caixa_atual;
             }
         }
-        // Senão procura no historico um caixa que abriu exatamente nessa data ou que estava aberto nessa data
         return historico.find((c:any)=> {
             const ab = getDatePart(c.aberto_em);
             const fe = c.fechado_em? getDatePart(c.fechado_em) : todayISO();
@@ -111,9 +108,21 @@ export function CaixaTab() {
     },[selectedDate, historico, status]);
 
     const movs = extrato?.movimentos || [];
-    const entradas = Number(extrato?.total_entradas || 0);
-    const saidas = Math.abs(Number(extrato?.total_saidas || 0));
-    const atual = Number(extrato?.saldo_atual || 0);
+
+    // CALCULO LOCAL - IGNORA ABERTURA, FIM DO FANTASMA DE 1000
+    const { entradas, saidas, atual } = useMemo(()=>{
+        const saldoInicial = Number(extrato?.saldo_inicial || 0);
+        let ent = 0, sai = 0;
+        (extrato?.movimentos || []).forEach((m:any)=>{
+            const tipo = (m.tipo||"").toUpperCase();
+            if (tipo === "ABERTURA" || tipo === "FECHAMENTO") return;
+            const v = Number(m.valor||0);
+            if (v > 0) ent += v;
+            if (v < 0) sai += Math.abs(v);
+        });
+        return { entradas: ent, saidas: sai, atual: saldoInicial + ent - sai };
+    }, [extrato]);
+
     const perPage = 10;
     const totalPages = Math.max(1, Math.ceil(movs.length / perPage));
     const paginados = useMemo(()=> movs.slice((page-1)*perPage, page*perPage), [movs, page]);
