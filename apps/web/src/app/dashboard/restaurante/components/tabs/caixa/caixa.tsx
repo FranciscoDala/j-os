@@ -12,9 +12,7 @@ const BASE = `${API_URL.replace(/\/$/, "")}/api/v1`;
 async function apiFetch(path: string, options: RequestInit = {}) {
     const token = localStorage.getItem("access_token");
     const res = await fetch(`${BASE}${path}`, {...options, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`,...(options.headers || {}) } });
-    const d = await res.json().catch(() => ({}));
-    if (!res.ok) throw d;
-    return d;
+    const d = await res.json().catch(() => ({})); if (!res.ok) throw d; return d;
 }
 const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -40,19 +38,7 @@ function JCalendarPicker({ value, onChange }: { value: string, onChange: (v:stri
                 <div className="text-left"><p className="text-[7px] text-white/40 font-black">DATA</p><p className="text-[11px] font-black -mt-1">{value.split('-').reverse().join('/')}</p></div>
                 <ChevronRight size={10} className={`ml-1 opacity-50 ${open?'rotate-90':''}`} />
             </button>
-            {open && (
-                <><div className="fixed inset-0 z-20" onClick={()=>setOpen(false)} />
-                <div className="absolute z-30 mt-2 left-0 w-[290px] rounded-[20px] bg-[#0B0B0B] border border-white/10 p-4">
-                    <div className="flex items-center justify-between mb-3">
-                        <button onClick={()=>setViewDate(new Date(year, month-1, 1))} className="w-7 h-7 rounded-full bg-white/10 text-white flex items-center justify-center"><ChevronLeft size={14}/></button>
-                        <p className="text-white font-black text-[12px] uppercase">{viewDate.toLocaleDateString('pt-PT',{month:'long'})} {year}</p>
-                        <button onClick={()=>setViewDate(new Date(year, month+1, 1))} className="w-7 h-7 rounded-full bg-white/10 text-white flex items-center justify-center"><ChevronRight size={14}/></button>
-                    </div>
-                    <div className="grid grid-cols-7 gap-1 mb-1">{['D','S','T','Q','Q','S','S'].map((d,i)=><div key={i} className="text-[8px] text-white/30 text-center">{d}</div>)}</div>
-                    <div className="grid grid-cols-7 gap-1">{days.map((d,i)=> d===null? <div key={i}/> : (<button key={i} onClick={()=>{ onChange(toISO(d)); setOpen(false); }} className={`h-8 rounded-full text-[11px] font-bold ${toISO(d)===value?'bg-white text-black': toISO(d)===todayISO()?'bg-[#0CC06B] text-white':'text-white/70 hover:bg-white/10'}`}>{d}</button>))}</div>
-                    <div className="mt-3 flex gap-2"><button onClick={()=>{ onChange(todayISO()); setOpen(false); }} className="flex-1 h-8 rounded-full bg-white/10 text-white text-[10px] font-black">HOJE</button><button onClick={()=>setOpen(false)} className="flex-1 h-8 rounded-full bg-white text-black text-[10px] font-black">OK</button></div>
-                </div></>
-            )}
+            {open && (<><div className="fixed inset-0 z-20" onClick={()=>setOpen(false)} /><div className="absolute z-30 mt-2 left-0 w-[290px] rounded-[20px] bg-[#0B0B0B] border border-white/10 p-4"><div className="flex items-center justify-between mb-3"><button onClick={()=>setViewDate(new Date(year, month-1, 1))} className="w-7 h-7 rounded-full bg-white/10 text-white flex items-center justify-center"><ChevronLeft size={14}/></button><p className="text-white font-black text-[12px] uppercase">{viewDate.toLocaleDateString('pt-PT',{month:'long'})} {year}</p><button onClick={()=>setViewDate(new Date(year, month+1, 1))} className="w-7 h-7 rounded-full bg-white/10 text-white flex items-center justify-center"><ChevronRight size={14}/></button></div><div className="grid grid-cols-7 gap-1 mb-1">{['D','S','T','Q','Q','S','S'].map((d,i)=><div key={i} className="text-[8px] text-white/30 text-center">{d}</div>)}</div><div className="grid grid-cols-7 gap-1">{days.map((d,i)=> d===null? <div key={i}/> : (<button key={i} onClick={()=>{ onChange(toISO(d)); setOpen(false); }} className={`h-8 rounded-full text-[11px] font-bold ${toISO(d)===value?'bg-white text-black': toISO(d)===todayISO()?'bg-[#0CC06B] text-white':'text-white/70 hover:bg-white/10'}`}>{d}</button>))}</div><div className="mt-3 flex gap-2"><button onClick={()=>{ onChange(todayISO()); setOpen(false); }} className="flex-1 h-8 rounded-full bg-white/10 text-white text-[10px] font-black">HOJE</button><button onClick={()=>setOpen(false)} className="flex-1 h-8 rounded-full bg-white text-black text-[10px] font-black">OK</button></div></div></>)}
         </div>
     )
 }
@@ -70,47 +56,57 @@ export function CaixaTab() {
     const [sangriaTipo, setSangriaTipo] = useState<"SANGRIA" | "SUPRIMENTO">("SANGRIA");
 
     const loadAll = async () => {
-        try {
-            const s = await apiFetch("/caixa/status").catch(()=>null);
-            setStatus(s);
-            const h = await apiFetch("/caixa/historico").catch(async()=> await apiFetch("/caixa/").catch(()=>[]));
-            setHistorico(Array.isArray(h)? h : []);
-            if (s?.aberto) {
-                const ext = await apiFetch("/caixa/extrato");
-                setExtrato(ext);
-            } else {
-                setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0, total_entradas: 0, total_saidas: 0 });
-            }
-        } catch {}
+        const s = await apiFetch("/caixa/status").catch(()=>null);
+        setStatus(s);
+        const h = await apiFetch("/caixa/historico").catch(async()=> await apiFetch("/caixa/").catch(()=>[]));
+        setHistorico(Array.isArray(h)? h : []);
+        if (s?.aberto) {
+            const ext = await apiFetch("/caixa/extrato");
+            setExtrato(ext);
+        } else {
+            setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0, total_entradas: 0, total_saidas: 0 });
+        }
     };
 
     useEffect(()=>{ (async()=>{ setLoading(true); await loadAll(); setLoading(false); })(); }, []);
 
+    const findCaixaForDate = (date: string) => {
+        // Se tem caixa aberto e a data selecionada é >= data que abriu, esse caixa vale pra essa data
+        if (status?.aberto && status?.caixa_atual?.aberto_em) {
+            const abertura = getDatePart(status.caixa_atual.aberto_em);
+            if (date >= abertura && date <= todayISO()) {
+                return status.caixa_atual;
+            }
+        }
+        // Senão procura no historico um caixa que abriu exatamente nessa data ou que estava aberto nessa data
+        return historico.find((c:any)=> {
+            const ab = getDatePart(c.aberto_em);
+            const fe = c.fechado_em? getDatePart(c.fechado_em) : todayISO();
+            return date >= ab && date <= fe;
+        }) || historico.find((c:any)=> getDatePart(c.aberto_em) === date);
+    };
+
     useEffect(()=>{
         (async()=>{
-            if (selectedDate === todayISO()) {
-                if (status?.aberto) {
-                    setLoading(true);
-                    const ext = await apiFetch("/caixa/extrato").catch(()=>null);
-                    if (ext) setExtrato(ext);
-                    setLoading(false);
-                }
-                return;
-            }
-            const caixaDoDia = historico.find((c:any)=> getDatePart(c.aberto_em) === selectedDate);
-            if (caixaDoDia) {
-                setLoading(true);
+            setLoading(true);
+            const caixaAlvo = findCaixaForDate(selectedDate);
+            if (caixaAlvo) {
                 try {
-                    const ext = await apiFetch(`/caixa/${caixaDoDia.id}/extrato`);
-                    setExtrato(ext);
+                    if (status?.aberto && caixaAlvo.id === status.caixa_atual.id) {
+                        const ext = await apiFetch("/caixa/extrato");
+                        setExtrato(ext);
+                    } else {
+                        const ext = await apiFetch(`/caixa/${caixaAlvo.id}/extrato`);
+                        setExtrato(ext);
+                    }
                 } catch {
                     setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0, total_entradas: 0, total_saidas: 0 });
                 }
-                setLoading(false);
             } else {
                 setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0, total_entradas: 0, total_saidas: 0 });
             }
             setPage(1);
+            setLoading(false);
         })();
     },[selectedDate, historico, status]);
 
@@ -118,7 +114,6 @@ export function CaixaTab() {
     const entradas = Number(extrato?.total_entradas || 0);
     const saidas = Math.abs(Number(extrato?.total_saidas || 0));
     const atual = Number(extrato?.saldo_atual || 0);
-
     const perPage = 10;
     const totalPages = Math.max(1, Math.ceil(movs.length / perPage));
     const paginados = useMemo(()=> movs.slice((page-1)*perPage, page*perPage), [movs, page]);
@@ -141,7 +136,7 @@ export function CaixaTab() {
             </div>
             <div className="bg-white rounded-[24px] p-5 border">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-black text-[12px]">Extrato • {movs.length} • {selectedDate.split('-').reverse().join('/')} {selectedDate===todayISO() && status?.aberto?"(ABERTO)":""}</h3>
+                    <h3 className="font-black text-[12px]">Extrato • {movs.length} • {selectedDate.split('-').reverse().join('/')}</h3>
                     <div className="flex items-center gap-1">
                         <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} className="w-7 h-7 rounded-full border flex items-center justify-center disabled:opacity-30"><ChevronLeft size={14}/></button>
                         <span className="text-[11px] font-bold px-2">{page}/{totalPages}</span>
@@ -149,7 +144,7 @@ export function CaixaTab() {
                     </div>
                 </div>
                 <div className="space-y-2 max-h-[420px] overflow-y-auto">
-                    {!movs.length? <p className="text-[11px] text-gray-400 text-center py-10">Sem movimentos em {selectedDate.split('-').reverse().join('/')} - {selectedDate===todayISO() && status?.aberto? "caixa ainda aberto, mas sem vendas ainda": "nenhum caixa aberto nesse dia"}</p> : paginados.map((m:any)=>(
+                    {!movs.length? <p className="text-[11px] text-gray-400 text-center py-10">Sem movimentos em {selectedDate.split('-').reverse().join('/')}</p> : paginados.map((m:any)=>(
                         <div key={m.id} className="flex items-center justify-between bg-[#F5F7FB] rounded-full px-4 py-3">
                             <div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center ${Number(m.valor)>0?'bg-[#0CC06B]':'bg-[#E53935]'} text-white`}>{Number(m.valor)>0?<TrendingUp size={12}/>:<TrendingDown size={12}/>}</div><div><p className="text-[11px] font-bold">{m.descricao}</p><p className="text-[9px] text-gray-500">{m.tipo}</p></div></div>
                             <span className={`text-[12px] font-black ${Number(m.valor)>0?'text-[#0CC06B]':'text-[#E53935]'}`}>Kz {fmt(Number(m.valor))}</span>
@@ -158,7 +153,7 @@ export function CaixaTab() {
                 </div>
             </div>
             <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={status?.caixa_atual || extrato} onClose={()=>setModalOpen(false)} onSuccess={async()=>{ await loadAll(); toast.success("Atualizado!"); }} />
-            <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={()=>setSangriaOpen(false)} onSuccess={async()=>{ if (selectedDate===todayISO()){ const ext = await apiFetch("/caixa/extrato").catch(()=>null); if(ext) setExtrato(ext); } else { const caixaDoDia = historico.find((c:any)=> getDatePart(c.aberto_em)===selectedDate); if(caixaDoDia){ const ext = await apiFetch(`/caixa/${caixaDoDia.id}/extrato`); setExtrato(ext);} } toast.success("Feito!"); }} />
+            <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={()=>setSangriaOpen(false)} onSuccess={async()=>{ await loadAll(); toast.success("Feito!"); }} />
         </div>
     )
 }
