@@ -1,36 +1,54 @@
-import { LayoutDashboard, UtensilsCrossed, ChefHat, Armchair, Receipt, Users, UserPlus, FileText, Shield, Lock, Camera, AlertTriangle } from "lucide-react";
+import {
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
+  Receipt,
+  BarChart3,
+  Users,
+  ClipboardList,
+  Armchair,
+  ChefHat,
+  DollarSign,
+  Settings,
+  Power
+} from "lucide-react";
 
 export type ModuleId = "restaurante" | "rh" | "seguranca" | "financeiro" | "empresa" | "dashboard";
 
 export const menuConfig: Record<ModuleId, { label: string; id: string; icon: any }[]> = {
   dashboard: [
-    { label: "Home", id: "home", icon: LayoutDashboard },
+    { label: "Dashboard", id: "home", icon: LayoutDashboard },
   ],
   restaurante: [
     { label: "Dashboard", id: "home", icon: LayoutDashboard },
-    { label: "Pedidos", id: "pedidos", icon: UtensilsCrossed },
-    { label: "Cardápio", id: "cardapio", icon: ChefHat },
+    { label: "Tela Vendas", id: "vendas", icon: ShoppingCart },
+    { label: "Pedidos", id: "pedidos", icon: ClipboardList },
     { label: "Mesas", id: "mesas", icon: Armchair },
-    { label: "Caixa", id: "financeiro", icon: Receipt },
+    { label: "Produtos", id: "produtos", icon: Package },
+    { label: "Cardápio", id: "cardapio", icon: ChefHat },
+    { label: "Funcionários", id: "funcionarios", icon: Users },
+    { label: "Caixa", id: "caixa", icon: Receipt },
+    { label: "Finanças", id: "financas", icon: DollarSign },
+    { label: "Relatórios", id: "relatorios", icon: BarChart3 },
   ],
   rh: [
     { label: "Dashboard", id: "home", icon: LayoutDashboard },
     { label: "Funcionários", id: "funcionarios", icon: Users },
-    { label: "Recrutamento", id: "recrutamento", icon: UserPlus },
-    { label: "Folha", id: "folha", icon: FileText },
   ],
   seguranca: [
-    { label: "Dashboard", id: "home", icon: Shield },
-    { label: "Acessos", id: "acessos", icon: Lock },
-    { label: "Câmeras", id: "cameras", icon: Camera },
-    { label: "Ocorrências", id: "ocorrencias", icon: AlertTriangle },
+    { label: "Dashboard", id: "home", icon: LayoutDashboard },
   ],
   financeiro: [
-    { label: "Dashboard", id: "home", icon: LayoutDashboard },
-    { label: "Caixa", id: "caixa", icon: Receipt },
-    { label: "Relatórios", id: "relatorios", icon: FileText },
+    { label: "Finanças", id: "financas", icon: DollarSign },
+    { label: "Relatórios", id: "relatorios", icon: BarChart3 },
   ],
   empresa: [
-    { label: "Empresas", id: "home", icon: LayoutDashboard },
+    { label: "Dashboard", id: "home", icon: LayoutDashboard },
   ],
 };
+
+// ícones fixos do rodapé
+export const bottomMenu = [
+  { label: "Config", id: "settings", icon: Settings },
+  { label: "Sair", id: "logout", icon: Power },
+];
