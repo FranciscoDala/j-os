@@ -61,11 +61,11 @@ export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, s
       </div>
 
       {loadingProd? (
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-          {[...Array(8)].map((_, i) => <div key={i} className="bg-white rounded-[22px] p-3 h-[198px] animate-pulse flex flex-col items-center"><div className="w-[118px] h-[118px] bg-gray-100 rounded-full" /><div className="h-3 bg-gray-100 rounded mt-3 w-3/4" /><div className="h-3 bg-gray-100 rounded w-1/2 mt-2" /></div>)}
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-[5px]">
+          {[...Array(10)].map((_, i) => <div key={i} className="bg-white rounded-[22px] p-3 h-[198px] animate-pulse flex flex-col items-center"><div className="w-[118px] h-[118px] bg-gray-100 rounded-full" /><div className="h-3 bg-gray-100 rounded mt-3 w-3/4" /><div className="h-3 bg-gray-100 rounded w-1/2 mt-2" /></div>)}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-3.5">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-[5px]">
           {filteredByCat.map(p => {
             const qty = getQty(p.id);
             const stockState = getStockState(p);
