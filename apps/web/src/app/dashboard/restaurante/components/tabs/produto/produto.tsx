@@ -107,7 +107,7 @@ export function ProdutosTab(){
   };
 
   return (
-    <div className="w-full space-y-3 relative">
+    <div className="w-full space-y-4 relative">
       <div className="fixed top-4 right-4 z-[999] flex flex-col gap-2 w-[340px] pointer-events-none">
         {toasts.map(t=>(
           <div key={t.id} className={`pointer-events-auto flex gap-2 items-start p-3 rounded-[14px] border backdrop-blur-xl shadow-2xl text-[12px] font-medium ${t.type==="success"?"bg-[#E8F5E9] border-green-200 text-green-800": t.type==="error"?"bg-[#FDECEA] border-red-200 text-red-800":"bg-white border-gray-200 text-gray-800"}`}>
@@ -132,20 +132,36 @@ export function ProdutosTab(){
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+      {/* CARDS ESTILO RAMEN - IGUAL PRINT */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
         {items.map(p=>(
-          <div key={p.id} className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-[18px] p-3 shadow-sm flex gap-3">
-            <img
-              src={getImgUrl(p.imagem_url)}
-              onError={(e)=> (e.currentTarget.src = FALLBACK_IMG)}
-              className="w-[72px] h-[72px] rounded-[12px] object-cover border-2 border-white shrink-0" alt={p.nome}/>
-            <div className="flex-1 min-w-0">
-              <div className="flex justify-between gap-2"><p className="font-bold text-[12px] truncate">{p.nome}</p><span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${p.ativo?"bg-[#E8F5E9] text-green-700":"bg-red-50 text-red-600"}`}>{p.ativo?"ATIVO":"INATIVO"}</span></div>
-              <p className="text-[10px] text-gray-500">{p.codigo} • {p.categoria||"Sem cat"} • {p.tipo}</p>
-              <p className="text-[11px] font-black mt-1">Kz {Number(p.preco_venda).toLocaleString()} {p.tem_iva?`+ ${p.iva}%`:""}</p>
-              <p className="text-[10px] text-gray-500">Stock: {p.stock_atual}</p>
-              <div className="flex gap-1.5 mt-2"><button onClick={()=>openEdit(p)} className="flex-1 bg-black/5 rounded-full py-1.5 flex justify-center"><Pencil size={12}/></button><button onClick={()=>handleDelete(p.id)} className="flex-1 bg-red-50 text-red-500 rounded-full py-1.5 flex justify-center"><Trash2 size={12}/></button></div>
+          <div key={p.id} className="group relative bg-white rounded-[28px] p-4 pt-5 pb-5 shadow-[0_10px_30px_rgba(0,0,0,0.06)] border border-white flex flex-col items-center text-center hover:shadow-[0_16px_40px_rgba(0,0,0,0.10)] hover:-translate-y-1 transition-all duration-300">
+            {/* botoes edit/delete no hover */}
+            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={()=>openEdit(p)} className="w-7 h-7 bg-black/80 backdrop-blur text-white rounded-full flex items-center justify-center"><Pencil size={12}/></button>
+              <button onClick={()=>handleDelete(p.id)} className="w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center"><Trash2 size={12}/></button>
             </div>
+
+            <div className="w-[110px] h-[110px] md:w-[125px] md:h-[125px] rounded-full p-[4px] bg-[#F5E6D3] shadow-inner">
+              <img
+                src={getImgUrl(p.imagem_url)}
+                onError={(e)=> (e.currentTarget.src = FALLBACK_IMG)}
+                className="w-full h-full rounded-full object-cover"
+                alt={p.nome}
+              />
+            </div>
+
+            <h3 className="mt-4 font-black text-[14px] md:text-[15px] leading-[1.1] text-black tracking-tight line-clamp-1">{p.nome}</h3>
+            <p className="mt-1 text-[10px] md:text-[11px] leading-[1.25] text-[#6B6B6B] h-[28px] line-clamp-2 px-1">
+              {p.descricao || p.categoria || p.codigo || "produto especial da casa"}
+            </p>
+
+            <div className="mt-3 bg-[#A67C52] text-white rounded-full px-5 py-[5px] flex items-baseline gap-1 shadow-sm">
+              <span className="text-[10px] font-bold opacity-90">$</span>
+              <span className="text-[15px] font-black tracking-wide">{Number(p.preco_venda).toLocaleString('en-US')}</span>
+            </div>
+
+            {!p.ativo && <span className="mt-2 text-[9px] px-2 py-0.5 rounded-full bg-red-50 text-red-500 font-bold">INATIVO</span>}
           </div>
         ))}
       </div>
