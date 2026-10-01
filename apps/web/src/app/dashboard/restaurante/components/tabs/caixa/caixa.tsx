@@ -10,7 +10,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com";
 const BASE = `${API_URL.replace(/\/$/, "")}/api/v1`;
 async function apiFetch(path: string, options: RequestInit = {}) {
     const token = localStorage.getItem("access_token");
-    const res = await fetch(`${BASE}${path}`, { ...options, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options.headers || {}) } });
+    const res = await fetch(`${BASE}${path}`, {...options, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`,...(options.headers || {}) } });
     const d = await res.json().catch(() => ({})); if (!res.ok) throw d; return d;
 }
 const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -32,22 +32,22 @@ export function CaixaTab() {
     useEffect(() => { fetchData() }, []);
     if (loading) return <div className="bg-white rounded-[22px] p-8 animate-pulse h-[300px]" />;
 
-    const aberto = !!caixa;
+    const aberto =!!caixa;
     const movs: any[] = extrato?.movimentos || [];
-    const inicial = Number(extrato?.saldo_inicial ?? caixa?.saldo_inicial ?? 0);
+    const inicial = Number(extrato?.saldo_inicial?? caixa?.saldo_inicial?? 0);
     const entradas = movs.filter((m: any) => {
         const tipo = (m.tipo || '').toUpperCase();
         const desc = (m.descricao || '').toLowerCase();
         const isVenda = tipo.includes('VENDA') || tipo === 'ENTRADA' || desc.includes('venda');
         const isAbertura = tipo.includes('ABERT') || desc.includes('abertura');
-        return isVenda && !isAbertura && Number(m.valor) > 0;
+        return isVenda &&!isAbertura && Number(m.valor) > 0;
     }).reduce((acc: any, m: any) => acc + Number(m.valor), 0);
     const saidas = movs.filter((m: any) => m.tipo?.toUpperCase().includes('SANGRIA') || Number(m.valor) < 0).reduce((acc: any, m: any) => acc + Math.abs(Number(m.valor)), 0);
     const atual = inicial + entradas - saidas;
 
     const nomeRestaurante = caixa?.restaurante_nome || "J-OS RESTAURANTE";
-    const dataAbertura = caixa?.aberto_em ? new Date(caixa.aberto_em).toLocaleDateString('pt-PT') : "10/2026";
-    const horaAbertura = caixa?.aberto_em ? new Date(caixa.aberto_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : "08:15";
+    const dataAbertura = caixa?.aberto_em? new Date(caixa.aberto_em).toLocaleDateString('pt-PT') : "10/2026";
+    const horaAbertura = caixa?.aberto_em? new Date(caixa.aberto_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : "08:15";
     const dataHoje = new Date().toLocaleDateString('pt-PT').slice(0, 5);
     const qtdVendas = movs.filter((m: any) => (m.tipo || '').toUpperCase().includes('VENDA')).length;
 
@@ -57,24 +57,24 @@ export function CaixaTab() {
 
             <div className="bg-white rounded-[24px] p-4 flex items-center justify-between border shadow-sm">
                 <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-full flex items-center justify-center ${aberto ? 'bg-[#0CC06B] text-white' : 'bg-black text-white'}`}>{aberto ? <Unlock size={18} /> : <Lock size={18} />}</div>
-                    <div><h2 className="font-black text-[13px]">{aberto ? 'Caixa Aberto' : 'Caixa Fechado'}</h2><p className="text-[10px] text-gray-500 flex items-center gap-1"><Clock size={11} />{aberto ? `${caixa.aberto_por_nome} • ${new Date(caixa.aberto_em).toLocaleString()}` : 'Abra o caixa'}</p></div>
+                    <div className={`w-11 h-11 rounded-full flex items-center justify-center ${aberto? 'bg-[#0CC06B] text-white' : 'bg-black text-white'}`}>{aberto? <Unlock size={18} /> : <Lock size={18} />}</div>
+                    <div><h2 className="font-black text-[13px]">{aberto? 'Caixa Aberto' : 'Caixa Fechado'}</h2><p className="text-[10px] text-gray-500 flex items-center gap-1"><Clock size={11} />{aberto? `${caixa.aberto_por_nome} • ${new Date(caixa.aberto_em).toLocaleString()}` : 'Abra o caixa'}</p></div>
                 </div>
-                {!aberto ? <button onClick={() => { setModalMode("abrir"); setModalOpen(true) }} className="px-6 py-2.5 bg-black text-white rounded-full text-[11px] font-black">Abrir Caixa</button> : <button onClick={() => { setModalMode("fechar"); setModalOpen(true) }} className="px-5 py-2 bg-white border rounded-full text-[11px] font-bold">Fechar</button>}
+                {!aberto? <button onClick={() => { setModalMode("abrir"); setModalOpen(true) }} className="px-6 py-2.5 bg-black text-white rounded-full text-[11px] font-black">Abrir Caixa</button> : <button onClick={() => { setModalMode("fechar"); setModalOpen(true) }} className="px-5 py-2 bg-white border rounded-full text-[11px] font-bold">Fechar</button>}
             </div>
 
             {aberto && (
                 <>
-                    {/* MOBILE: 1 CARD + SWIPE, DESKTOP: 3 COLS */}
-                    <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0 md:grid md:grid-cols-3 pb-2">
-                        <div className="min-w-[88%] snap-center md:min-w-0">
+                    {/* CELULAR: 100% WIDTH, SEM PONTINHA - DESKTOP: 3 COLS */}
+                    <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
+                        <div className="min-w-full w-full snap-center md:min-w-0 shrink-0">
                             <MasterCard atual={atual} nomeRestaurante={nomeRestaurante} dataAbertura={dataAbertura} horaAbertura={horaAbertura} />
                         </div>
-                        <div className="min-w-[88%] snap-center md:min-w-0">
+                        <div className="min-w-full w-full snap-center md:min-w-0 shrink-0">
                             <EntradasCard entradas={entradas} nome={nomeRestaurante} dataHoje={dataHoje} qtdVendas={qtdVendas} />
                         </div>
-                        <div className="min-w-[88%] snap-center md:min-w-0">
-                            <SaidasCard saidas={saidas} nome={nomeRestaurante} hora={horaAbertura} retirado={saidas > 0 ? '1' : '0'} />
+                        <div className="min-w-full w-full snap-center md:min-w-0 shrink-0">
+                            <SaidasCard saidas={saidas} nome={nomeRestaurante} hora={horaAbertura} retirado={saidas > 0? '1' : '0'} />
                         </div>
                     </div>
 
@@ -85,7 +85,7 @@ export function CaixaTab() {
                 </>
             )}
 
-            <div className="bg-white rounded-[24px] p-5 border shadow-sm"><h3 className="font-black text-[12px] mb-4">Extrato • {movs.length} movimentos</h3><div className="space-y-2 max-h-[420px] overflow-y-auto">{!movs.length ? <p className="text-[11px] text-gray-400 text-center py-10">Sem movimentos</p> : movs.map((m: any) => (<div key={m.id} className="flex items-center justify-between bg-[#F5F7FB] rounded-full px-4 py-3"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center ${Number(m.valor) > 0 ? 'bg-[#0CC06B]' : 'bg-[#E53935]'} text-white`}>{Number(m.valor) > 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}</div><div><p className="text-[11px] font-bold">{m.descricao}</p><p className="text-[9px] text-gray-500">{m.tipo}</p></div></div><span className={`text-[12px] font-black ${Number(m.valor) > 0 ? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>Kz {fmt(Number(m.valor))}</span></div>))}</div></div>
+            <div className="bg-white rounded-[24px] p-5 border shadow-sm"><h3 className="font-black text-[12px] mb-4">Extrato • {movs.length} movimentos</h3><div className="space-y-2 max-h-[420px] overflow-y-auto">{!movs.length? <p className="text-[11px] text-gray-400 text-center py-10">Sem movimentos</p> : movs.map((m: any) => (<div key={m.id} className="flex items-center justify-between bg-[#F5F7FB] rounded-full px-4 py-3"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center ${Number(m.valor) > 0? 'bg-[#0CC06B]' : 'bg-[#E53935]'} text-white`}>{Number(m.valor) > 0? <TrendingUp size={12} /> : <TrendingDown size={12} />}</div><div><p className="text-[11px] font-bold">{m.descricao}</p><p className="text-[9px] text-gray-500">{m.tipo}</p></div></div><span className={`text-[12px] font-black ${Number(m.valor) > 0? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>Kz {fmt(Number(m.valor))}</span></div>))}</div></div>
 
             <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={caixa} onClose={() => setModalOpen(false)} onSuccess={() => { fetchData(); toast.success("Atualizado!"); }} />
             <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={() => setSangriaOpen(false)} onSuccess={() => { fetchData(); toast.success("Feito!"); }} />
