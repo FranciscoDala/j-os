@@ -4,7 +4,7 @@ import { X, Plus, Minus, Search, Clock3, SlidersHorizontal, Delete, Banknote, Pr
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const API_BASE = `${API_URL}/api/v1/produtos`;
-const FALLBACK_IMG = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=400";
+const FALLBACK_IMG = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=200";
 
 const getImgUrl = (url?: string) => {
   if (!url) return FALLBACK_IMG;
@@ -27,7 +27,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
   const [recebido, setRecebido] = useState("");
   const [forma, setForma] = useState<"dinheiro" | "transferencia" | "tpa">("dinheiro");
 
-  // BUSCAR PRODUTOS REAIS
   useEffect(() => {
     const fetchReal = async () => {
       setLoadingProd(true);
@@ -97,7 +96,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
   }, [showPay, forma, recebidoNum, total, recebido]);
 
   const filteredByCat = activeCat === "All"? dbProducts : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
-  const displayProducts = filteredByCat;
 
   const imprimirFatura = () => {
     const win = window.open("", "_blank", "width=320,height=600");
@@ -105,7 +103,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const html = `
     <html><head><style>
       body{font-family:monospace;width:80mm;padding:10px;font-size:12px;color:#000}
-   .center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}
+  .center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}
       table{width:100%} td{padding:2px 0}
     </style></head><body>
       <div class="center bold">RESTAURANTE JENATH<br/>NIF: 123456789<br/>Talatona, Luanda<br/>${forma.toUpperCase()}</div>
@@ -150,38 +148,49 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-        {/* PRODUTOS - ÁREA AJUSTADA PARA DB REAL */}
+        {/* PRODUTOS COM MESMO DESIGN DO ProdutoCard */}
         <div className="flex-1 overflow-y-auto no-scrollbar bg-[#F5F7FB] p-3 md:p-5">
-          <div className="flex items-center justify-between mb-3"><h2 className="font-bold text-[14px]">Produtos do Stock</h2><span className="text-[11px] text-gray-500">{loadingProd? "carregando..." : `${displayProducts.length} produtos`}</span></div>
+          <div className="flex items-center justify-between mb-3"><h2 className="font-bold text-[14px]">Produtos do Stock</h2><span className="text-[11px] text-gray-500">{loadingProd? "carregando..." : `${filteredByCat.length} produtos`}</span></div>
 
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 mb-3">
-            {cats.map(c=><button key={c} onClick={()=>setActiveCat(c)} className={`whitespace-nowrap px-4 py-2 rounded-full text-[12px] border shrink-0 ${activeCat===c?"bg-black text-white border-black":"bg-white/80 text-gray-600 border-white/60"}`}>{c === ""? "Todas" : c}</button>)}
+            {cats.map(c=><button key={c} onClick={()=>setActiveCat(c)} className={`whitespace-nowrap px-4 py-2 rounded-full text-[12px] border shrink-0 ${activeCat===c?"bg-black text-white border-black":"bg-white/80 text-gray-600 border-white/60"}`}>{c===""?"Todas":c}</button>)}
             <button className="px-3 py-2 rounded-full bg-white border shrink-0"><SlidersHorizontal size={14}/></button>
           </div>
 
           {loadingProd? (
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-              {[...Array(8)].map((_,i)=><div key={i} className="bg-white rounded-[18px] p-2.5 h-[180px] animate-pulse"><div className="w-full h-[110px] bg-gray-100 rounded-[12px]"/><div className="h-3 bg-gray-100 rounded mt-3"/><div className="h-3 bg-gray-100 rounded w-1/2 mt-2"/></div>)}
+              {[...Array(8)].map((_,i)=><div key={i} className="bg-white rounded-[22px] p-3 h-[198px] animate-pulse flex flex-col items-center"><div className="w-[118px] h-[118px] bg-gray-100 rounded-full"/><div className="h-3 bg-gray-100 rounded mt-3 w-3/4"/><div className="h-3 bg-gray-100 rounded w-1/2 mt-2"/></div>)}
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-              {displayProducts.map(p=>{
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-3.5">
+              {filteredByCat.map(p=>{
                 const qty=getQty(p.id);
-                const avail = p.stock_atual?? p.quantidade?? 0;
                 return (
-                  <div key={p.id} className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-[18px] p-2.5 shadow-sm hover:shadow-md transition-all">
-                    <div className="relative">
-                      <img src={getImgUrl(p.imagem_url)} onError={(e)=>(e.currentTarget.src=FALLBACK_IMG)} className="w-full h-[110px] object-cover rounded-[12px] border-2 border-white" alt={p.nome}/>
-                      <span className="absolute top-2 left-2 bg-white/90 text-[10px] px-2 py-1 rounded-full border font-medium">Disp: {avail}</span>
+                  <div key={p.id} className="group relative bg-white rounded-[22px] p-2.5 pt-3 pb-3 md:p-3 md:pt-3.5 md:pb-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.06)] border border-white flex flex-col items-center text-center hover:shadow-[0_14px_36px_rgba(0,0,0,0.10)] hover:-translate-y-0.5 transition-all duration-300 overflow-hidden w-full">
+
+                    <div className="w-[122px] h-[122px] md:w-[118px] md:h-[118px] rounded-full p-[3px] bg-[#F5E6D3] shadow-inner shrink-0">
+                      <img src={getImgUrl(p.imagem_url)} onError={(e)=>(e.currentTarget.src=FALLBACK_IMG)} className="w-full h-full rounded-full object-cover" alt={p.nome} />
                     </div>
-                    <p className="font-semibold text-[12px] mt-2 truncate">{p.nome}</p>
-                    <p className="text-[10px] text-gray-400 truncate">{p.categoria || p.codigo}</p>
-                    <div className="flex justify-between items-center mt-2">
-                      <p className="text-[12px] font-black">Kz {Number(p.preco_venda).toLocaleString("de-DE")}</p>
-                      {qty===0
-                       ? <button onClick={()=>add(p)} className="bg-black text-white rounded-full px-3.5 py-1.5 text-[11px] active:scale-95">Add</button>
-                        : <div className="flex items-center gap-1 bg-black text-white rounded-full px-1 py-1"><button onClick={()=>sub(p)} className="w-5 h-5 bg-white/20 rounded-full flex justify-center items-center"><Minus size={12}/></button><span className="text-[11px] w-4 text-center">{qty}</span><button onClick={()=>add(p)} className="w-5 h-5 bg-white text-black rounded-full flex justify-center items-center"><Plus size={12}/></button></div>
-                      }
+
+                    <h3 className="mt-2.5 font-black text-[12.5px] md:text-[12px] leading-[1.15] text-black tracking-tight w-full px-1.5 break-words line-clamp-2">{p.nome}</h3>
+                    <p className="mt-1 text-[10px] leading-[1.15] text-[#6B6B6B] w-full px-2 h-[28px] md:h-[26px] line-clamp-2 overflow-hidden">{p.descricao || p.categoria || p.codigo}</p>
+
+                    <div className="mt-2 bg-[#A67C52] text-white rounded-full px-4 py-[4px] flex items-baseline gap-0.5 shadow-sm">
+                      <span className="text-[8px] font-bold opacity-90">Kz</span>
+                      <span className="text-[12.5px] font-black tracking-wide">{Number(p.preco_venda).toLocaleString('en-US')}</span>
+                    </div>
+
+                    {/* CONTROLE DE QTD ESTILO VENDA */}
+                    <div className="mt-2.5 w-full">
+                      {qty===0? (
+                        <button onClick={()=>add(p)} className="w-full h-8 bg-black text-white rounded-full text-[11px] font-bold hover:bg-zinc-800 active:scale-95 transition-all">Adicionar</button>
+                      ) : (
+                        <div className="w-full h-8 bg-black text-white rounded-full flex items-center justify-between px-1">
+                          <button onClick={()=>sub(p)} className="w-7 h-7 bg-white/15 rounded-full flex items-center justify-center hover:bg-white/25"><Minus size={12}/></button>
+                          <span className="text-[12px] font-black w-6 text-center">{qty}</span>
+                          <button onClick={()=>add(p)} className="w-7 h-7 bg-white text-black rounded-full flex items-center justify-center hover:bg-gray-100"><Plus size={12}/></button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
@@ -189,14 +198,12 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {!loadingProd && displayProducts.length===0 && (
-            <div className="text-center py-10 text-[13px] text-gray-400">Nenhum produto encontrado</div>
-          )}
+          {!loadingProd && filteredByCat.length===0 && <div className="text-center py-10 text-[13px] text-gray-400">Nenhum produto encontrado</div>}
         </div>
 
         <div className="w-full lg:w-[340px] bg-white/90 backdrop-blur-2xl border-t lg:border-l border-black/5 flex flex-col h-[42dvh] lg:h-auto shrink-0">
           <div className="p-4 flex justify-between items-center border-b border-black/5"><p className="font-bold text-[14px]">Seu pedido</p><span className="text-[11px] bg-black text-white px-3 py-1 rounded-full">{cart.length} itens</span></div>
-          <div className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-2">{cart.length===0&&<p className="text-center text-[12px] text-gray-400 mt-10">Nenhum item</p>}{cart.map(i=>(<div key={i.id} className="flex gap-3 bg-[#F8FAFF] border rounded-[14px] p-2.5"><img src={i.img} className="w-12 h-12 rounded-[10px] object-cover" style={{border:'2px solid #fff'}} alt=""/><div className="flex-1 min-w-0"><p className="font-semibold text-[12px] truncate">{i.name}</p><p className="text-[11px] text-gray-500">Kz {i.price.toLocaleString("de-DE")} x {i.qtd}</p></div><p className="font-bold text-[12px]">Kz {(i.price*i.qtd).toLocaleString("de-DE")}</p></div>))}</div>
+          <div className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-2">{cart.length===0&&<p className="text-center text-[12px] text-gray-400 mt-10">Nenhum item</p>}{cart.map(i=>(<div key={i.id} className="flex gap-3 bg-[#F8FAFF] border rounded-[14px] p-2.5"><img src={i.img} className="w-12 h-12 rounded-full object-cover border-2 border-white" alt=""/><div className="flex-1 min-w-0"><p className="font-semibold text-[12px] truncate">{i.name}</p><p className="text-[11px] text-gray-500">Kz {i.price.toLocaleString("de-DE")} x {i.qtd}</p></div><p className="font-bold text-[12px]">Kz {(i.price*i.qtd).toLocaleString("de-DE")}</p></div>))}</div>
 
           <div className="p-3 border-t bg-white/90 backdrop-blur-xl space-y-2.5">
             <div className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-[14px] p-2.5 shadow-sm">
@@ -221,45 +228,12 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
           <div className="w-full max-w-[400px] bg-white/95 backdrop-blur-2xl rounded-[22px] border border-white/60 shadow-2xl overflow-hidden">
             <div className="p-3.5 space-y-3">
               <div className="bg-[#F5F7FB] rounded-[14px] p-3 border border-black/5 space-y-2.5">
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] font-black tracking-wide uppercase text-gray-600">{forma}</span>
-                  <span className="font-black text-[14px]">Kz {total.toLocaleString("de-DE")}</span>
-                </div>
-                <div className="bg-white rounded-[12px] px-3 py-2.5 border flex justify-between items-center shadow-sm">
-                  <div><p className="text-[8px] text-gray-400 tracking-widest font-bold">VALOR RECEBIDO</p><p className="text-[18px] font-black leading-none mt-1">Kz {recebido||"0"}</p></div>
-                  <div className="w-8 h-8 bg-[#EEF4FF] rounded-full flex items-center justify-center"><Banknote size={14} className="text-[#2F4A8A]"/></div>
-                </div>
-                {forma==="dinheiro" && (
-                  <div className={`rounded-[12px] px-3 py-2 flex justify-between items-center border ${troco>=0?"bg-[#E8F5E9] border-green-200":"bg-[#FFEBEE] border-red-200"}`}>
-                    <span className="text-[10px] font-black">{troco>=0?"TROCO":"FALTA"}</span>
-                    <span className={`text-[13px] font-black ${troco>=0?"text-green-700":"text-red-600"}`}>Kz {Math.abs(troco).toLocaleString("de-DE")}</span>
-                  </div>
-                )}
+                <div className="flex justify-between items-center"><span className="text-[11px] font-black tracking-wide uppercase text-gray-600">{forma}</span><span className="font-black text-[14px]">Kz {total.toLocaleString("de-DE")}</span></div>
+                <div className="bg-white rounded-[12px] px-3 py-2.5 border flex justify-between items-center shadow-sm"><div><p className="text-[8px] text-gray-400 tracking-widest font-bold">VALOR RECEBIDO</p><p className="text-[18px] font-black leading-none mt-1">Kz {recebido||"0"}</p></div><div className="w-8 h-8 bg-[#EEF4FF] rounded-full flex items-center justify-center"><Banknote size={14} className="text-[#2F4A8A]"/></div></div>
+                {forma==="dinheiro" && (<div className={`rounded-[12px] px-3 py-2 flex justify-between items-center border ${troco>=0?"bg-[#E8F5E9] border-green-200":"bg-[#FFEBEE] border-red-200"}`}><span className="text-[10px] font-black">{troco>=0?"TROCO":"FALTA"}</span><span className={`text-[13px] font-black ${troco>=0?"text-green-700":"text-red-600"}`}>Kz {Math.abs(troco).toLocaleString("de-DE")}</span></div>)}
               </div>
-
-              {forma==="dinheiro" && (
-                <div className="grid grid-cols-4 gap-2">
-                  <button onClick={()=>handleCalc("7")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">7</button>
-                  <button onClick={()=>handleCalc("8")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">8</button>
-                  <button onClick={()=>handleCalc("9")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">9</button>
-                  <button onClick={()=>handleCalc("DEL")} className="h-[40px] rounded-[12px] bg-black text-white flex justify-center items-center active:scale-95"><Delete size={16}/></button>
-                  <button onClick={()=>handleCalc("4")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">4</button>
-                  <button onClick={()=>handleCalc("5")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">5</button>
-                  <button onClick={()=>handleCalc("6")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">6</button>
-                  <button onClick={()=>handleCalc("C")} className="h-[40px] rounded-[12px] bg-black text-white font-black text-[13px] active:scale-95">C</button>
-                  <button onClick={()=>handleCalc("1")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">1</button>
-                  <button onClick={()=>handleCalc("2")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">2</button>
-                  <button onClick={()=>handleCalc("3")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">3</button>
-                  <button onClick={()=>handleCalc("00")} className="h-[40px] rounded-[12px] bg-white/70 border shadow-sm font-bold text-[12px] active:scale-95">00</button>
-                  <button onClick={()=>handleCalc("0")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95 col-span-2">0</button>
-                  <button onClick={()=>handleCalc(".")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[16px] active:scale-95 col-span-2">.</button>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <button onClick={()=>setShowPay(false)} className="h-[40px] bg-[#EF4444] text-white rounded-full flex items-center justify-center active:scale-95"><X size={18}/></button>
-                <button disabled={forma==="dinheiro" && recebidoNum < total} onClick={()=>setShowConfirm(true)} className="h-[40px] bg-[#16A34A] disabled:bg-gray-300 text-white rounded-full flex items-center justify-center active:scale-95"><Check size={18}/></button>
-              </div>
+              {forma==="dinheiro" && (<div className="grid grid-cols-4 gap-2"><button onClick={()=>handleCalc("7")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">7</button><button onClick={()=>handleCalc("8")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">8</button><button onClick={()=>handleCalc("9")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">9</button><button onClick={()=>handleCalc("DEL")} className="h-[40px] rounded-[12px] bg-black text-white flex justify-center items-center active:scale-95"><Delete size={16}/></button><button onClick={()=>handleCalc("4")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">4</button><button onClick={()=>handleCalc("5")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">5</button><button onClick={()=>handleCalc("6")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">6</button><button onClick={()=>handleCalc("C")} className="h-[40px] rounded-[12px] bg-black text-white font-black text-[13px] active:scale-95">C</button><button onClick={()=>handleCalc("1")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">1</button><button onClick={()=>handleCalc("2")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">2</button><button onClick={()=>handleCalc("3")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95">3</button><button onClick={()=>handleCalc("00")} className="h-[40px] rounded-[12px] bg-white/70 border shadow-sm font-bold text-[12px] active:scale-95">00</button><button onClick={()=>handleCalc("0")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[14px] active:scale-95 col-span-2">0</button><button onClick={()=>handleCalc(".")} className="h-[40px] rounded-[12px] bg-white border shadow-sm font-bold text-[16px] active:scale-95 col-span-2">.</button></div>)}
+              <div className="grid grid-cols-2 gap-2.5"><button onClick={()=>setShowPay(false)} className="h-[40px] bg-[#EF4444] text-white rounded-full flex items-center justify-center active:scale-95"><X size={18}/></button><button disabled={forma==="dinheiro" && recebidoNum < total} onClick={()=>setShowConfirm(true)} className="h-[40px] bg-[#16A34A] disabled:bg-gray-300 text-white rounded-full flex items-center justify-center active:scale-95"><Check size={18}/></button></div>
             </div>
           </div>
         </div>
