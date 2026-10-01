@@ -38,7 +38,7 @@ export function ProdutoCard({ p, onEdit, onDelete }: Props) {
             </p>
 
             <div className="mt-2 bg-[#A67C52] text-white rounded-full px-4 py-[4px] flex items-baseline gap-0.5 shadow-sm">
-                <span className="text-[8px] font-bold opacity-90">$</span>
+                <span className="text-[8px] font-bold opacity-90">Kz</span>
                 <span className="text-[12.5px] font-black tracking-wide">{Number(p.preco_venda).toLocaleString('en-US')}</span>
             </div>
 
