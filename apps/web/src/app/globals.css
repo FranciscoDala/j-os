@@ -2,15 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  background: #5A8AD4;
-  font-family: "Zalando Sans Expanded", sans-serif;
-  
-  height: 100%;
-  overflow: hidden;
-  overscroll-behavior: none;
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #5A8AD4;
+    font-family: "Zalando Sans Expanded", sans-serif;
+
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
+/* ESCONDE TODO SCROLL DO SISTEMA */
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
