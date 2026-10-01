@@ -5,6 +5,7 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: #f5f8ff;
+  height: 100%;
   font-family: Inter, sans-serif;
+  background: #5A8AD4;
 }
