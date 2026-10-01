@@ -39,7 +39,7 @@ export function ProdutoCard({ p, onEdit, onDelete }: Props) {
     return (
         <div className={`
             group relative rounded-[22px] p-3 pt-4 pb-4 shadow-[0_8px_24px_rgba(0,0,0,0.06)] flex flex-col items-center text-center hover:shadow-[0_14px_36px_rgba(0,0,0,0.10)] hover:-translate-y-0.5 transition-all duration-300 overflow-hidden
-            w-full min-h-[250px]
+            w-full min-h-[230px]
             ${isZero? "bg-[#FFF5F5] border-2 border-red-200" : isLow? "bg-[#FFFBEB] border-2 border-amber-300" : "bg-white border border-white"}
         `}>
             <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
