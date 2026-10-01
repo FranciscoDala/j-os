@@ -15,23 +15,45 @@ async function apiFetch(path: string, options: RequestInit = {}) {
     const d = await res.json().catch(() => ({})); if (!res.ok) throw d; return d;
 }
 const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const todayISO = () => new Date().toISOString().slice(0,10);
+
+// DATA LOCAL - FIX FUSO LUANDA
+const todayISO = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+};
+const toLocalISO = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth()+1).padStart(2,'0');
+    const day = String(date.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+}
 
 function JCalendarPicker({ value, onChange }: { value: string, onChange: (v:string)=>void }) {
     const [open, setOpen] = useState(false);
-    const [viewDate, setViewDate] = useState(new Date(value+'T12:00:00'));
-    useEffect(()=>{ setViewDate(new Date(value+'T12:00:00')) }, [value]);
+    const [viewDate, setViewDate] = useState(()=>{
+        const [y,m,d] = value.split('-').map(Number);
+        return new Date(y, m-1, d);
+    });
+    useEffect(()=>{
+        const [y,m,d] = value.split('-').map(Number);
+        setViewDate(new Date(y, m-1, d));
+    }, [value]);
+
     const year = viewDate.getFullYear();
     const month = viewDate.getMonth();
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month+1, 0).getDate();
     const days = Array.from({length: firstDay}, ()=>null).concat(Array.from({length: daysInMonth}, (_,i)=>i+1));
-    const toISO = (d:number) => new Date(year, month, d).toISOString().slice(0,10);
+    const toISO = (d:number) => toLocalISO(new Date(year, month, d));
+
     return (
         <div className="relative">
             <button onClick={()=>setOpen(!open)} className="flex items-center gap-2 bg-black text-white rounded-full px-4 py-2 border">
                 <div className="w-6 h-6 rounded-full bg-white text-black flex items-center justify-center"><Calendar size={12}/></div>
-                <div className="text-left"><p className="text-[7px] text-white/40 font-black">DATA</p><p className="text-[11px] font-black -mt-1">{new Date(value+'T12:00:00').toLocaleDateString('pt-PT')}</p></div>
+                <div className="text-left"><p className="text-[7px] text-white/40 font-black">DATA</p><p className="text-[11px] font-black -mt-1">{value.split('-').reverse().join('/')}</p></div>
                 <ChevronRight size={10} className={`ml-1 opacity-50 ${open?'rotate-90':''}`} />
             </button>
             {open && (
@@ -74,59 +96,52 @@ export function CaixaTab() {
     const loadDia = async (date: string) => {
         setLoading(true);
         try {
-            // SÓ EXTRATO DO DIA - é daqui que vem tudo
             const ext = await apiFetch(`/caixa/extrato?data=${date}`);
             setExtrato(ext);
-        } catch (e:any) {
-            // fallback sem filtro se API não tiver data
-            try { const ext = await apiFetch("/caixa/extrato"); setExtrato(ext); }
-            catch { toast.error("Erro ao carregar"); setExtrato({movimentos:[]}); }
+        } catch {
+            // se API não tem filtro, busca tudo e filtra aqui
+            try {
+                const all = await apiFetch("/caixa/extrato");
+                setExtrato(all);
+            } catch {
+                setExtrato({movimentos:[]});
+            }
         } finally { setLoading(false); }
     };
 
     useEffect(()=>{ loadDia(selectedDate); setPage(1); }, [selectedDate]);
 
     const movs = useMemo(()=>{
-        const all = extrato?.movimentos || [];
-        // filtra só se o backend NÃO filtrou
-        const jaFiltrado = extrato?.data === selectedDate || extrato?.filtrado;
-        if (jaFiltrado) return all;
-        return all.filter((m:any)=>{
-            const d = (m.data || m.criado_em || m.created_at || "").toString().slice(0,10);
-            if (!d) return true;
+        const all = extrato?.movimentos || extrato?.data || [];
+        // SEMPRE filtra por data localmente para garantir
+        return (extrato?.movimentos || []).filter((m:any)=>{
+            const raw = (m.data || m.criado_em || m.created_at || "").toString();
+            const d = raw.slice(0,10); // já vem YYYY-MM-DD
+            if (!d) return false;
             return d === selectedDate;
         });
     }, [extrato, selectedDate]);
 
-    const { inicial, entradas, saidas, atual, qtdVendas } = useMemo(()=>{
-        if (!movs.length) return { inicial: 0, entradas: 0, saidas: 0, atual: 0, qtdVendas: 0 };
+    const { entradas, saidas, atual } = useMemo(()=>{
+        if (!movs.length) return { entradas: 0, saidas: 0, atual: 0, qtdVendas: 0, inicial: 0 };
 
-        // se backend já mandou totais, usa (mas só se tem movs)
-        if (extrato?.total_entradas!== undefined && movs.length) {
-            return {
-                inicial: Number(extrato.saldo_inicial||0),
-                entradas: Number(extrato.total_entradas||0),
-                saidas: Number(extrato.total_saidas||0),
-                atual: Number(extrato.saldo_atual?? (Number(extrato.saldo_inicial||0)+Number(extrato.total_entradas||0)-Number(extrato.total_saidas||0))),
-                qtdVendas: movs.filter((m:any)=> (m.tipo||"").toUpperCase().includes("VENDA")).length
-            }
-        }
-
-        // CALCULO CLIENT - SEM ABERTURA
         let ent = 0, sai = 0, ini = 0;
         movs.forEach((m:any)=>{
             const tipo = (m.tipo||"").toUpperCase();
             const valor = Number(m.valor||0);
             if (tipo.includes("ABERTURA") || tipo.includes("SALDO_INICIAL")) { ini += valor; return; }
-            if (valor > 0) ent += valor;
-            if (valor < 0) sai += Math.abs(valor);
-            if (tipo.includes("SANGRIA")) sai += Math.abs(valor);
+            if (tipo.includes("SANGRIA")) { sai += Math.abs(valor); return; }
+            if (tipo.includes("SUPRIMENTO")) { ent += Math.abs(valor); return; }
+            if (tipo.includes("VENDA") || tipo.includes("ENTRADA")) {
+                if (valor > 0) ent += valor;
+            } else {
+                if (valor > 0) ent += valor;
+                if (valor < 0) sai += Math.abs(valor);
+            }
         });
-        // se não achou saldo inicial, pega do extrato
-        if (ini===0) ini = Number(extrato?.saldo_inicial||0);
 
         return { inicial: ini, entradas: ent, saidas: sai, atual: ini+ent-sai, qtdVendas: movs.filter((m:any)=> (m.tipo||"").toUpperCase().includes("VENDA")).length };
-    }, [movs, extrato]);
+    }, [movs]);
 
     const perPage = 10;
     const totalPages = Math.max(1, Math.ceil(movs.length / perPage));
@@ -147,13 +162,13 @@ export function CaixaTab() {
 
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div className="min-w-full w-full snap-center md:min-w-0 shrink-0"><MasterCard atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={selectedDate.slice(5).replace("-","/")} horaAbertura={new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} /></div>
-                <div className="min-w-full w-full snap-center md:min-w-0 shrink-0"><EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={selectedDate.slice(5).replace("-","/")} qtdVendas={qtdVendas} /></div>
+                <div className="min-w-full w-full snap-center md:min-w-0 shrink-0"><EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={selectedDate.slice(5).replace("-","/")} qtdVendas={movs.filter((m:any)=>(m.tipo||"").toUpperCase().includes("VENDA")).length} /></div>
                 <div className="min-w-full w-full snap-center md:min-w-0 shrink-0"><SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} retirado={saidas>0?'1':'0'} /></div>
             </div>
 
             <div className="bg-white rounded-[24px] p-5 border">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-black text-[12px]">Extrato • {movs.length} movimentos • {new Date(selectedDate+'T12:00:00').toLocaleDateString('pt-PT')}</h3>
+                    <h3 className="font-black text-[12px]">Extrato • {movs.length} movimentos • {selectedDate.split('-').reverse().join('/')}</h3>
                     <div className="flex items-center gap-1">
                         <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} className="w-7 h-7 rounded-full border flex items-center justify-center disabled:opacity-30"><ChevronLeft size={14}/></button>
                         <span className="text-[11px] font-bold px-2">{page}/{totalPages}</span>
@@ -161,7 +176,7 @@ export function CaixaTab() {
                     </div>
                 </div>
                 <div className="space-y-2 max-h-[420px] overflow-y-auto">
-                    {!movs.length? <p className="text-[11px] text-gray-400 text-center py-10">Sem movimentos em {selectedDate}</p> : paginados.map((m:any)=>(
+                    {!movs.length? <p className="text-[11px] text-gray-400 text-center py-10">Sem movimentos em {selectedDate.split('-').reverse().join('/')}</p> : paginados.map((m:any)=>(
                         <div key={m.id} className="flex items-center justify-between bg-[#F5F7FB] rounded-full px-4 py-3">
                             <div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center ${Number(m.valor)>0?'bg-[#0CC06B]':'bg-[#E53935]'} text-white`}>{Number(m.valor)>0?<TrendingUp size={12}/>:<TrendingDown size={12}/>}</div><div><p className="text-[11px] font-bold">{m.descricao}</p><p className="text-[9px] text-gray-500">{m.tipo}</p></div></div>
                             <span className={`text-[12px] font-black ${Number(m.valor)>0?'text-[#0CC06B]':'text-[#E53935]'}`}>Kz {fmt(Number(m.valor))}</span>
