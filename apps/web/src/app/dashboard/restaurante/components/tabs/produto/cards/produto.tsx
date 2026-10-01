@@ -38,8 +38,8 @@ export function ProdutoCard({ p, onEdit, onDelete }: Props) {
 
     return (
         <div className={`
-            group relative rounded-[22px] p-3 pt-4 pb-4 shadow-[0_8px_24px_rgba(0,0,0,0.06)] flex flex-col items-center text-center hover:shadow-[0_14px_36px_rgba(0,0,0,0.10)] hover:-translate-y-0.5 transition-all duration-300 overflow-hidden
-            w-full min-h-[220px]
+            group relative rounded-[22px] p-2.5 pt-3 pb-3.5 md:p-3 md:pt-3.5 md:pb-4 shadow-[0_8px_24px_rgba(0,0,0,0.06)] flex flex-col items-center text-center hover:shadow-[0_14px_36px_rgba(0,0,0,0.10)] hover:-translate-y-0.5 transition-all duration-300 overflow-hidden
+            w-full select-none
             ${isZero? "bg-[#FFF5F5] border-2 border-red-200" : isLow? "bg-[#FFFBEB] border-2 border-amber-300" : "bg-white border border-white"}
         `}>
             <div className="absolute top-2.5 right-2.5 flex gap-[5px] opacity-0 group-hover:opacity-100 transition-opacity z-20">
@@ -47,13 +47,13 @@ export function ProdutoCard({ p, onEdit, onDelete }: Props) {
                 <button onClick={() => onDelete(p)} className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 shadow-lg"><Trash2 size={13} /></button>
             </div>
 
-            <div className="relative w-[140px] h-[140px] shrink-0">
-                <div className={`w-full h-full rounded-full p-[4px] shadow-inner ${borderBg}`}>
+            <div className="relative w-[122px] h-[122px] md:w-[118px] md:h-[118px] shrink-0">
+                <div className={`w-full h-full rounded-full p-[3px] shadow-inner ${borderBg}`}>
                     <img src={getImgUrl(p.imagem_url)} onError={(e) => (e.currentTarget.src = FALLBACK_IMG)} className={`w-full h-full rounded-full object-cover ${isZero? "grayscale" : ""}`} alt={p.nome} />
                 </div>
 
                 {p.controlar_stock && (
-                    <div className={`absolute -top-1 -left-1 w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black shadow-md border-2 border-white z-10 ${qtyCircleBg}`}>
+                    <div className={`absolute -top-1 -left-1 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shadow-md border-2 border-white z-10 ${qtyCircleBg}`}>
                         {atual}
                     </div>
                 )}
@@ -70,15 +70,15 @@ export function ProdutoCard({ p, onEdit, onDelete }: Props) {
                 )}
             </div>
 
-            <h3 className="mt-3 font-black text-[13px] leading-[1.15] text-black tracking-tight w-full px-2 break-words line-clamp-2">{p.nome}</h3>
+            <h3 className="mt-2.5 font-black text-[12.5px] md:text-[12px] leading-[1.15] text-black tracking-tight w-full px-1.5 break-words line-clamp-2">{p.nome}</h3>
 
-            <p className="mt-1 text-[11px] leading-[1.15] text-[#6B6B6B] w-full px-2 h-[28px] line-clamp-2 overflow-hidden">
+            <p className="mt-1 text-[10px] leading-[1.15] text-[#6B6B6B] w-full px-2 h-[28px] md:h-[26px] line-clamp-2 overflow-hidden">
                 {p.descricao || p.categoria || p.codigo}
             </p>
 
-            <div className={`mt-3 text-white rounded-full px-4 py-[5px] flex items-baseline gap-0.5 shadow-sm ${isZero? "bg-gray-400" : isLow? "bg-amber-500" : "bg-[#A67C52]"}`}>
-                <span className="text-[9px] font-bold opacity-90">Kz</span>
-                <span className="text-[13px] font-black tracking-wide">{Number(p.preco_venda).toLocaleString('en-US')}</span>
+            <div className={`mt-2.5 text-white rounded-full px-4 py-[4px] flex items-baseline gap-0.5 shadow-sm ${isZero? "bg-gray-400" : isLow? "bg-amber-500" : "bg-[#A67C52]"}`}>
+                <span className="text-[8px] font-bold opacity-90">Kz</span>
+                <span className="text-[12.5px] font-black tracking-wide">{Number(p.preco_venda).toLocaleString('en-US')}</span>
             </div>
 
             {!p.ativo && <span className="mt-1.5 text-[7px] px-2 py-0.5 rounded-full bg-red-50 text-red-500 font-bold">INATIVO</span>}
