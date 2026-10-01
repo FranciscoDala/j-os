@@ -7,7 +7,16 @@ const API_BASE = `${API_URL}/api/v1/produtos`;
 const TIPOS = ["GENERAL","RESTAURANT_DISH","RESTAURANT_INGREDIENT","RESTAURANT_DRINK","SERVICE","KIT"];
 const UNIDADES = ["UNIT","UN","KG","LITER","PORTION","HOUR","DAY","TASK"];
 const MODAL_TABS = ["Geral","Preços","Stock","Cozinha","Códigos"];
+const FALLBACK_IMG = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=200";
 type Toast = { id:string; msg:string; type:"success"|"error"|"info" };
+
+const getImgUrl = (url?: string)=>{
+  if(!url) return FALLBACK_IMG;
+  if(url.startsWith("blob:")) return url;
+  if(url.startsWith("http")) return url;
+  if(url.startsWith("/media")) return `${API_URL}${url}`;
+  return url;
+};
 
 export function ProdutosTab(){
   const [items, setItems] = useState<any[]>([]);
@@ -81,10 +90,10 @@ export function ProdutosTab(){
       const r = await fetch(url, { method, headers:{ Authorization:`Bearer ${token}` }, body: fd });
       const data = await r.json().catch(async()=>({detail: await r.text()}));
       if(r.ok){
-        pushToast(editId? "Produto atualizado com sucesso!" : `Produto ${form.nome} criado!`, "success");
+        pushToast(editId? "Produto atualizado!" : `Produto ${form.nome} criado!`, "success");
         setOpen(false); resetForm(); fetchProds();
       } else {
-        pushToast(data.detail || "Erro ao salvar produto", "error");
+        pushToast(data.detail || "Erro ao salvar", "error");
       }
     }catch{ pushToast("Erro de rede ao salvar", "error"); }
   };
@@ -93,7 +102,7 @@ export function ProdutosTab(){
     if(!confirm("Apagar produto?")) return;
     const token = localStorage.getItem("access_token");
     const r = await fetch(`${API_BASE}/${id}`, { method:"DELETE", headers:{ Authorization:`Bearer ${token}` }});
-    if(r.ok){ pushToast("Produto apagado com sucesso", "success"); fetchProds(); }
+    if(r.ok){ pushToast("Produto apagado", "success"); fetchProds(); }
     else pushToast("Erro ao apagar", "error");
   };
 
@@ -126,7 +135,10 @@ export function ProdutosTab(){
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {items.map(p=>(
           <div key={p.id} className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-[18px] p-3 shadow-sm flex gap-3">
-            <img src={p.imagem_url? (p.imagem_url.startsWith("/media")? `${API_URL}${p.imagem_url}` : p.imagem_url) : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=200"} className="w-[72px] h-[72px] rounded-[12px] object-cover border-2 border-white shrink-0" alt=""/>
+            <img
+              src={getImgUrl(p.imagem_url)}
+              onError={(e)=> (e.currentTarget.src = FALLBACK_IMG)}
+              className="w-[72px] h-[72px] rounded-[12px] object-cover border-2 border-white shrink-0" alt={p.nome}/>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between gap-2"><p className="font-bold text-[12px] truncate">{p.nome}</p><span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${p.ativo?"bg-[#E8F5E9] text-green-700":"bg-red-50 text-red-600"}`}>{p.ativo?"ATIVO":"INATIVO"}</span></div>
               <p className="text-[10px] text-gray-500">{p.codigo} • {p.categoria||"Sem cat"} • {p.tipo}</p>
@@ -149,7 +161,9 @@ export function ProdutosTab(){
               {tab==="Geral" && (
                 <div className="space-y-3">
                   <div className="flex gap-3">
-                    <div className="w-[80px] h-[80px] bg-[#F5F7FB] rounded-[12px] border overflow-hidden flex items-center justify-center shrink-0">{preview? <img src={preview.startsWith("/media")? `${API_URL}${preview}` : preview} className="w-full h-full object-cover" alt=""/> : <Upload size={18} className="text-gray-400"/>}</div>
+                    <div className="w-[80px] h-[80px] bg-[#F5F7FB] rounded-[12px] border overflow-hidden flex items-center justify-center shrink-0">
+                      <img src={getImgUrl(preview)} onError={(e)=> e.currentTarget.style.display='none'} className="w-full h-full object-cover" alt=""/>
+                    </div>
                     <div className="flex-1 space-y-2">
                       <input value={form.nome} onChange={e=>setForm({...form, nome:e.target.value})} placeholder="Nome *" className="w-full bg-[#F5F7FB] border rounded-full px-4 py-2.5 text-[13px] outline-none"/>
                       <input value={form.codigo} onChange={e=>setForm({...form, codigo:e.target.value})} placeholder="Código interno *" className="w-full bg-[#F5F7FB] border rounded-full px-4 py-2.5 text-[13px] outline-none"/>

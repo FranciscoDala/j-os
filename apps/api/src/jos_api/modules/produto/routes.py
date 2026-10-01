@@ -4,18 +4,16 @@ import uuid
 from typing import List, Optional
 from decimal import Decimal
 import logging
-import shutil
-from pathlib import Path
 from jos_api.db.session import get_db
 from jos_api.modules.produto.schemas import ProdutoCreateRequest, ProdutoResponse, ProdutoUpdateRequest, BaixaStockRequest
 from jos_api.modules.produto.models import ProductType, ProductUnit
 from jos_api.modules.produto import service as produto_service
 from jos_api.core.deps import get_current_user, precisa_modulo
 from jos_api.modules.auth.models import User
+from jos_api.core.uploadImagem import upload_image
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/produtos", tags=["Produtos"])
-MEDIA_ROOT = Path("media/produtos")
 
 def _parse_tipo(tipo_str: str) -> ProductType:
     try: return ProductType(tipo_str)
@@ -33,20 +31,10 @@ def _parse_bool(v) -> bool:
     if isinstance(v, str): return v.lower() in ("true","1","t","yes","on","sim")
     return bool(v)
 
-def _save_upload_file(imagem: UploadFile, empresa_id: uuid.UUID) -> str:
-    folder = MEDIA_ROOT / str(empresa_id); folder.mkdir(parents=True, exist_ok=True)
-    ext = Path(imagem.filename or "jpg").suffix or ".jpg"
-    filename = f"{uuid.uuid4().hex}{ext}"; file_path = folder / filename
-    with open(file_path, "wb") as buffer: shutil.copyfileobj(imagem.file, buffer)
-    try: imagem.file.close()
-    except: pass
-    return f"/media/produtos/{empresa_id}/{filename}"
-
 async def _try_upload(imagem: UploadFile | None, empresa_id: uuid.UUID | None) -> str | None:
     if not imagem or not empresa_id or not imagem.filename: return None
-    size = getattr(imagem, "size", None)
-    if size and size > 5 * 1024 * 1024: raise HTTPException(400, "Imagem muito grande, max 5MB")
-    return _save_upload_file(imagem, empresa_id)
+    # teu uploader já valida 2MB, imghdr e salva em j-os/{empresa_id}/produtos
+    return await upload_image(imagem, str(empresa_id), folder="produtos")
 
 def _get_empresa_id_from_perfil(perfil_data) -> uuid.UUID:
     eid = perfil_data.get("empresa_id")
@@ -173,7 +161,7 @@ async def atualizar_produto(
     if prep_time is not None: update_data["prep_time"] = prep_time
     if kitchen_station is not None: update_data["kitchen_station"] = kitchen_station
     if is_modifiable is not None: update_data["is_modifiable"] = _parse_bool(is_modifiable)
-    if imagem:
+    if imagem and imagem.filename:
         url = await _try_upload(imagem, empresa_id)
         if url: update_data["imagem_url"] = url
     return produto_service.update_produto(db, produto_id, ProdutoUpdateRequest(**update_data), empresa_id, user_id=current_user.id, user_nome=_get_nome(current_user, perfil_data), ip=_get_ip(request))
