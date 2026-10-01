@@ -30,8 +30,7 @@ def _parse_unidade(unidade_str: str) -> ProductUnit:
 def _parse_bool(v) -> bool:
     if isinstance(v, bool): return v
     if v is None: return False
-    if isinstance(v, str):
-        return v.lower() in ("true","1","t","yes","on","sim")
+    if isinstance(v, str): return v.lower() in ("true","1","t","yes","on","sim")
     return bool(v)
 
 def _save_upload_file(imagem: UploadFile, empresa_id: uuid.UUID) -> str:
@@ -118,28 +117,18 @@ async def criar_produto(
         empresa_id = _get_empresa_id_from_perfil(perfil_data)
         imagem_url = await _try_upload(imagem, empresa_id)
         produto_data = ProdutoCreateRequest(
-            nome=nome.strip(),
-            codigo=codigo.strip(),
+            nome=nome.strip(), codigo=codigo.strip(),
             preco_venda=Decimal(str(preco_venda)),
-            tipo=_parse_tipo(tipo),
-            unidade=_parse_unidade(unidade),
-            ativo=_parse_bool(ativo),
-            controlar_stock=_parse_bool(controlar_stock),
-            stock_atual=Decimal(str(stock_atual)),
-            stock_minimo=Decimal(str(stock_minimo)),
+            tipo=_parse_tipo(tipo), unidade=_parse_unidade(unidade),
+            ativo=_parse_bool(ativo), controlar_stock=_parse_bool(controlar_stock),
+            stock_atual=Decimal(str(stock_atual)), stock_minimo=Decimal(str(stock_minimo)),
             preco_custo=Decimal(str(preco_custo)),
-            codigo_barras=codigo_barras,
-            codigo_qr=codigo_qr,
-            descricao=descricao,
-            categoria=categoria,
-            iva=Decimal(str(iva)),
-            tem_iva=_parse_bool(tem_iva),
-            peso=peso,
-            imagem_url=imagem_url,
-            prep_time=prep_time,
-            kitchen_station=kitchen_station,
-            is_modifiable=_parse_bool(is_modifiable),
-            service_duration=service_duration,
+            codigo_barras=codigo_barras, codigo_qr=codigo_qr,
+            descricao=descricao, categoria=categoria,
+            iva=Decimal(str(iva)), tem_iva=_parse_bool(tem_iva),
+            peso=peso, imagem_url=imagem_url,
+            prep_time=prep_time, kitchen_station=kitchen_station,
+            is_modifiable=_parse_bool(is_modifiable), service_duration=service_duration,
         )
         return produto_service.create_produto(db, produto_data, empresa_id, current_user.id, criado_por_nome=_get_nome(current_user, perfil_data), ip=_get_ip(request))
     except HTTPException:
@@ -148,27 +137,20 @@ async def criar_produto(
         logger.exception("Erro criar produto")
         raise HTTPException(500, f"Erro ao criar produto: {str(e)}")
 
-
 @router.put("/{produto_id}", response_model=ProdutoResponse)
 async def atualizar_produto(
-    request: Request,
-    produto_id: uuid.UUID,
-    nome: Optional[str] = Form(None),
-    codigo: Optional[str] = Form(None),
-    preco_venda: Optional[float] = Form(None),
-    tipo: Optional[str] = Form(None),
-    ativo: Optional[str] = Form(None),
-    controlar_stock: Optional[str] = Form(None),
-    stock_atual: Optional[float] = Form(None),
-    codigo_barras: Optional[str] = Form(None),
-    codigo_qr: Optional[str] = Form(None),
-    descricao: Optional[str] = Form(None),
-    categoria: Optional[str] = Form(None),
-    iva: Optional[float] = Form(None),
-    tem_iva: Optional[str] = Form(None),
+    request: Request, produto_id: uuid.UUID,
+    nome: Optional[str] = Form(None), codigo: Optional[str] = Form(None),
+    preco_venda: Optional[float] = Form(None), tipo: Optional[str] = Form(None),
+    ativo: Optional[str] = Form(None), controlar_stock: Optional[str] = Form(None),
+    stock_atual: Optional[float] = Form(None), stock_minimo: Optional[float] = Form(None),
+    codigo_barras: Optional[str] = Form(None), codigo_qr: Optional[str] = Form(None),
+    descricao: Optional[str] = Form(None), categoria: Optional[str] = Form(None),
+    iva: Optional[float] = Form(None), tem_iva: Optional[str] = Form(None),
+    peso: Optional[float] = Form(None), prep_time: Optional[int] = Form(None),
+    kitchen_station: Optional[str] = Form(None), is_modifiable: Optional[str] = Form(None),
     imagem: Optional[UploadFile] = File(None),
-    db: Session = Depends(get_db),
-    perfil_data = Depends(precisa_modulo("caixa")),
+    db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")),
     current_user: User = Depends(get_current_user)
 ):
     empresa_id = _get_empresa_id_from_perfil(perfil_data)
@@ -180,18 +162,21 @@ async def atualizar_produto(
     if ativo is not None: update_data["ativo"] = _parse_bool(ativo)
     if controlar_stock is not None: update_data["controlar_stock"] = _parse_bool(controlar_stock)
     if stock_atual is not None: update_data["stock_atual"] = Decimal(str(stock_atual))
+    if stock_minimo is not None: update_data["stock_minimo"] = Decimal(str(stock_minimo))
     if codigo_barras is not None: update_data["codigo_barras"] = codigo_barras
     if codigo_qr is not None: update_data["codigo_qr"] = codigo_qr
     if descricao is not None: update_data["descricao"] = descricao
     if categoria is not None: update_data["categoria"] = categoria
     if iva is not None: update_data["iva"] = Decimal(str(iva))
     if tem_iva is not None: update_data["tem_iva"] = _parse_bool(tem_iva)
+    if peso is not None: update_data["peso"] = peso
+    if prep_time is not None: update_data["prep_time"] = prep_time
+    if kitchen_station is not None: update_data["kitchen_station"] = kitchen_station
+    if is_modifiable is not None: update_data["is_modifiable"] = _parse_bool(is_modifiable)
     if imagem:
         url = await _try_upload(imagem, empresa_id)
         if url: update_data["imagem_url"] = url
     return produto_service.update_produto(db, produto_id, ProdutoUpdateRequest(**update_data), empresa_id, user_id=current_user.id, user_nome=_get_nome(current_user, perfil_data), ip=_get_ip(request))
-
-
 
 @router.delete("/{produto_id}")
 def delete_produto(request: Request, produto_id: uuid.UUID, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user)):
