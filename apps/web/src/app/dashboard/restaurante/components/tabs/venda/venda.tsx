@@ -46,12 +46,10 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="h-full w-full flex flex-col bg-[#F5F7FB] overflow-hidden">
-      {/* HEADER */}
       <div className="h-[60px] px-4 md:px-6 flex items-center justify-between bg-white/80 backdrop-blur-xl border-b border-black/5 shrink-0">
         <div className="flex items-center gap-3">
           <button onClick={onClose} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center"><X size={15}/></button>
           <p className="font-black text-[14px]">Restaurante PDV</p>
-          <span className="hidden md:flex items-center gap-1 text-[11px] bg-black/5 px-3 py-1 rounded-full"><Clock3 size={12}/>12:10:09</span>
         </div>
         <div className="hidden md:flex bg-[#EEF2F8] rounded-full px-4 py-2 items-center gap-2 w-[240px]"><Search size={14} className="text-gray-400"/><input placeholder="Buscar prato..." className="bg-transparent outline-none text-[12px] w-full"/></div>
       </div>
@@ -62,7 +60,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 mb-5">
             {filtered.slice(0,4).map(p=>{
               const qty=getQty(p.id);
-              return (<div key={p.id} className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-[16px] p-2 shadow-sm"><div className="relative"><img src={p.img} className="w-full h-[90px] object-cover rounded-[10px]" style={{border:'2px solid #fff'}} alt=""/><span className="absolute top-1.5 left-1.5 bg-white/90 text-[9px] px-2 py-0.5 rounded-full border">Available: {p.avail}</span></div><p className="font-semibold text-[11px] mt-2 truncate">{p.name}</p><div className="flex justify-between items-center mt-1.5"><p className="text-[11px] font-black">Rp {p.price.toLocaleString("de-DE")}</p>{qty===0?<button onClick={()=>add(p)} className="bg-black text-white rounded-full px-3 py-1 text-[10px]">Order</button>:<div className="flex items-center gap-1 bg-black text-white rounded-full px-1 py-0.5"><button onClick={()=>sub(p)} className="w-5 h-5 bg-white/20 rounded-full flex justify-center items-center"><Minus size={10}/></button><span className="text-[10px] w-3 text-center">{qty}</span><button onClick={()=>add(p)} className="w-5 h-5 bg-white text-black rounded-full flex justify-center items-center"><Plus size={10}/></button></div>}</div></div>)
+              return (<div key={p.id} className="bg-white/90 border border-white/60 rounded-[16px] p-2 shadow-sm"><div className="relative"><img src={p.img} className="w-full h-[90px] object-cover rounded-[10px]" style={{border:'2px solid #fff'}} alt=""/><span className="absolute top-1.5 left-1.5 bg-white/90 text-[9px] px-2 py-0.5 rounded-full border">Available: {p.avail}</span></div><p className="font-semibold text-[11px] mt-2 truncate">{p.name}</p><div className="flex justify-between items-center mt-1.5"><p className="text-[11px] font-black">Rp {p.price.toLocaleString("de-DE")}</p>{qty===0?<button onClick={()=>add(p)} className="bg-black text-white rounded-full px-3 py-1 text-[10px]">Order</button>:<div className="flex items-center gap-1 bg-black text-white rounded-full px-1 py-0.5"><button onClick={()=>sub(p)} className="w-5 h-5 bg-white/20 rounded-full flex justify-center items-center"><Minus size={10}/></button><span className="text-[10px] w-3 text-center">{qty}</span><button onClick={()=>add(p)} className="w-5 h-5 bg-white text-black rounded-full flex justify-center items-center"><Plus size={10}/></button></div>}</div></div>)
             })}
           </div>
           <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2 mb-2">{cats.map(c=><button key={c} onClick={()=>setActiveCat(c==="All"?"All":c.split(" ")[0])} className={`whitespace-nowrap px-3.5 py-1.5 rounded-full text-[11px] border shrink-0 ${activeCat.startsWith(c.split(" ")[0])||c==="All"&&activeCat==="All"?"bg-black text-white border-black":"bg-white/80 text-gray-600 border-white/60"}`}>{c}</button>)}<button className="px-2.5 py-1.5 rounded-full bg-white border shrink-0"><SlidersHorizontal size={12}/></button></div>
@@ -81,66 +79,77 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      {/* MODAL CALCULADORA - COMPRIMIDA E CENTRALIZADA */}
+      {/* MODAL PAGAMENTO - 400PX CENTRALIZADO */}
       {showPay && (
         <div className="absolute inset-0 z-[200] bg-black/30 backdrop-blur-md flex items-center justify-center p-3">
-          <div className="w-full max-w-[320px] bg-white rounded-[20px] shadow-2xl border border-white/50 overflow-hidden max-h-[92dvh] flex flex-col">
-            {/* header compacto */}
-            <div className="px-4 py-3 flex justify-between items-center border-b border-black/5 shrink-0">
-              <div><p className="font-bold text-[13px] leading-none">Pagamento</p><p className="text-[10px] text-gray-500 mt-1">Digite o valor recebido</p></div>
-              <button onClick={()=>setShowPay(false)} className="w-7 h-7 bg-black/5 rounded-full flex items-center justify-center"><X size={14}/></button>
+          <div className="w-full max-w-[400px] bg-white rounded-[22px] shadow-2xl border border-white/60 overflow-hidden flex flex-col max-h-[92dvh]">
+            <div className="px-5 py-4 flex justify-between items-center border-b border-black/5 shrink-0">
+              <div><p className="font-bold text-[14px]">Pagamento</p><p className="text-[11px] text-gray-500">Digite o valor recebido</p></div>
+              <button onClick={()=>setShowPay(false)} className="w-8 h-8 bg-black/5 rounded-full flex items-center justify-center"><X size={14}/></button>
             </div>
 
-            <div className="p-3 space-y-2.5 overflow-y-auto no-scrollbar">
-              <div className="bg-[#F5F7FB] rounded-[14px] p-2.5 space-y-2 border border-black/5">
-                <div className="flex justify-between items-center px-1"><span className="text-[11px] text-gray-500">Valor a Pagar</span><span className="font-black text-[13px]">Rp {total.toLocaleString("de-DE")}</span></div>
-                <div className="bg-white rounded-[10px] p-2.5 border flex justify-between items-center">
-                  <div><p className="text-[8px] text-gray-400 tracking-widest">VALOR RECEBIDO</p><p className="text-[18px] font-black leading-none mt-0.5">Rp {recebido||"0"}</p></div>
-                  <div className="w-8 h-8 bg-[#EEF4FF] rounded-full flex items-center justify-center"><Banknote size={14} className="text-[#2F4A8A]"/></div>
+            <div className="p-4 space-y-3 overflow-y-auto no-scrollbar">
+              <div className="bg-[#F5F7FB] rounded-[14px] p-3 space-y-2.5 border border-black/5">
+                <div className="flex justify-between items-center px-1"><span className="text-[12px] text-gray-500">Valor a Pagar</span><span className="font-black text-[14px]">Rp {total.toLocaleString("de-DE")}</span></div>
+                <div className="bg-white rounded-[12px] p-3 border flex justify-between items-center">
+                  <div><p className="text-[9px] text-gray-400 tracking-widest">VALOR RECEBIDO</p><p className="text-[20px] font-black leading-none mt-1">Rp {recebido||"0"}</p></div>
+                  <div className="w-9 h-9 bg-[#EEF4FF] rounded-full flex items-center justify-center"><Banknote size={16} className="text-[#2F4A8A]"/></div>
                 </div>
-                <div className={`rounded-[10px] px-3 py-2 flex justify-between items-center border ${troco>=0?"bg-[#E8F5E9] border-green-200":"bg-[#FFEBEE] border-red-200"}`}>
-                  <span className="text-[10px] font-bold">{troco>=0?"TROCO":"FALTA"}</span>
-                  <span className={`text-[14px] font-black ${troco>=0?"text-green-700":"text-red-600"}`}>Rp {Math.abs(troco).toLocaleString("de-DE")}</span>
+                <div className={`rounded-[12px] px-3 py-2.5 flex justify-between items-center border ${troco>=0?"bg-[#E8F5E9] border-green-200":"bg-[#FFEBEE] border-red-200"}`}>
+                  <span className="text-[11px] font-bold">{troco>=0?"TROCO":"FALTA"}</span>
+                  <span className={`text-[16px] font-black ${troco>=0?"text-green-700":"text-red-600"}`}>Rp {Math.abs(troco).toLocaleString("de-DE")}</span>
                 </div>
               </div>
 
-              {/* CALCULADORA COMPACTA */}
-              <div className="grid grid-cols-4 gap-2">
-                {["7","8","9","DEL","4","5","6","C","1","2","3","00","0",".","+5k","+10k"].map(k=>{
+              <div className="grid grid-cols-4 gap-2.5">
+                {[
+                  "7","8","9","DEL",
+                  "4","5","6","C",
+                  "1","2","3","00",
+                  "0",".","0-sp2","00-sp2"
+                ].map((k,i)=>{
+                  if(k.includes("-sp2")) return null;
                   const isAction = ["DEL","C"].includes(k);
-                  const isQuick = k.includes("k");
+                  const isZero = k==="0";
                   return (
-                    <button key={k} onClick={()=>{
-                      if(isQuick){ const addVal = k==="+5k"?5000:10000; setRecebido(s=>String((Number(s||0)+addVal))); }
-                      else handleCalc(k);
-                    }} className={`h-[40px] rounded-[10px] font-bold text-[13px] active:scale-95 border ${isAction?"bg-black text-white border-black": isQuick?"bg-[#FFE86A] border-[#FFE86A] text-black text-[11px]":"bg-white border-black/10"}`}>
-                      {k==="DEL"?<Delete size={14} className="mx-auto"/>:k}
+                    <button key={`${k}-${i}`} onClick={()=>handleCalc(k)} className={`${isZero?"col-span-2":""} h-[44px] rounded-[12px] font-bold text-[14px] active:scale-95 border transition ${isAction?"bg-black text-white border-black":"bg-white border-black/10"}`}>
+                      {k==="DEL"?<Delete size={16} className="mx-auto"/>:k}
                     </button>
                   )
                 })}
+                {/* linha do 0 ocupando 2 colunas */}
+                <button onClick={()=>handleCalc(".")} className="h-[44px] rounded-[12px] font-bold text-[14px] bg-white border border-black/10 active:scale-95">.</button>
+                <button onClick={()=>handleCalc("00")} className="h-[44px] rounded-[12px] font-bold text-[13px] bg-white border border-black/10 active:scale-95">00</button>
               </div>
 
-              <button disabled={recebidoNum < total} onClick={()=>setShowConfirm(true)} className="w-full bg-[#2F4A8A] disabled:bg-gray-300 text-white rounded-full py-3 font-bold text-[12px] flex items-center justify-center gap-2 shrink-0">
-                <Check size={14}/> Confirmar • Troco Rp {troco>=0?troco.toLocaleString("de-DE"):"0"}
-              </button>
+              {/* BOTOES CANCELAR E CONFIRMAR */}
+              <div className="flex gap-2.5 pt-1">
+                <button onClick={()=>setShowPay(false)} className="flex-1 bg-[#EF4444] hover:bg-red-600 text-white rounded-full py-3.5 font-bold text-[13px] flex items-center justify-center gap-2 active:scale-95">
+                  <X size={16}/> Cancelar
+                </button>
+                <button disabled={recebidoNum < total} onClick={()=>setShowConfirm(true)} className="flex-1 bg-[#16A34A] hover:bg-green-600 disabled:bg-gray-300 disabled:text-gray-500 text-white rounded-full py-3.5 font-bold text-[13px] flex items-center justify-center gap-2 active:scale-95">
+                  <Check size={16}/> Confirmar
+                </button>
+              </div>
+              <p className="text-center text-[10px] text-gray-400">Troco: Rp {troco>=0?troco.toLocaleString("de-DE"):"0"}</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL CONFIRMAÇÃO - COMPACTO E CENTRAL */}
+      {/* MODAL CONFIRMAÇÃO */}
       {showConfirm && (
         <div className="absolute inset-0 z-[300] bg-black/40 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-[300px] bg-white rounded-[20px] p-5 border shadow-2xl text-center">
+          <div className="w-full max-w-[320px] bg-white rounded-[20px] p-5 border shadow-2xl text-center">
             <div className="w-12 h-12 bg-[#EEF4FF] rounded-full flex items-center justify-center mx-auto mb-3"><Printer size={20} className="text-[#2F4A8A]"/></div>
             <h3 className="font-black text-[14px]">Finalizar venda?</h3>
-            <p className="text-[11px] text-gray-500 mt-1.5 leading-[1.3]">Recebido Rp {recebidoNum.toLocaleString("de-DE")} • Troco Rp {troco.toLocaleString("de-DE")}. Imprimir fatura térmica?</p>
+            <p className="text-[11px] text-gray-500 mt-1.5">Recebido Rp {recebidoNum.toLocaleString("de-DE")} • Troco Rp {troco.toLocaleString("de-DE")}. Imprimir fatura?</p>
             <div className="bg-[#F5F7FB] rounded-[10px] p-2.5 mt-3 text-left border text-[10px] space-y-1">
               <div className="flex justify-between"><span>Total</span><span className="font-bold">Rp {total.toLocaleString("de-DE")}</span></div>
               <div className="flex justify-between"><span>Recebido</span><span className="font-bold">Rp {recebidoNum.toLocaleString("de-DE")}</span></div>
               <div className="flex justify-between font-black text-[11px]"><span>Troco</span><span>Rp {troco.toLocaleString("de-DE")}</span></div>
             </div>
-            <div className="flex gap-2 mt-4"><button onClick={()=>setShowConfirm(false)} className="flex-1 bg-white border border-black/10 rounded-full py-2.5 text-[12px]">Cancelar</button><button onClick={imprimirFatura} className="flex-1 bg-black text-white rounded-full py-2.5 text-[12px] font-bold flex justify-center items-center gap-1"><Printer size={12}/> Sim</button></div>
+            <div className="flex gap-2 mt-4"><button onClick={()=>setShowConfirm(false)} className="flex-1 bg-white border border-black/10 rounded-full py-2.5 text-[12px]">Voltar</button><button onClick={imprimirFatura} className="flex-1 bg-black text-white rounded-full py-2.5 text-[12px] font-bold flex justify-center items-center gap-1"><Printer size={12}/> Sim, Finalizar</button></div>
           </div>
         </div>
       )}
