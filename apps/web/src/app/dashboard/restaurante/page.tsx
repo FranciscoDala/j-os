@@ -1,6 +1,7 @@
 "use client";
 import { useDashboard } from "@/components/dashboard/Tamplate";
 import { HomeTab } from "./components/tabs/dashboard";
+import { ProdutosTab } from "./components/tabs/produto/produto";
 
 export default function RestaurantePage() {
     const { activeTab, user } = useDashboard();
@@ -8,10 +9,10 @@ export default function RestaurantePage() {
     return (
         <div className="w-full min-w-0">
             {activeTab === "home" && <HomeTab user={user} />}
+            {activeTab === "produtos" && <ProdutosTab />}
+            {activeTab === "cardapio" && <div className="bg-white/70 backdrop-blur-xl rounded-[18px] p-4 md:p-8 border border-white/50">Cardápio - montagem de pratos</div>}
             {activeTab === "pedidos" && <div className="bg-white/70 backdrop-blur-xl rounded-[18px] p-4 md:p-8 border border-white/50">Pedidos</div>}
-            {activeTab === "cardapio" && <div className="bg-white/70 backdrop-blur-xl rounded-[18px] p-4 md:p-8 border border-white/50">Cardápio</div>}
             {activeTab === "mesas" && <div className="bg-white/70 backdrop-blur-xl rounded-[18px] p-4 md:p-8 border border-white/50">Mesas</div>}
-            {/* vendas não renderiza aqui, já está no overlay do layout */}
         </div>
     );
 }
