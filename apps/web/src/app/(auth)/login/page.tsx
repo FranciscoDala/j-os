@@ -1,6 +1,5 @@
 "use client";
-
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { loginApi } from "@/lib/api";
 
 export default function LoginPage() {
@@ -10,10 +9,8 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [erro, setErro] = useState("");
 
-    useEffect(() => {
-        const token = localStorage.getItem("access_token");
-        if (token) window.location.href = "/dashboard";
-    }, []);
+    // REMOVEU o useEffect que causava loop.
+    // Quem tem que proteger é o dashboard, não o login.
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -21,8 +18,6 @@ export default function LoginPage() {
         setErro("");
         try {
             const data = await loginApi(email, senha);
-
-            // 1 loja = access_token direto
             if (data.access_token) {
                 localStorage.setItem("access_token", data.access_token);
                 localStorage.setItem("user", JSON.stringify(data.user));
@@ -31,8 +26,6 @@ export default function LoginPage() {
                 window.location.href = "/dashboard";
                 return;
             }
-
-            // +1 loja = temp_token
             if (data.temp_token) {
                 localStorage.setItem("temp_token", data.temp_token);
                 localStorage.setItem("empresas", JSON.stringify(data.empresas || []));
@@ -40,7 +33,6 @@ export default function LoginPage() {
                 window.location.href = "/dashboard/empresa";
                 return;
             }
-
             setErro("Resposta inválida");
         } catch (err: any) {
             setErro(err.message || "Email ou senha inválidos");
@@ -56,11 +48,11 @@ export default function LoginPage() {
                 {erro && <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg mb-4">{erro}</div>}
                 <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-zinc-800 text-white p-3 rounded-lg mb-3 outline-none border border-zinc-700" required />
                 <div className="relative mb-6">
-                    <input type={mostrarSenha ? "text" : "password"} placeholder="Senha" value={senha} onChange={(e) => setSenha(e.target.value)} className="w-full bg-zinc-800 text-white p-3 rounded-lg outline-none border border-zinc-700 pr-10" required />
-                    <button type="button" onClick={() => setMostrarSenha(!mostrarSenha)} className="absolute right-3 top-3 text-zinc-400 text-sm">{mostrarSenha ? "ocultar" : "ver"}</button>
+                    <input type={mostrarSenha? "text" : "password"} placeholder="Senha" value={senha} onChange={(e) => setSenha(e.target.value)} className="w-full bg-zinc-800 text-white p-3 rounded-lg outline-none border border-zinc-700 pr-10" required />
+                    <button type="button" onClick={() => setMostrarSenha(!mostrarSenha)} className="absolute right-3 top-3 text-zinc-400 text-sm">{mostrarSenha? "ocultar" : "ver"}</button>
                 </div>
                 <button disabled={loading} className="w-full bg-violet-600 hover:bg-violet-700 text-white p-3 rounded-lg font-semibold">
-                    {loading ? "Entrando..." : "Entrar"}
+                    {loading? "Entrando..." : "Entrar"}
                 </button>
             </form>
         </div>

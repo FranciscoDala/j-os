@@ -90,6 +90,17 @@ pnpm start
     uvicorn jos_api.main:app --reload --port 8000
 
 
+    # Windows CMD
+    set PYTHONPATH=src
+    uvicorn jos_api.main:app --reload --port 8000
+
+    # Se for PowerShell
+    $env:PYTHONPATH="src"
+    uvicorn jos_api.main:app --reload --port 8000
+
+
+
+
 
 # subir o projecto no git
     # 1. Inicia
