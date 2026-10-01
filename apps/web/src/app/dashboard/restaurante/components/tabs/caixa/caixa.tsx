@@ -31,6 +31,8 @@ function Contactless() {
   )
 }
 
+const fmt = (v: number) => v.toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 export function CaixaTab() {
   const [caixa, setCaixa] = useState<any>(null);
   const [extrato, setExtrato] = useState<any>(null);
@@ -49,10 +51,14 @@ export function CaixaTab() {
   if(loading) return <div className="bg-white rounded-[22px] p-8 animate-pulse h-[300px]" />;
 
   const aberto =!!caixa;
-  const entradas = Number(extrato?.total_entradas||0);
-  const inicial = Number(extrato?.saldo_inicial||0);
-  const atual = Number(extrato?.saldo_atual||0);
-  const saidas = Math.max(0,(inicial+entradas)-atual);
+  // CORREÇÃO LÓGICA REAL
+  const inicial = Number(extrato?.saldo_inicial?? caixa?.saldo_inicial?? 0);
+  const entradas = Number(extrato?.total_entradas?? 0); // SÓ VENDAS REAIS DO DB
+  const saidas = Number(extrato?.total_saidas?? extrato?.total_saida?? 0); // SÓ SANGRIAS REAIS
+  // Se backend não manda total_saidas, calcula pelos movimentos negativos
+  const saidasCalc = saidas || Math.abs(extrato?.movimentos?.filter((m:any)=> Number(m.valor) < 0).reduce((acc:any,m:any)=> acc + Number(m.valor),0) || 0);
+  const atual = Number(extrato?.saldo_atual?? (inicial + entradas - saidasCalc));
+
   const nomeRestaurante = caixa?.restaurante_nome || caixa?.loja_nome || "J-OS RESTAURANTE";
   const dataAbertura = caixa?.aberto_em? new Date(caixa.aberto_em).toLocaleDateString('pt-PT').slice(3) : "10/25";
   const horaAbertura = caixa?.aberto_em? new Date(caixa.aberto_em).toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'}) : "08:15";
@@ -70,58 +76,47 @@ export function CaixaTab() {
       {aberto && extrato && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* CARD MASTER - IGUAL REFERÊNCIA */}
+            {/* MASTER - NA GAVETA */}
             <div className="relative h-[210px] rounded-[22px] bg-[#0B0B0B] overflow-hidden border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6)] p-[18px] flex flex-col justify-between">
-              {/* fundo pattern da tua ref */}
               <div className="absolute inset-0 opacity-[0.18]" style={{backgroundImage:`radial-gradient(circle at 20% 30%, #1a1a1a 1px, transparent 1px)`, backgroundSize:'22px 22px'}}/>
-              <div className="absolute -right-10 top-0 w-[260px] h-[260px] bg-white/[0.07] rounded-[40px] rotate-12 blur-[1px]" />
-              <div className="absolute right-[30px] top-[20px] w-[220px] h-[160px] bg-white/[0.05] rounded-[30px] rotate-12" />
-
+              <div className="absolute -right-10 top-0 w-[260px] h-[260px] bg-white/[0.07] rounded-[40px] rotate-12" />
               <div className="relative flex justify-between items-center">
                 <div className="flex items-center gap-1.5"><span className="text-white font-black text-[13px] tracking-widest">KZ</span><span className="text-[14px]">🇦🇴</span></div>
-                <span className="text-[#D4AF37] font-[cursive] italic text-[16px] tracking-wide">premium</span>
+                <span className="text-[#D4AF37] font-[cursive] italic text-[16px]">premium</span>
               </div>
-
-              <div className="relative flex items-center gap-3 mt-1">
-                <ChipReal/><Contactless/>
-              </div>
-
+              <div className="relative flex items-center gap-3 mt-1"><ChipReal/><Contactless/></div>
               <div className="relative mt-2">
-                <p className="text-white font-mono text-[17px] tracking-[0.18em] font-medium">KZ {atual.toLocaleString().padEnd(12,'0')} 0990</p>
+                <p className="text-white font-mono text-[18px] tracking-wide font-bold">KZ {fmt(atual)}</p>
                 <div className="flex gap-8 mt-2">
                   <div><p className="text-[7px] text-white/40 tracking-widest">MONTH/YEAR</p><p className="text-[10px] text-white/80 font-mono">{dataAbertura}</p></div>
                   <div><p className="text-[7px] text-white/40 tracking-widest">HORA ABERTURA</p><p className="text-[10px] text-white/80 font-mono">{horaAbertura}</p></div>
-                  <div className="ml-auto text-right"><p className="text-[7px] text-white/40 tracking-widest">DEBIT CARD</p><p className="text-[8px] text-white/60 font-bold">CAIXA • MASTER</p></div>
+                  <div className="ml-auto text-right"><p className="text-[7px] text-white/40">DEBIT CARD</p><p className="text-[8px] text-white/60 font-bold">CAIXA • MASTER</p></div>
                 </div>
               </div>
-
               <div className="relative flex justify-between items-end mt-1">
                 <p className="text-white text-[11px] font-bold tracking-[0.12em] uppercase truncate max-w-[65%]">{nomeRestaurante}</p>
-                <div className="flex flex-col items-end">
-                  <div className="flex -space-x-[10px]"><div className="w-7 h-7 rounded-full bg-[#EB001B]"/><div className="w-7 h-7 rounded-full bg-[#F79E1B]"/></div>
-                  <p className="text-white/70 text-[9px] tracking-widest mt-1">mastercard.</p>
-                </div>
+                <div className="flex flex-col items-end"><div className="flex -space-x-[10px]"><div className="w-7 h-7 rounded-full bg-[#EB001B]"/><div className="w-7 h-7 rounded-full bg-[#F79E1B]"/></div><p className="text-white/70 text-[9px] mt-1">mastercard.</p></div>
               </div>
             </div>
 
-            {/* ENTRADAS - VERDE MAS MESMO LAYOUT */}
+            {/* ENTRADAS - SÓ VENDAS */}
             <div className="relative h-[210px] rounded-[22px] bg-gradient-to-br from-[#0B1F15] to-[#149256] overflow-hidden border border-white/10 shadow-[0_20px_50px_rgba(20,146,86,0.4)] p-[18px] flex flex-col justify-between">
               <div className="absolute -right-10 top-0 w-[260px] h-[260px] bg-white/[0.06] rounded-[40px] rotate-12" />
               <div className="relative flex justify-between"><span className="text-white font-black text-[12px] tracking-widest">ENTRADAS</span><span className="text-emerald-200/80 font-[cursive] italic text-[15px]">influx</span></div>
               <div className="flex items-center gap-3"><ChipReal/><Contactless/></div>
-              <div><p className="text-white font-mono text-[17px] tracking-[0.18em]">+ KZ {entradas.toLocaleString().padEnd(10,'0')}</p>
-                <div className="flex gap-8 mt-2"><div><p className="text-[7px] text-white/50">HOJE</p><p className="text-[10px] text-white/90 font-mono">{new Date().toLocaleDateString('pt-PT').slice(0,5)}</p></div><div><p className="text-[7px] text-white/50">VENDAS</p><p className="text-[10px] text-white/90 font-mono">{extrato?.movimentos?.filter((m:any)=>Number(m.valor)>0).length || 0} MOVS</p></div></div>
+              <div><p className="text-white font-mono text-[18px] tracking-wide font-bold">+ KZ {fmt(entradas)}</p>
+                <div className="flex gap-8 mt-2"><div><p className="text-[7px] text-white/50">HOJE</p><p className="text-[10px] text-white/90 font-mono">{new Date().toLocaleDateString('pt-PT').slice(0,5)}</p></div><div><p className="text-[7px] text-white/50">VENDAS</p><p className="text-[10px] text-white/90 font-mono">{extrato?.movimentos?.filter((m:any)=> Number(m.valor)>0).length || 0} MOVS</p></div></div>
               </div>
               <div className="flex justify-between items-end"><p className="text-white text-[10px] font-bold tracking-widest uppercase truncate max-w-[60%]">{nomeRestaurante}</p><p className="text-white/70 text-[9px]">mastercard.</p></div>
             </div>
 
-            {/* SAIDAS - VERMELHO */}
+            {/* SAIDAS */}
             <div className="relative h-[210px] rounded-[22px] bg-gradient-to-br from-[#2A0A0A] to-[#B91C1C] overflow-hidden border border-white/10 shadow-[0_20px_50px_rgba(185,28,28,0.4)] p-[18px] flex flex-col justify-between">
               <div className="absolute -right-10 top-0 w-[260px] h-[260px] bg-white/[0.06] rounded-[40px] rotate-12" />
               <div className="relative flex justify-between"><span className="text-white font-black text-[12px] tracking-widest">SAIDAS</span><span className="text-red-200/80 font-[cursive] italic text-[15px]">outflow</span></div>
               <div className="flex items-center gap-3"><ChipReal/><Contactless/></div>
-              <div><p className="text-white font-mono text-[17px] tracking-[0.18em]">- KZ {saidas.toLocaleString().padEnd(10,'0')}</p>
-                <div className="flex gap-8 mt-2"><div><p className="text-[7px] text-white/50">RETIRADO</p><p className="text-[10px] text-white/90 font-mono">{saidas>0?'SANGRIAS': '0'}</p></div><div><p className="text-[7px] text-white/50">HORA</p><p className="text-[10px] text-white/90 font-mono">{horaAbertura}</p></div></div>
+              <div><p className="text-white font-mono text-[18px] tracking-wide font-bold">- KZ {fmt(saidasCalc)}</p>
+                <div className="flex gap-8 mt-2"><div><p className="text-[7px] text-white/50">RETIRADO</p><p className="text-[10px] text-white/90 font-mono">{saidasCalc>0?'SANGRIAS':'0'}</p></div><div><p className="text-[7px] text-white/50">HORA</p><p className="text-[10px] text-white/90 font-mono">{horaAbertura}</p></div></div>
               </div>
               <div className="flex justify-between items-end"><p className="text-white text-[10px] font-bold tracking-widest uppercase truncate max-w-[60%]">{nomeRestaurante}</p><p className="text-white/70 text-[9px]">mastercard.</p></div>
             </div>
@@ -134,7 +129,7 @@ export function CaixaTab() {
         </>
       )}
 
-      <div className="bg-white rounded-[24px] p-5 border shadow-sm"><h3 className="font-black text-[12px] mb-4">Extrato • {extrato?.movimentos?.length||0} movimentos</h3><div className="space-y-2 max-h-[420px] overflow-y-auto">{!extrato?.movimentos?.length?<p className="text-[11px] text-gray-400 text-center py-10">Sem movimentos</p>:extrato.movimentos.map((m:any)=>(<div key={m.id} className="flex items-center justify-between bg-[#F5F7FB] rounded-full px-4 py-3"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center ${Number(m.valor)>0?'bg-[#0CC06B] text-white':'bg-[#E53935] text-white'}`}>{Number(m.valor)>0?<TrendingUp size={12}/>:<TrendingDown size={12}/>}</div><div><p className="text-[11px] font-bold">{m.descricao}</p><p className="text-[9px] text-gray-500">{m.tipo} • {new Date(m.criado_em).toLocaleTimeString()}</p></div></div><span className={`text-[12px] font-black ${Number(m.valor)>0?'text-[#0CC06B]':'text-[#E53935]'}`}>{Number(m.valor)>0?'+':''} Kz {Number(m.valor).toLocaleString()}</span></div>))}</div></div>
+      <div className="bg-white rounded-[24px] p-5 border shadow-sm"><h3 className="font-black text-[12px] mb-4">Extrato • {extrato?.movimentos?.length||0} movimentos</h3><div className="space-y-2 max-h-[420px] overflow-y-auto">{!extrato?.movimentos?.length?<p className="text-[11px] text-gray-400 text-center py-10">Sem movimentos</p>:extrato.movimentos.map((m:any)=>(<div key={m.id} className="flex items-center justify-between bg-[#F5F7FB] rounded-full px-4 py-3"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center ${Number(m.valor)>0?'bg-[#0CC06B] text-white':'bg-[#E53935] text-white'}`}>{Number(m.valor)>0?<TrendingUp size={12}/>:<TrendingDown size={12}/>}</div><div><p className="text-[11px] font-bold">{m.descricao}</p><p className="text-[9px] text-gray-500">{m.tipo} • {new Date(m.criado_em).toLocaleTimeString()}</p></div></div><span className={`text-[12px] font-black ${Number(m.valor)>0?'text-[#0CC06B]':'text-[#E53935]'}`}>{Number(m.valor)>0?'+':''} Kz {fmt(Number(m.valor))}</span></div>))}</div></div>
 
       <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={caixa} onClose={()=>setModalOpen(false)} onSuccess={()=>{fetchData(); toast.success(modalMode==='abrir'?"Caixa aberto!":"Fechado!");}}/>
       <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={()=>setSangriaOpen(false)} onSuccess={()=>{fetchData(); toast.success(sangriaTipo==='SANGRIA'?"Sangria feita":"Suprimento ok");}}/>
