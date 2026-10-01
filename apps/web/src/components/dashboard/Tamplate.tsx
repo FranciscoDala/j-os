@@ -6,7 +6,7 @@ import { Sidebar } from "./Sidebar";
 import { ModuleId } from "./menu_config";
 import { VendasTab } from "@/app/dashboard/restaurante/components/tabs/venda/venda";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
 
 type Ctx = { activeTab: string; setActiveTab: (t: string) => void; user: any; moduleId: ModuleId; };
 const DashboardCtx = createContext<Ctx>(null as any);
@@ -29,35 +29,22 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
 
     useEffect(() => {
         localStorage.setItem(`${moduleId}_tab`, activeTab);
-
-        // TRAVA: se tentar ir pra vendas, verifica caixa
         if (activeTab === "vendas") {
             const token = localStorage.getItem("access_token");
-            fetch(`${API_URL}/caixa/aberto`, {
-                headers: { Authorization: `Bearer ${token}` }
-            }).then(async r => {
-                if (!r.ok) {
-                    setActiveTab("caixa");
-                    return;
-                }
-                const data = await r.json();
-                const caixa = data.caixa || data;
-                if (!caixa || caixa.status!== 'aberto' &&!caixa.id) {
-                    setActiveTab("caixa");
-                }
-            }).catch(() => setActiveTab("caixa"));
+            fetch(`${API_BASE}/caixa/status`, { headers: { Authorization: `Bearer ${token}` } })
+             .then(r => r.json())
+             .then(d => { if(!d.aberto) setActiveTab("caixa"); })
+             .catch(() => setActiveTab("caixa"));
         }
     }, [activeTab, moduleId]);
 
     const logout = () => { localStorage.clear(); router.push("/login"); };
-
     const isVendasOpen = activeTab === "vendas";
 
     return (
         <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId }}>
             <div className="h-[100dvh] w-screen overflow-hidden bg-[#5A8AD4] p-0 md:p-3 flex">
                 <div className="relative flex-1 bg-[#EEF4FF]/60 md:bg-white/30 backdrop-blur-2xl md:rounded-[28px] rounded-none flex gap-0 md:gap-3 md:p-3 p-2 border-0 md:border border-white/40 h-full overflow-hidden">
-
                     <div className="hidden md:flex">
                         <Sidebar activeTab={activeTab} setActiveTab={(t) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} />
                     </div>
@@ -91,7 +78,6 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                             {children}
                         </div>
                     </div>
-
                     {isVendasOpen && (
                       <div className="absolute inset-0 z-[100] bg-[#F8FAFF] md:rounded-[28px] rounded-none flex flex-col overflow-hidden animate-in fade-in">
                         <VendasTab onClose={() => setActiveTab("home")} />
@@ -99,7 +85,6 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                     )}
                 </div>
             </div>
-
             <style jsx global>{`
         html, body { height: 100%; overflow: hidden; scrollbar-width: none; -ms-overflow-style: none; }
         html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; height: 0; }

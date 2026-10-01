@@ -4,7 +4,19 @@ import { Unlock, Lock, TrendingUp, TrendingDown, Clock, Plus, Minus } from "luci
 import { CaixaModal } from "./modals/open_close";
 import { SangriaModal } from "./modals/saida";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com";
+const BASE = `${API_URL.replace(/\/$/, "")}/api/v1`;
+
+async function apiFetch(path: string, options: RequestInit = {}) {
+  const token = typeof window!== 'undefined'? localStorage.getItem("access_token") : null;
+  const res = await fetch(`${BASE}${path}`, {
+   ...options,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`,...(options.headers || {}) },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw data;
+  return data;
+}
 
 export function CaixaTab() {
   const [caixa, setCaixa] = useState<any>(null);
@@ -18,30 +30,23 @@ export function CaixaTab() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const statusRes = await fetch(`${API_URL}/caixa/status`, { headers: { Authorization: `Bearer ${token}` } });
-      const statusData = await statusRes.json();
-
+      const statusData = await apiFetch("/caixa/status");
       if(statusData.aberto) {
         setCaixa(statusData.caixa_atual);
-        // busca extrato
-        const extRes = await fetch(`${API_URL}/caixa/extrato`, { headers: { Authorization: `Bearer ${token}` } });
-        if(extRes.ok) {
-          const ext = await extRes.json();
+        try {
+          const ext = await apiFetch("/caixa/extrato");
           setExtrato(ext);
-        }
+        } catch { setExtrato(null); }
       } else {
         setCaixa(null);
         setExtrato(null);
       }
-    } catch { setCaixa(null) }
+    } catch { setCaixa(null); }
     finally { setLoading(false) }
   };
 
   useEffect(()=>{ fetchData() },[]);
-
   if(loading) return <div className="bg-white rounded-[18px] p-8 animate-pulse h-[300px]" />;
-
   const aberto =!!caixa;
 
   return (
@@ -63,7 +68,6 @@ export function CaixaTab() {
             <button onClick={()=>{ setModalMode("fechar"); setModalOpen(true) }} className="px-5 py-2.5 bg-white border border-black/10 rounded-full text-[12px] font-bold">Fechar</button>
           )}
         </div>
-
         {aberto && extrato && (
           <>
             <div className="grid grid-cols-3 gap-3 mt-5">
@@ -78,7 +82,6 @@ export function CaixaTab() {
           </>
         )}
       </div>
-
       <div className="bg-white/80 backdrop-blur-xl rounded-[22px] p-5 border border-white/60 shadow-sm">
         <h3 className="font-bold text-[13px] mb-3">Extrato • {extrato?.movimentos?.length || 0} movimentos</h3>
         <div className="space-y-2 max-h-[420px] overflow-y-auto no-scrollbar">
@@ -95,7 +98,6 @@ export function CaixaTab() {
           }
         </div>
       </div>
-
       <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={caixa} onClose={()=>setModalOpen(false)} onSuccess={fetchData}/>
       <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={()=>setSangriaOpen(false)} onSuccess={fetchData}/>
     </div>

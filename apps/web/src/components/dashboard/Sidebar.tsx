@@ -4,7 +4,7 @@ import { Settings, Power } from "lucide-react";
 import { menuConfig, ModuleId } from "./menu_config";
 import { useEffect, useState } from "react";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
 
 export function Sidebar({ activeTab, setActiveTab, onLogout }: any) {
     const pathname = usePathname();
@@ -12,18 +12,16 @@ export function Sidebar({ activeTab, setActiveTab, onLogout }: any) {
     const [caixaAberto, setCaixaAberto] = useState<boolean | null>(null);
     const tabs = menuConfig[moduleId] || menuConfig.dashboard;
 
-    // verifica caixa
     useEffect(() => {
         const checkCaixa = async () => {
             try {
                 const token = localStorage.getItem("access_token");
-                const res = await fetch(`${API_URL}/caixa/aberto`, {
+                const res = await fetch(`${API_BASE}/caixa/status`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    const caixa = data.caixa || data;
-                    setCaixaAberto(caixa?.status === 'aberto' || !!caixa?.id);
+                    setCaixaAberto(data.aberto === true);
                 } else {
                     setCaixaAberto(false);
                 }
@@ -32,20 +30,18 @@ export function Sidebar({ activeTab, setActiveTab, onLogout }: any) {
             }
         };
         checkCaixa();
-        // re-verifica a cada vez que troca de tab
         const interval = setInterval(checkCaixa, 10000);
         return () => clearInterval(interval);
     }, [activeTab]);
 
-    // se caixa fechado e user tentar ficar em vendas, joga pra home
     useEffect(() => {
         if (caixaAberto === false && activeTab === 'vendas') {
-            setActiveTab('home');
+            setActiveTab('caixa');
         }
-    }, [caixaAberto, activeTab]);
+    }, [caixaAberto]);
 
     const filteredTabs = tabs.filter((t: any) => {
-        if (t.id === 'vendas' && caixaAberto === false) return false; // OCULTA VENDAS
+        if (t.id === 'vendas' && caixaAberto === false) return false;
         return true;
     });
 
@@ -57,18 +53,10 @@ export function Sidebar({ activeTab, setActiveTab, onLogout }: any) {
             <div className="flex-1 min-h-0 overflow-y-auto px-2 scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
                 <nav className="flex flex-col items-center gap-2.5 py-2 pb-4">
                     {filteredTabs.map(({ id, icon: Icon }: any) => (
-                        <button
-                          key={id}
-                          onClick={() => setActiveTab(id)}
-                          className={`w-11 h-11 rounded-full flex items-center justify-center transition shrink-0 ${activeTab === id? "bg-[#FFE86A] text-black shadow-md" : id === 'caixa'? "bg-black text-white shadow-md hover:bg-black/80" : "bg-gray-100 md:bg-white/30 text-gray-600 md:text-white/80 hover:bg-white/50"}`}
-                          title={id}
-                        >
+                        <button key={id} onClick={() => setActiveTab(id)} className={`w-11 h-11 rounded-full flex items-center justify-center transition shrink-0 ${activeTab === id? "bg-[#FFE86A] text-black shadow-md" : id === 'caixa'? "bg-black text-white shadow-md hover:bg-black/80" : "bg-gray-100 md:bg-white/30 text-gray-600 md:text-white/80 hover:bg-white/50"}`} title={id}>
                             <Icon size={19} />
                         </button>
                     ))}
-                    {caixaAberto === null && (
-                        <div className="w-11 h-11 rounded-full bg-gray-100 animate-pulse" />
-                    )}
                 </nav>
             </div>
             <div className="flex flex-col items-center gap-3 py-4 shrink-0 border-t border-black/5 md:border-white/10 bg-black/[0.02] md:bg-white/5">
