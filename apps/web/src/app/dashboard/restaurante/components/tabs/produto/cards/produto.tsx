@@ -42,7 +42,7 @@ export function ProdutoCard({ p, onEdit, onDelete }: Props) {
             w-full select-none
             ${isZero? "bg-[#FFF5F5] border-2 border-red-200" : isLow? "bg-[#FFFBEB] border-2 border-amber-300" : "bg-white border border-white"}
         `}>
-            <div className="absolute top-2.5 right-2.5 flex gap-[5px] opacity-0 group-hover:opacity-100 transition-opacity z-20">
+            <div className="absolute top-2.5 right-2.5 flex gap-[2px] opacity-0 group-hover:opacity-100 transition-opacity z-20">
                 <button onClick={() => onEdit(p)} className="w-8 h-8 bg-black/80 backdrop-blur text-white rounded-full flex items-center justify-center hover:bg-black shadow-lg"><Pencil size={13} /></button>
                 <button onClick={() => onDelete(p)} className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 shadow-lg"><Trash2 size={13} /></button>
             </div>
