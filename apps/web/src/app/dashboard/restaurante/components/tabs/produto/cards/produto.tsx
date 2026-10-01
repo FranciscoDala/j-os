@@ -39,7 +39,7 @@ export function ProdutoCard({ p, onEdit, onDelete }: Props) {
     return (
         <div className={`
             group relative rounded-[22px] p-3 pt-4 pb-4 shadow-[0_8px_24px_rgba(0,0,0,0.06)] flex flex-col items-center text-center hover:shadow-[0_14px_36px_rgba(0,0,0,0.10)] hover:-translate-y-0.5 transition-all duration-300 overflow-hidden
-            w-full min-h-[230px]
+            w-full min-h-[250px]
             ${isZero? "bg-[#FFF5F5] border-2 border-red-200" : isLow? "bg-[#FFFBEB] border-2 border-amber-300" : "bg-white border border-white"}
         `}>
             <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
@@ -47,7 +47,7 @@ export function ProdutoCard({ p, onEdit, onDelete }: Props) {
                 <button onClick={() => onDelete(p)} className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 shadow-lg"><Trash2 size={13} /></button>
             </div>
 
-            <div className="relative w-[132px] h-[132px] shrink-0">
+            <div className="relative w-[140px] h-[140px] shrink-0">
                 <div className={`w-full h-full rounded-full p-[4px] shadow-inner ${borderBg}`}>
                     <img src={getImgUrl(p.imagem_url)} onError={(e) => (e.currentTarget.src = FALLBACK_IMG)} className={`w-full h-full rounded-full object-cover ${isZero? "grayscale" : ""}`} alt={p.nome} />
                 </div>
