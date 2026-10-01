@@ -177,8 +177,8 @@ export function ProdutosTab() {
                 </div>
             </div>
 
-            {/* GRID AJUSTADO - 5 por linha na tua tela */}
-            <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
+            {/* GRID - 5 POR LINHA - FIXO */}
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 {items.map(p => (
                     <ProdutoCard key={p.id} p={p} onEdit={openEdit} onDelete={(prod) => setDeleteModal({ id: prod.id, nome: prod.nome, img: prod.imagem_url })} />
                 ))}
