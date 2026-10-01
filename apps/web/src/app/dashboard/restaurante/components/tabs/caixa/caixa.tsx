@@ -17,10 +17,9 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const todayISO = () => new Date().toISOString().slice(0,10);
 
-// DATE PICKER CUSTOM PREMIUM
 function JCalendarPicker({ value, onChange }: { value: string, onChange: (v:string)=>void }) {
     const [open, setOpen] = useState(false);
-    const [viewDate, setViewDate] = useState(new Date(value));
+    const [viewDate, setViewDate] = useState(new Date(value+'T12:00:00'));
 
     useEffect(()=>{ setViewDate(new Date(value+'T12:00:00')) }, [value]);
 
@@ -54,18 +53,16 @@ function JCalendarPicker({ value, onChange }: { value: string, onChange: (v:stri
                         <div className="text-center"><p className="text-white font-black text-[13px] uppercase tracking-widest">{viewDate.toLocaleDateString('pt-PT',{month:'long'})} {year}</p><p className="text-[8px] text-white/40 font-bold">J-OS CALENDAR • PREMIUM</p></div>
                         <button onClick={()=>setViewDate(new Date(year, month+1, 1))} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center"><ChevronRight size={14}/></button>
                     </div>
-
-                    <div className="relative grid grid-cols-7 gap-1 mb-2">{['D','S','T','Q','Q','S','S'].map(d=><div key={d} className="text-[9px] font-black text-white/30 text-center py-1">{d}</div>)}</div>
+                    <div className="relative grid grid-cols-7 gap-1 mb-2">{['D','S','T','Q','Q','S','S'].map((d,i)=><div key={i} className="text-[9px] font-black text-white/30 text-center py-1">{d}</div>)}</div>
                     <div className="relative grid grid-cols-7 gap-1">
-                        {days.map((d,i)=> d===null? <div key={i}/> : (
-                            <button key={i} onClick={()=>{ onChange(toISO(d)); setOpen(false); }}
+                        {days.map((d,i)=> d===null? <div key={`${i}-empty`}/> : (
+                            <button key={`${i}-${d}`} onClick={()=>{ onChange(toISO(d)); setOpen(false); }}
                                 className={`h-9 rounded-full text-[11px] font-bold transition flex items-center justify-center
                                 ${isSelected(d)? 'bg-white text-black shadow-lg scale-105' : isToday(d)? 'bg-[#0CC06B] text-white' : 'text-white/70 hover:bg-white/10'}`}>
                                 {d}
                             </button>
                         ))}
                     </div>
-
                     <div className="relative mt-4 flex gap-2">
                         <button onClick={()=>{ onChange(todayISO()); setOpen(false); }} className="flex-1 h-9 rounded-full bg-white/10 text-white text-[10px] font-black">HOJE</button>
                         <button onClick={()=>setOpen(false)} className="flex-1 h-9 rounded-full bg-white text-black text-[10px] font-black">FECHAR</button>
@@ -105,10 +102,8 @@ export function CaixaTab() {
     useEffect(() => { fetchData(selectedDate); setPage(1); }, [selectedDate]);
     useEffect(()=>{ fetchData(); }, []);
 
-    if (loading) return <div className="bg-white rounded-[22px] p-8 animate-pulse h-[300px]" />;
-
-    const aberto =!!caixa;
-    const allMovs: any[] = extrato?.movimentos || [];
+    // TODOS OS HOOKS ANTES DE QUALQUER RETURN - FIX DO ERRO 310
+    const allMovs: any[] = useMemo(()=> extrato?.movimentos || [], [extrato]);
 
     const movsFiltrados = useMemo(()=>{
         return allMovs.filter((m:any)=>{
@@ -117,26 +112,34 @@ export function CaixaTab() {
         });
     }, [allMovs, selectedDate]);
 
-    const movs = movsFiltrados.length > 0 || allMovs.length === 0? movsFiltrados : allMovs;
+    const movs = useMemo(()=> movsFiltrados.length > 0 || allMovs.length === 0? movsFiltrados : allMovs, [movsFiltrados, allMovs]);
 
-    const inicial = Number(extrato?.saldo_inicial?? caixa?.saldo_inicial?? 0);
-    const entradas = movs.filter((m: any) => {
-        const tipo = (m.tipo || '').toUpperCase();
-        const desc = (m.descricao || '').toLowerCase();
-        const isVenda = tipo.includes('VENDA') || tipo === 'ENTRADA' || desc.includes('venda');
-        const isAbertura = tipo.includes('ABERT') || desc.includes('abertura');
-        return isVenda &&!isAbertura && Number(m.valor) > 0;
-    }).reduce((a:any,c:any)=>a+Number(c.valor),0);
-    const saidas = movs.filter((m:any)=> m.tipo?.toUpperCase().includes('SANGRIA') || Number(m.valor) < 0).reduce((a:any,c:any)=>a+Math.abs(Number(c.valor)),0);
+    const { entradas, saidas, inicial } = useMemo(()=>{
+        const ini = Number(extrato?.saldo_inicial?? caixa?.saldo_inicial?? 0);
+        const ent = movs.filter((m: any) => {
+            const tipo = (m.tipo || '').toUpperCase();
+            const desc = (m.descricao || '').toLowerCase();
+            const isVenda = tipo.includes('VENDA') || tipo === 'ENTRADA' || desc.includes('venda');
+            const isAbertura = tipo.includes('ABERT') || desc.includes('abertura');
+            return isVenda &&!isAbertura && Number(m.valor) > 0;
+        }).reduce((a:any,c:any)=>a+Number(c.valor),0);
+        const sai = movs.filter((m:any)=> m.tipo?.toUpperCase().includes('SANGRIA') || Number(m.valor) < 0).reduce((a:any,c:any)=>a+Math.abs(Number(c.valor)),0);
+        return { inicial: ini, entradas: ent, saidas: sai };
+    }, [movs, extrato, caixa]);
+
     const atual = inicial + entradas - saidas;
 
     const nomeRestaurante = caixa?.restaurante_nome || "J-OS RESTAURANTE";
-    const dataAbertura = new Date(selectedDate+'T12:00:00').toLocaleDateString('pt-PT').slice(3) || "10/25";
+    const dataAbertura = useMemo(()=> new Date(selectedDate+'T12:00:00').toLocaleDateString('pt-PT').slice(3) || "10/25", [selectedDate]);
     const horaAbertura = caixa?.aberto_em? new Date(caixa.aberto_em).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) : "08:15";
 
     const perPage = 10;
     const totalPages = Math.max(1, Math.ceil(movs.length / perPage));
-    const movsPaginados = movs.slice((page-1)*perPage, page*perPage);
+    const movsPaginados = useMemo(()=> movs.slice((page-1)*perPage, page*perPage), [movs, page]);
+
+    if (loading) return <div className="bg-white rounded-[22px] p-8 animate-pulse h-[300px]" />;
+
+    const aberto =!!caixa;
 
     return (
         <div className="space-y-4">
@@ -144,7 +147,6 @@ export function CaixaTab() {
 
             <div className="bg-white rounded-[24px] p-3 border shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
                 <JCalendarPicker value={selectedDate} onChange={setSelectedDate} />
-
                 <div className="flex items-center gap-2 w-full md:w-auto">
                     <button onClick={()=>{ setSangriaTipo("SANGRIA"); setSangriaOpen(true)}} className="flex-1 md:flex-none h-[42px] bg-white border rounded-full text-[11px] font-black text-[#C62828] flex items-center justify-center gap-1.5 px-5"><Minus size={14}/> Sangria</button>
                     <button onClick={()=>{ setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true)}} className="flex-1 md:flex-none h-[42px] bg-white border rounded-full text-[11px] font-black text-[#2E7D32] flex items-center justify-center gap-1.5 px-5"><Plus size={14}/> Suprimento</button>
