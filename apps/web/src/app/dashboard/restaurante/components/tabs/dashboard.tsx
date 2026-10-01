@@ -7,61 +7,33 @@ export function HomeTab({ user }: { user: any }) {
 
     const cards = [
       {
-        id: 1,
-        value: stats.active,
-        label: "Active Patients",
-        labelColor: "text-blue-600",
-        bg: "bg-white/90",
-        icon: <FileChartColumn size={16} className="text-blue-700" />,
-        iconBg: "bg-blue-100",
-        bottom: (
-          <div className="flex gap-1.5 mt-4 items-end h-8">
-            <div className="w-full h-2.5 bg-[#A8C7F0] rounded-sm" />
-            <div className="w-full h-4 bg-[#A8C7F0] rounded-sm" />
-            <div className="w-full h-8 bg-[#1E3A8A] rounded-sm" />
-          </div>
-        )
+        id: 1, value: stats.active, label: "Active Patients", labelColor: "text-blue-600", bg: "bg-white/90",
+        icon: <FileChartColumn size={16} className="text-blue-700" />, iconBg: "bg-blue-100",
+        bottom: (<div className="flex gap-1.5 mt-4 items-end h-8"><div className="w-full h-2.5 bg-[#A8C7F0] rounded-sm" /><div className="w-full h-4 bg-[#A8C7F0] rounded-sm" /><div className="w-full h-8 bg-[#1E3A8A] rounded-sm" /></div>)
       },
       {
-        id: 2,
-        value: stats.urgent,
-        label: "Urgent Cases",
-        labelColor: "text-gray-500",
-        bg: "bg-white/90",
-        icon: <TriangleAlert size={16} className="text-orange-500" />,
-        iconBg: "bg-orange-100",
+        id: 2, value: stats.urgent, label: "Urgent Cases", labelColor: "text-gray-500", bg: "bg-white/90",
+        icon: <TriangleAlert size={16} className="text-orange-500" />, iconBg: "bg-orange-100",
         bottom: <p className="text-[12px] text-red-500 mt-6 flex items-center gap-1"><ArrowUpRight size={14} />+2 in last hour</p>
       },
       {
-        id: 3,
-        value: stats.pending,
-        label: "Pending Reviews",
-        labelColor: "text-black/70",
-        bg: "bg-[#FFF68F]/95",
-        icon: <File size={16} />,
-        iconBg: "bg-white/70",
-        bottom: (
-          <div className="mt-6"><div className="h-1.5 bg-black/10 rounded-full"><div className="h-1.5 w-1/2 bg-black rounded-full" /></div><p className="text-[11px] mt-2 font-medium">6 completed · 14 remaining</p></div>
-        )
+        id: 3, value: stats.pending, label: "Pending Reviews", labelColor: "text-black/70", bg: "bg-[#FFF68F]/95",
+        icon: <File size={16} />, iconBg: "bg-white/70",
+        bottom: (<div className="mt-6"><div className="h-1.5 bg-black/10 rounded-full"><div className="h-1.5 w-1/2 bg-black rounded-full" /></div><p className="text-[11px] mt-2 font-medium">6 completed · 14 remaining</p></div>)
       },
       {
-        id: 4,
-        value: stats.watchlist,
-        label: "AI Watchlist",
-        labelColor: "text-white/80",
-        bg: "bg-gradient-to-br from-[#5A8AD0] to-[#A9C5F0] text-white",
-        icon: <Eye size={16} className="text-white" />,
-        iconBg: "bg-white/20",
+        id: 4, value: stats.watchlist, label: "AI Watchlist", labelColor: "text-white/80", bg: "bg-gradient-to-br from-[#5A8AD0] to-[#A9C5F0] text-white",
+        icon: <Eye size={16} className="text-white" />, iconBg: "bg-white/20",
         bottom: <span className="mt-6 inline-flex bg-white/20 rounded-full px-3 py-1 text-[11px]">◎ 4 new insights</span>
       },
     ];
 
     return (
-        <div className="flex flex-col gap-3 md:gap-4 w-full min-w-0 pb-6">
+        <div className="flex flex-col gap-3 md:gap-4 w-full min-w-0 pb-6 no-scrollbar">
             <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 px-1 md:px-0">
                 <h1 className="text-[22px] md:text-[20px] font-bold text-slate-900 leading-tight">Good Morning, {user?.nome || "Admin Jenath"}</h1>
                 <div className="flex gap-2 shrink-0">
-                    <button className="flex-1 md:flex-none bg-[#2F4A8A] text-white rounded-full px-4 py-3 md:py-2.5 text-[13px] md:text-[12px] font-medium flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition">
+                    <button className="flex-1 md:flex-none bg-[#2F4A8A] text-white rounded-full px-4 py-3 md:py-2.5 text-[13px] font-medium flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition">
                       <Plus size={16} /> New Patient
                     </button>
                     <button className="bg-white/80 backdrop-blur rounded-full w-11 h-11 md:w-9 md:h-9 flex items-center justify-center border border-white/60 shrink-0">
@@ -70,9 +42,8 @@ export function HomeTab({ user }: { user: any }) {
                 </div>
             </div>
 
-            {/* MOBILE - CARROSSEL 1 CARD 100% */}
-            <div className="flex md:hidden gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-1 pb-2"
-                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {/* MOBILE - 1 CARD 100% + SCROLL-X INVISIVEL */}
+            <div className="flex md:hidden gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory px-1 pb-2 overscroll-x-contain">
               {cards.map((c)=>(
                 <div key={c.id} className={`min-w-[100%] snap-center snap-always ${c.bg} backdrop-blur-xl rounded-[22px] p-4 shadow-sm border border-white/60 flex flex-col justify-between h-[130px] shrink-0`}>
                     <div className="flex justify-between items-start">
@@ -97,14 +68,13 @@ export function HomeTab({ user }: { user: any }) {
               ))}
             </div>
 
-            {/* TABELA / LISTA */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                 <div className="lg:col-span-2 bg-white/70 backdrop-blur-xl rounded-[20px] md:rounded-[18px] p-3 md:p-4 flex flex-col border border-white/50 min-w-0">
                     <div className="flex justify-between items-center mb-3 px-1">
                       <h2 className="font-bold text-[15px] md:text-[13px]">Priority Patient Queue</h2>
                       <button className="text-[12px] md:text-[11px] font-semibold bg-white/80 px-4 py-2 md:px-3 md:py-1.5 rounded-full border border-white/60">View All</button>
                     </div>
-                    <div className="flex flex-col gap-2.5">
+                    <div className="flex flex-col gap-2.5 no-scrollbar">
                       {[
                         { name: "James Wilson", sub: "Post-Op CABG · ICU-204", status: "Critical", img: 10 },
                         { name: "Elena Rostova", sub: "Ketoacidosis · ER-102", status: "Critical", img: 32 },
@@ -112,7 +82,7 @@ export function HomeTab({ user }: { user: any }) {
                       ].map((p,i)=>(
                         <div key={i} className="bg-white rounded-[16px] p-3.5 flex justify-between items-center border border-white/80 shadow-sm active:scale-[0.99] transition">
                           <div className="flex gap-3 items-center min-w-0">
-                            <img src={`https://i.pravatar.cc/100?img=${p.img}`} className="w-10 h-10 md:w-9 md:h-9 rounded-full shrink-0" style={{ border: '2px solid #ffffff' }} />
+                            <img src={`https://i.pravatar.cc/100?img=${p.img}`} className="w-10 h-10 rounded-full shrink-0 object-cover" style={{ border: '2px solid #ffffff' }} alt="" />
                             <div className="min-w-0"><p className="font-bold text-[14px] truncate">{p.name}</p><p className="text-[12px] text-gray-500 truncate">{p.sub}</p></div>
                           </div>
                           <span className={`text-[11px] px-3 py-1 rounded-full font-medium shrink-0 ml-2 ${p.status==="Critical"?"bg-orange-100 text-orange-600":"bg-blue-100 text-blue-600"}`}>{p.status}</span>
@@ -140,8 +110,8 @@ export function HomeTab({ user }: { user: any }) {
             </div>
 
             <style jsx>{`
-             .scrollbar-hide::-webkit-scrollbar{display:none}
-             .scrollbar-hide{ -ms-overflow-style:none; scrollbar-width:none; }
+             .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
+             .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
         </div>
     );
