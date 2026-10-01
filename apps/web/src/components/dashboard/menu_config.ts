@@ -22,12 +22,12 @@ export const menuConfig: Record<ModuleId, { label: string; id: string; icon: any
   restaurante: [
     { label: "Dashboard", id: "home", icon: LayoutDashboard },
     { label: "Tela Vendas", id: "vendas", icon: ShoppingCart },
+    { label: "Caixa", id: "caixa", icon: Receipt }, // SUBIU PRA CÁ
     { label: "Pedidos", id: "pedidos", icon: ClipboardList },
     { label: "Mesas", id: "mesas", icon: Armchair },
     { label: "Produtos", id: "produtos", icon: Package },
     { label: "Cardápio", id: "cardapio", icon: ChefHat },
     { label: "Funcionários", id: "funcionarios", icon: Users },
-    { label: "Caixa", id: "caixa", icon: Receipt },
     { label: "Finanças", id: "financas", icon: DollarSign },
     { label: "Relatórios", id: "relatorios", icon: BarChart3 },
   ],
@@ -47,7 +47,6 @@ export const menuConfig: Record<ModuleId, { label: string; id: string; icon: any
   ],
 };
 
-// ícones fixos do rodapé
 export const bottomMenu = [
   { label: "Config", id: "settings", icon: Settings },
   { label: "Sair", id: "logout", icon: Power },
