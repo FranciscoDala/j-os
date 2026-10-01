@@ -4,7 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Search, Bell, Mail, Menu } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { ModuleId } from "./menu_config";
-import { VendasTab } from "@/app/dashboard/restaurante/components/tabs/venda";
+import { VendasTab } from "@/app/dashboard/restaurante/components/tabs/venda/venda";
 
 type Ctx = { activeTab: string; setActiveTab: (t: string) => void; user: any; moduleId: ModuleId; };
 const DashboardCtx = createContext<Ctx>(null as any);
