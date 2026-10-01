@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Check, ChevronDown, Loader2 } from "lucide-react";
 
 const TIPOS = ["GENERAL", "RESTAURANT_DISH", "RESTAURANT_INGREDIENT", "RESTAURANT_DRINK", "SERVICE", "KIT"];
@@ -100,12 +101,15 @@ type Props = {
 }
 
 export function ProdutoModal({ open: isOpen, editId, tab, setTab, form, setForm, preview, setPreview, setImgFile, cats, saving, onClose, onSave }: Props) {
-    if (!isOpen) return null;
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
+
+    if (!isOpen ||!mounted) return null;
     const inputClass = "w-full bg-[#F5F7FB] border border-black/5 rounded-full px-4 py-2 text-[12px] outline-none focus:border-[#A67C52] focus:ring-1 focus:ring-[#A67C52]/20";
 
-    return (
-        <div className="fixed inset-0 z-[300] bg-black/30 backdrop-blur-md flex items-center justify-center p-2 md:p-4">
-            <div className="w-full max-w-[560px] bg-white/95 backdrop-blur-2xl rounded-[22px] border border-white/60 shadow-2xl overflow-hidden max-h-[94dvh] flex flex-col">
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] w-screen h-screen bg-[#FAF6F1]/80 backdrop-blur-[14px] flex items-center justify-center p-2 md:p-4">
+            <div className="w-full max-w-[560px] bg-white/95 backdrop-blur-2xl rounded-[22px] border border-white/60 shadow-[0_20px_60px_rgba(0,0,0,0.15)] overflow-hidden max-h-[94dvh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
                 <div className="p-4 flex justify-between items-center border-b"><p className="font-black text-[14px]">{editId? "Editar" : "Novo"} • {TIPO_LABELS[form.tipo] || form.tipo}</p><button onClick={onClose} className="w-8 h-8 bg-black/5 rounded-full flex items-center justify-center"><X size={14} /></button></div>
                 <div className="flex gap-1.5 px-4 py-2 border-b bg-[#F5F7FB]/70 overflow-x-auto no-scrollbar">
                     {MODAL_TABS.map(t => <button key={t} onClick={() => setTab(t)} className={`whitespace-nowrap px-4 py-1 rounded-full text-[11px] font-bold border ${tab === t? "bg-black text-white border-black" : "bg-white border-black/10"}`}>{t}</button>)}
@@ -187,6 +191,7 @@ export function ProdutoModal({ open: isOpen, editId, tab, setTab, form, setForm,
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }
