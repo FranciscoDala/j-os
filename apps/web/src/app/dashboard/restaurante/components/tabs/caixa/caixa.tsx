@@ -46,12 +46,15 @@ export function CaixaTab() {
     const atual = inicial + entradas - saidas;
 
     const nomeRestaurante = caixa?.restaurante_nome || "J-OS RESTAURANTE";
-    const dataAbertura = caixa?.aberto_em ? new Date(caixa.aberto_em).toLocaleDateString('pt-PT').slice(3) : "10/25";
+    const dataAbertura = caixa?.aberto_em ? new Date(caixa.aberto_em).toLocaleDateString('pt-PT') : "10/2026";
     const horaAbertura = caixa?.aberto_em ? new Date(caixa.aberto_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : "08:15";
+    const dataHoje = new Date().toLocaleDateString('pt-PT').slice(0, 5);
     const qtdVendas = movs.filter((m: any) => (m.tipo || '').toUpperCase().includes('VENDA')).length;
 
     return (
         <div className="space-y-4">
+            <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
+
             <div className="bg-white rounded-[24px] p-4 flex items-center justify-between border shadow-sm">
                 <div className="flex items-center gap-3">
                     <div className={`w-11 h-11 rounded-full flex items-center justify-center ${aberto ? 'bg-[#0CC06B] text-white' : 'bg-black text-white'}`}>{aberto ? <Unlock size={18} /> : <Lock size={18} />}</div>
@@ -62,11 +65,19 @@ export function CaixaTab() {
 
             {aberto && (
                 <>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <MasterCard atual={atual} nomeRestaurante={nomeRestaurante} dataAbertura={dataAbertura} horaAbertura={horaAbertura} />
-                        <EntradasCard entradas={entradas} nome={nomeRestaurante} qtdVendas={qtdVendas} />
-                        <SaidasCard saidas={saidas} nome={nomeRestaurante} />
+                    {/* MOBILE: 1 CARD + SWIPE, DESKTOP: 3 COLS */}
+                    <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0 md:grid md:grid-cols-3 pb-2">
+                        <div className="min-w-[88%] snap-center md:min-w-0">
+                            <MasterCard atual={atual} nomeRestaurante={nomeRestaurante} dataAbertura={dataAbertura} horaAbertura={horaAbertura} />
+                        </div>
+                        <div className="min-w-[88%] snap-center md:min-w-0">
+                            <EntradasCard entradas={entradas} nome={nomeRestaurante} dataHoje={dataHoje} qtdVendas={qtdVendas} />
+                        </div>
+                        <div className="min-w-[88%] snap-center md:min-w-0">
+                            <SaidasCard saidas={saidas} nome={nomeRestaurante} hora={horaAbertura} retirado={saidas > 0 ? '1' : '0'} />
+                        </div>
                     </div>
+
                     <div className="grid grid-cols-2 gap-3">
                         <button onClick={() => { setSangriaTipo("SANGRIA"); setSangriaOpen(true) }} className="h-[48px] bg-white border rounded-full text-[11px] font-black text-[#C62828] flex items-center justify-center gap-2"><Minus size={14} /> Sangria</button>
                         <button onClick={() => { setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true) }} className="h-[48px] bg-white border rounded-full text-[11px] font-black text-[#2E7D32] flex items-center justify-center gap-2"><Plus size={14} /> Suprimento</button>
