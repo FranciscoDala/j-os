@@ -46,19 +46,28 @@ export function ProdutoCard({ p, onEdit, onDelete }: Props) {
                 <button onClick={() => onDelete(p)} className="w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 shadow-lg"><Trash2 size={12} /></button>
             </div>
 
-            {isZero && <div className="absolute top-2 left-2 z-10 bg-red-500 text-white text-[8px] font-black px-2 py-1 rounded-full">ESGOTADO</div>}
-            {isLow &&!isZero && <div className="absolute top-2 left-2 z-10 bg-amber-400 text-black text-[8px] font-black px-2 py-1 rounded-full">BAIXO</div>}
-
-            {/* IMAGEM COM CIRCULO DE QTD - MESMO ESTILO DA VENDA */}
+            {/* IMAGEM COM CIRCULO DE QTD + BAIXO EMBAIXO */}
             <div className="relative w-[122px] h-[122px] md:w-[118px] md:h-[118px] shrink-0">
                 <div className={`w-full h-full rounded-full p-[3px] shadow-inner ${borderBg}`}>
                     <img src={getImgUrl(p.imagem_url)} onError={(e) => (e.currentTarget.src = FALLBACK_IMG)} className={`w-full h-full rounded-full object-cover ${isZero? "grayscale" : ""}`} alt={p.nome} />
                 </div>
 
-                {/* CIRCULO DA QTD - MESMA COR DA BORDA */}
+                {/* CIRCULO DA QTD */}
                 {p.controlar_stock && (
-                    <div className={`absolute -top-1 -left-1 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shadow-md border-2 border-white ${qtyCircleBg}`}>
+                    <div className={`absolute -top-1 -left-1 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shadow-md border-2 border-white z-10 ${qtyCircleBg}`}>
                         {atual}
+                    </div>
+                )}
+
+                {/* BAIXO / ESGOTADO EMBAIXO DO CIRCULO */}
+                {isLow &&!isZero && (
+                    <div className="absolute top-[28px] -left-1 z-10 bg-[#FDE68A] text-black text-[8px] font-black px-2.5 py-1 rounded-full shadow-sm border border-white">
+                        BAIXO
+                    </div>
+                )}
+                {isZero && (
+                    <div className="absolute top-[28px] -left-1 z-10 bg-red-500 text-white text-[8px] font-black px-2.5 py-1 rounded-full shadow-sm border border-white">
+                        ESGOTADO
                     </div>
                 )}
             </div>
