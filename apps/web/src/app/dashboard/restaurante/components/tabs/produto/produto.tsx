@@ -191,8 +191,8 @@ export function ProdutosTab() {
                 </div>
             </div>
 
-            {/* GRID */}
-            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3 md:gap-3.5">
+            {/* GRID - TROCA ESSA LINHA */}
+            <div className="flex flex-wrap gap-3 md:gap-3.5 justify-start">
                 {items.map(p => (
                     <ProdutoCard
                         key={p.id}
