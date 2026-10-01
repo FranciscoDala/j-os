@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Unlock, Lock, TrendingUp, TrendingDown, Clock, Plus, Minus } from "lucide-react";
+import { Unlock, Lock, TrendingUp, TrendingDown, Clock, Plus, Minus, Wallet, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { CaixaModal } from "./modals/open_close";
 import { SangriaModal } from "./modals/saida";
 import { toast } from "sonner";
@@ -36,27 +36,74 @@ export function CaixaTab() {
   useEffect(()=>{ fetchData() },[]);
   if(loading) return <div className="bg-white rounded-[18px] p-8 animate-pulse h-[300px]" />;
   const aberto =!!caixa;
+  const entradas = Number(extrato?.total_entradas || 0);
+  const inicial = Number(extrato?.saldo_inicial || 0);
+  const atual = Number(extrato?.saldo_atual || 0);
+  const saidas = (inicial + entradas) - atual; // calcula o que saiu
 
   return (
-    <div className="space-y-3">
-      <div className="bg-white/80 backdrop-blur-xl rounded-[22px] p-5 border border-white/60 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${aberto? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>{aberto? <Unlock size={20}/> : <Lock size={20}/>}</div>
-            <div><h2 className="font-black text-[15px]">{aberto? 'Caixa Aberto' : 'Caixa Fechado'}</h2><p className="text-[11px] text-gray-500 flex items-center gap-1"><Clock size={12}/>{aberto? `Aberto por ${caixa.aberto_por_nome} • ${new Date(caixa.aberto_em).toLocaleString()}` : 'Abra o caixa para vender'}</p></div>
-          </div>
-          {!aberto? <button onClick={()=>{ setModalMode("abrir"); setModalOpen(true) }} className="px-5 py-2.5 bg-black text-white rounded-full text-[12px] font-bold">Abrir Caixa</button> : <button onClick={()=>{ setModalMode("fechar"); setModalOpen(true) }} className="px-5 py-2.5 bg-white border rounded-full text-[12px] font-bold">Fechar</button>}
+    <div className="space-y-4">
+      {/* HEADER */}
+      <div className="bg-white rounded-[24px] p-4 flex items-center justify-between border shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className={`w-11 h-11 rounded-full flex items-center justify-center ${aberto? 'bg-[#0CC06B] text-white' : 'bg-black text-white'}`}>{aberto? <Unlock size={18}/> : <Lock size={18}/>}</div>
+          <div><h2 className="font-black text-[14px] tracking-tight">{aberto? 'Caixa Aberto' : 'Caixa Fechado'}</h2><p className="text-[10px] text-gray-500 flex items-center gap-1"><Clock size={11}/>{aberto? `${caixa.aberto_por_nome} • ${new Date(caixa.aberto_em).toLocaleString()}` : 'Abra o caixa para vender'}</p></div>
         </div>
-        {aberto && extrato && (
-          <>
-            <div className="grid grid-cols-3 gap-3 mt-5"><div className="bg-[#F5F7FB] rounded-[16px] p-4"><p className="text-[9px] text-gray-500 font-bold">INICIAL</p><p className="font-black text-[16px]">Kz {Number(extrato.saldo_inicial).toLocaleString()}</p></div><div className="bg-[#F5F7FB] rounded-[16px] p-4"><p className="text-[9px] text-gray-500 font-bold">ENTRADAS</p><p className="font-black text-[16px] text-green-600">+ Kz {Number(extrato.total_entradas).toLocaleString()}</p></div><div className="bg-black text-white rounded-[16px] p-4"><p className="text-[9px] opacity-60 font-bold">ATUAL</p><p className="font-black text-[16px]">Kz {Number(extrato.saldo_atual).toLocaleString()}</p></div></div>
-            <div className="flex gap-2 mt-3"><button onClick={()=>{ setSangriaTipo("SANGRIA"); setSangriaOpen(true) }} className="flex-1 h-10 bg-red-50 border border-red-100 rounded-full text-[11px] font-bold text-red-600 flex items-center justify-center gap-1"><Minus size={14}/> Sangria</button><button onClick={()=>{ setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true) }} className="flex-1 h-10 bg-green-50 border border-green-100 rounded-full text-[11px] font-bold text-green-600 flex items-center justify-center gap-1"><Plus size={14}/> Suprimento</button></div>
-          </>
-        )}
+        {!aberto? <button onClick={()=>{ setModalMode("abrir"); setModalOpen(true) }} className="px-6 py-2.5 bg-black text-white rounded-full text-[11px] font-black">Abrir Caixa</button> : <button onClick={()=>{ setModalMode("fechar"); setModalOpen(true) }} className="px-5 py-2 bg-white border rounded-full text-[11px] font-bold">Fechar</button>}
       </div>
-      <div className="bg-white/80 backdrop-blur-xl rounded-[22px] p-5 border border-white/60 shadow-sm"><h3 className="font-bold text-[13px] mb-3">Extrato • {extrato?.movimentos?.length || 0}</h3><div className="space-y-2 max-h-[420px] overflow-y-auto">{!extrato?.movimentos?.length? <p className="text-[11px] text-gray-400 text-center py-10">Sem movimentos</p> : extrato.movimentos.map((m:any)=>(<div key={m.id} className="flex items-center justify-between bg-[#F5F7FB] rounded-full px-4 py-3"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center ${Number(m.valor) > 0? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>{Number(m.valor) > 0? <TrendingUp size={12}/> : <TrendingDown size={12}/>}</div><div><p className="text-[11px] font-bold">{m.descricao}</p><p className="text-[9px] text-gray-500">{m.tipo} • {new Date(m.criado_em).toLocaleTimeString()}</p></div></div><span className={`text-[12px] font-black ${Number(m.valor) > 0? 'text-green-600' : 'text-red-600'}`}>{Number(m.valor) > 0? '+' : ''} Kz {Number(m.valor).toLocaleString()}</span></div>))}</div></div>
-      <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={caixa} onClose={()=>setModalOpen(false)} onSuccess={()=>{ fetchData(); if(modalMode==='abrir') toast.success("Caixa aberto com sucesso!",{description:"Já podes começar a vender."}); if(modalMode==='fechar') toast.success("Caixa fechado!",{description:"Turno encerrado."}); if(modalMode==='forcar') toast.success("Troca de turno feita!",{description:"Novo caixa aberto."}); }}/>
-      <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={()=>setSangriaOpen(false)} onSuccess={()=>{ fetchData(); if(sangriaTipo==='SANGRIA') toast.success("Sangria registrada",{description:"Saída lançada no extrato."}); else toast.success("Suprimento registrado",{description:"Entrada adicionada."}); }}/>
+
+      {aberto && extrato && (
+        <>
+          {/* CARDS BRABOS */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* MASTER - GAVETA */}
+            <div className="md:col-span-1 bg-black rounded-[24px] p-5 text-white relative overflow-hidden">
+              <div className="absolute -right-10 -top-10 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-2"><Wallet size={14} className="opacity-60"/><p className="text-[9px] font-black tracking-[0.2em] opacity-50">NA GAVETA AGORA</p></div>
+                  <span className="text-[9px] bg-white/15 px-2 py-1 rounded-full">Inicial Kz {inicial.toLocaleString()}</span>
+                </div>
+                <p className="text-[28px] font-black tracking-tight">Kz {atual.toLocaleString()}</p>
+                <p className="text-[10px] opacity-60 mt-1">{inicial.toLocaleString()} inicial + {entradas.toLocaleString()} vendas - {saidas.toLocaleString()} saídas</p>
+              </div>
+            </div>
+
+            {/* ENTRADA */}
+            <div className="bg-[#E8F5E9] border border-[#C8E6C9] rounded-[24px] p-5 relative overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-9 h-9 bg-[#0CC06B] rounded-full flex items-center justify-center text-white"><ArrowDownLeft size={16}/></div>
+                <span className="text-[9px] font-black text-[#0CC06B] bg-white px-2.5 py-1 rounded-full">ENTRADAS</span>
+              </div>
+              <p className="text-[10px] font-bold text-[#2E7D32] tracking-wide">VENDAS DE HOJE</p>
+              <p className="text-[22px] font-black text-[#1B5E20] mt-1">+ Kz {entradas.toLocaleString()}</p>
+              <p className="text-[10px] text-[#4CAF50] mt-1">{extrato?.movimentos?.filter((m:any)=>Number(m.valor)>0).length || 0} vendas</p>
+            </div>
+
+            {/* SAIDA */}
+            <div className="bg-[#FFEBEE] border border-[#FFCDD2] rounded-[24px] p-5 relative overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-9 h-9 bg-[#E53935] rounded-full flex items-center justify-center text-white"><ArrowUpRight size={16}/></div>
+                <span className="text-[9px] font-black text-[#E53935] bg-white px-2.5 py-1 rounded-full">SAÍDAS</span>
+              </div>
+              <p className="text-[10px] font-bold text-[#C62828] tracking-wide">SANGRIAS / DESPESAS</p>
+              <p className="text-[22px] font-black text-[#B71C1C] mt-1">- Kz {Math.max(saidas,0).toLocaleString()}</p>
+              <p className="text-[10px] text-[#EF5350] mt-1">{saidas > 0? 'Dinheiro retirado' : 'Nenhuma saída'}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={()=>{ setSangriaTipo("SANGRIA"); setSangriaOpen(true) }} className="h-[48px] bg-white border rounded-full text-[11px] font-black text-[#C62828] flex items-center justify-center gap-2 hover:bg-red-50"><Minus size={14}/> Sangria (Retirar)</button>
+            <button onClick={()=>{ setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true) }} className="h-[48px] bg-white border rounded-full text-[11px] font-black text-[#2E7D32] flex items-center justify-center gap-2 hover:bg-green-50"><Plus size={14}/> Suprimento</button>
+          </div>
+        </>
+      )}
+
+      {/* EXTRATO */}
+      <div className="bg-white rounded-[24px] p-5 border shadow-sm"><h3 className="font-black text-[12px] mb-4 tracking-tight">Extrato • {extrato?.movimentos?.length || 0} movimentos</h3><div className="space-y-2 max-h-[420px] overflow-y-auto">{!extrato?.movimentos?.length? <p className="text-[11px] text-gray-400 text-center py-10">Sem movimentos</p> : extrato.movimentos.map((m:any)=>(<div key={m.id} className="flex items-center justify-between bg-[#F5F7FB] rounded-full px-4 py-3"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center ${Number(m.valor) > 0? 'bg-[#0CC06B] text-white' : 'bg-[#E53935] text-white'}`}>{Number(m.valor) > 0? <TrendingUp size={12}/> : <TrendingDown size={12}/>}</div><div><p className="text-[11px] font-bold">{m.descricao}</p><p className="text-[9px] text-gray-500">{m.tipo} • {new Date(m.criado_em).toLocaleTimeString()}</p></div></div><span className={`text-[12px] font-black ${Number(m.valor) > 0? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>{Number(m.valor) > 0? '+' : ''} Kz {Number(m.valor).toLocaleString()}</span></div>))}</div></div>
+
+      <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={caixa} onClose={()=>setModalOpen(false)} onSuccess={()=>{ fetchData(); toast.success(modalMode==='abrir'?"Caixa aberto!":modalMode==='fechar'?"Caixa fechado!":"Troca feita!"); }}/>
+      <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={()=>setSangriaOpen(false)} onSuccess={()=>{ fetchData(); toast.success(sangriaTipo==='SANGRIA'?"Sangria feita":"Suprimento ok"); }}/>
     </div>
   )
 }
