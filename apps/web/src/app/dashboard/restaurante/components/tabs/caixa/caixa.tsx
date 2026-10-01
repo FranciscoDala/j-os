@@ -27,38 +27,32 @@ function JCalendarPicker({ value, onChange }: { value: string, onChange: (v:stri
     const daysInMonth = new Date(year, month+1, 0).getDate();
     const days = Array.from({length: firstDay}, ()=>null).concat(Array.from({length: daysInMonth}, (_,i)=>i+1));
     const toISO = (d:number) => new Date(year, month, d).toISOString().slice(0,10);
-    const isSelected = (d:number) => toISO(d) === value;
-    const isToday = (d:number) => toISO(d) === todayISO();
-
     return (
         <div className="relative">
-            <button onClick={()=>setOpen(!open)} className="flex items-center gap-2.5 bg-[#0B0B0B] text-white rounded-full px-5 py-[11px] border border-white/10 shadow-sm justify-between">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-white text-black flex items-center justify-center"><Calendar size={13}/></div>
-                    <div className="text-left"><p className="text-[8px] text-white/40 font-black tracking-widest">DATA</p><p className="text-[12px] font-black -mt-1">{new Date(value+'T12:00:00').toLocaleDateString('pt-PT',{day:'2-digit',month:'short',year:'numeric'})}</p></div>
-                </div>
-                <ChevronRight size={12} className={`ml-2 text-white/40 transition ${open?'rotate-90':''}`} />
+            <button onClick={()=>setOpen(!open)} className="flex items-center gap-2 bg-black text-white rounded-full px-4 py-2 border">
+                <div className="w-6 h-6 rounded-full bg-white text-black flex items-center justify-center"><Calendar size={12}/></div>
+                <div className="text-left"><p className="text-[7px] text-white/40 font-black">DATA</p><p className="text-[11px] font-black -mt-1">{new Date(value+'T12:00:00').toLocaleDateString('pt-PT')}</p></div>
+                <ChevronRight size={10} className={`ml-1 opacity-50 ${open?'rotate-90':''}`} />
             </button>
             {open && (
                 <>
                 <div className="fixed inset-0 z-20" onClick={()=>setOpen(false)} />
-                <div className="absolute z-30 mt-2 left-0 w-[300px] rounded-[22px] bg-[#0B0B0B] border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-4 overflow-hidden">
-                    <div className="absolute -right-10 top-0 w-[200px] h-[200px] bg-white/[0.04] rounded-[30px] rotate-12" />
-                    <div className="relative flex items-center justify-between mb-4">
-                        <button onClick={()=>setViewDate(new Date(year, month-1, 1))} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center"><ChevronLeft size={14}/></button>
-                        <div className="text-center"><p className="text-white font-black text-[13px] uppercase tracking-widest">{viewDate.toLocaleDateString('pt-PT',{month:'long'})} {year}</p><p className="text-[8px] text-white/40 font-bold">J-OS CALENDAR</p></div>
-                        <button onClick={()=>setViewDate(new Date(year, month+1, 1))} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center"><ChevronRight size={14}/></button>
+                <div className="absolute z-30 mt-2 left-0 w-[290px] rounded-[20px] bg-[#0B0B0B] border border-white/10 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <button onClick={()=>setViewDate(new Date(year, month-1, 1))} className="w-7 h-7 rounded-full bg-white/10 text-white flex items-center justify-center"><ChevronLeft size={14}/></button>
+                        <p className="text-white font-black text-[12px] uppercase">{viewDate.toLocaleDateString('pt-PT',{month:'long'})} {year}</p>
+                        <button onClick={()=>setViewDate(new Date(year, month+1, 1))} className="w-7 h-7 rounded-full bg-white/10 text-white flex items-center justify-center"><ChevronRight size={14}/></button>
                     </div>
-                    <div className="relative grid grid-cols-7 gap-1 mb-2">{['D','S','T','Q','Q','S','S'].map((d,i)=><div key={i} className="text-[9px] font-black text-white/30 text-center py-1">{d}</div>)}</div>
-                    <div className="relative grid grid-cols-7 gap-1">
-                        {days.map((d,i)=> d===null? <div key={`${i}-empty`}/> : (
-                            <button key={`${i}-${d}`} onClick={()=>{ onChange(toISO(d)); setOpen(false); }}
-                                className={`h-9 rounded-full text-[11px] font-bold transition flex items-center justify-center ${isSelected(d)? 'bg-white text-black shadow-lg scale-105' : isToday(d)? 'bg-[#0CC06B] text-white' : 'text-white/70 hover:bg-white/10'}`}>{d}</button>
+                    <div className="grid grid-cols-7 gap-1 mb-1">{['D','S','T','Q','Q','S','S'].map((d,i)=><div key={i} className="text-[8px] text-white/30 text-center">{d}</div>)}</div>
+                    <div className="grid grid-cols-7 gap-1">
+                        {days.map((d,i)=> d===null? <div key={i}/> : (
+                            <button key={i} onClick={()=>{ onChange(toISO(d)); setOpen(false); }}
+                                className={`h-8 rounded-full text-[11px] font-bold ${toISO(d)===value?'bg-white text-black':'text-white/70 hover:bg-white/10'} ${toISO(d)===todayISO() && toISO(d)!==value?'bg-[#0CC06B] text-white':''}`}>{d}</button>
                         ))}
                     </div>
-                    <div className="relative mt-4 flex gap-2">
-                        <button onClick={()=>{ onChange(todayISO()); setOpen(false); }} className="flex-1 h-9 rounded-full bg-white/10 text-white text-[10px] font-black">HOJE</button>
-                        <button onClick={()=>setOpen(false)} className="flex-1 h-9 rounded-full bg-white text-black text-[10px] font-black">FECHAR</button>
+                    <div className="mt-3 flex gap-2">
+                        <button onClick={()=>{ onChange(todayISO()); setOpen(false); }} className="flex-1 h-8 rounded-full bg-white/10 text-white text-[10px] font-black">HOJE</button>
+                        <button onClick={()=>setOpen(false)} className="flex-1 h-8 rounded-full bg-white text-black text-[10px] font-black">OK</button>
                     </div>
                 </div>
                 </>
@@ -68,8 +62,6 @@ function JCalendarPicker({ value, onChange }: { value: string, onChange: (v:stri
 }
 
 export function CaixaTab() {
-    const [caixa, setCaixa] = useState<any>(null);
-    const [resumoDia, setResumoDia] = useState<any>(null);
     const [extrato, setExtrato] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState(todayISO());
@@ -79,113 +71,87 @@ export function CaixaTab() {
     const [sangriaOpen, setSangriaOpen] = useState(false);
     const [sangriaTipo, setSangriaTipo] = useState<"SANGRIA" | "SUPRIMENTO">("SANGRIA");
 
-    const fetchByDate = async (date: string) => {
+    const loadDia = async (date: string) => {
         setLoading(true);
         try {
-            // 1. Tenta buscar resumo do dia direto do backend
-            let resumo = null;
-            try { resumo = await apiFetch(`/caixa/resumo?data=${date}`); }
-            catch { try { resumo = await apiFetch(`/caixa/dia?data=${date}`); } catch { resumo = null; } }
-
-            // 2. Busca extrato do dia
-            let ext = null;
-            try { ext = await apiFetch(`/caixa/extrato?data=${date}`); }
-            catch {
-                try { ext = await apiFetch(`/caixa/extrato?date=${date}`); }
-                catch { ext = await apiFetch("/caixa/extrato").catch(()=>null); }
-            }
-
-            // 3. Status atual para nome restaurante
-            let status = null;
-            try { status = await apiFetch(`/caixa/status?data=${date}`); }
-            catch { status = await apiFetch("/caixa/status").catch(()=>null); }
-
-            setResumoDia(resumo);
+            // SÓ EXTRATO DO DIA - é daqui que vem tudo
+            const ext = await apiFetch(`/caixa/extrato?data=${date}`);
             setExtrato(ext);
-            setCaixa(status?.caixa_atual || status || resumo?.caixa || null);
-        } catch { toast.error("Erro ao carregar caixa do dia"); }
-        finally { setLoading(false) }
+        } catch (e:any) {
+            // fallback sem filtro se API não tiver data
+            try { const ext = await apiFetch("/caixa/extrato"); setExtrato(ext); }
+            catch { toast.error("Erro ao carregar"); setExtrato({movimentos:[]}); }
+        } finally { setLoading(false); }
     };
 
-    useEffect(() => { fetchByDate(selectedDate); setPage(1); }, [selectedDate]);
-
-    const allMovs: any[] = useMemo(()=> extrato?.movimentos || extrato?.movs || [], [extrato]);
+    useEffect(()=>{ loadDia(selectedDate); setPage(1); }, [selectedDate]);
 
     const movs = useMemo(()=>{
-        // se backend já filtrou, usa direto, senão filtra client
-        if (extrato?.filtrado_por_data || resumoDia) return allMovs;
-        return allMovs.filter((m:any)=>{
-            const d = new Date(m.criado_em || m.data || m.created_at || selectedDate).toISOString().slice(0,10);
+        const all = extrato?.movimentos || [];
+        // filtra só se o backend NÃO filtrou
+        const jaFiltrado = extrato?.data === selectedDate || extrato?.filtrado;
+        if (jaFiltrado) return all;
+        return all.filter((m:any)=>{
+            const d = (m.data || m.criado_em || m.created_at || "").toString().slice(0,10);
+            if (!d) return true;
             return d === selectedDate;
         });
-    }, [allMovs, selectedDate, extrato, resumoDia]);
+    }, [extrato, selectedDate]);
 
-    const { entradas, saidas, inicial, atual } = useMemo(()=>{
-        // Se backend mandou totais, usa eles
-        if (resumoDia) {
+    const { inicial, entradas, saidas, atual, qtdVendas } = useMemo(()=>{
+        if (!movs.length) return { inicial: 0, entradas: 0, saidas: 0, atual: 0, qtdVendas: 0 };
+
+        // se backend já mandou totais, usa (mas só se tem movs)
+        if (extrato?.total_entradas!== undefined && movs.length) {
             return {
-                inicial: Number(resumoDia.saldo_inicial?? resumoDia.inicial?? 0),
-                entradas: Number(resumoDia.total_entradas?? resumoDia.entradas?? 0),
-                saidas: Number(resumoDia.total_saidas?? resumoDia.saidas?? 0),
-                atual: Number(resumoDia.saldo_atual?? resumoDia.atual?? resumoDia.saldo?? 0),
+                inicial: Number(extrato.saldo_inicial||0),
+                entradas: Number(extrato.total_entradas||0),
+                saidas: Number(extrato.total_saidas||0),
+                atual: Number(extrato.saldo_atual?? (Number(extrato.saldo_inicial||0)+Number(extrato.total_entradas||0)-Number(extrato.total_saidas||0))),
+                qtdVendas: movs.filter((m:any)=> (m.tipo||"").toUpperCase().includes("VENDA")).length
             }
         }
-        if (extrato?.saldo_atual!== undefined) {
-            return {
-                inicial: Number(extrato.saldo_inicial?? 0),
-                entradas: Number(extrato.total_entradas?? 0),
-                saidas: Number(extrato.total_saidas?? 0),
-                atual: Number(extrato.saldo_atual?? 0),
-            }
-        }
-        // fallback client
-        const ini = Number(extrato?.saldo_inicial?? caixa?.saldo_inicial?? 0);
-        const ent = movs.filter((m: any) => {
-            const tipo = (m.tipo || '').toUpperCase();
-            const desc = (m.descricao || '').toLowerCase();
-            const isVenda = tipo.includes('VENDA') || tipo === 'ENTRADA' || desc.includes('venda');
-            const isAbertura = tipo.includes('ABERT') || desc.includes('abertura');
-            return isVenda &&!isAbertura && Number(m.valor) > 0;
-        }).reduce((a:any,c:any)=>a+Number(c.valor),0);
-        const sai = movs.filter((m:any)=> m.tipo?.toUpperCase().includes('SANGRIA') || Number(m.valor) < 0).reduce((a:any,c:any)=>a+Math.abs(Number(c.valor)),0);
-        return { inicial: ini, entradas: ent, saidas: sai, atual: ini+ent-sai };
-    }, [movs, extrato, caixa, resumoDia]);
 
-    const nomeRestaurante = caixa?.restaurante_nome || resumoDia?.restaurante_nome || "J-OS RESTAURANTE";
-    const dataAbertura = useMemo(()=> new Date(selectedDate+'T12:00:00').toLocaleDateString('pt-PT').slice(3) || "10/25", [selectedDate]);
-    const horaAbertura = caixa?.aberto_em? new Date(caixa.aberto_em).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) : "08:15";
+        // CALCULO CLIENT - SEM ABERTURA
+        let ent = 0, sai = 0, ini = 0;
+        movs.forEach((m:any)=>{
+            const tipo = (m.tipo||"").toUpperCase();
+            const valor = Number(m.valor||0);
+            if (tipo.includes("ABERTURA") || tipo.includes("SALDO_INICIAL")) { ini += valor; return; }
+            if (valor > 0) ent += valor;
+            if (valor < 0) sai += Math.abs(valor);
+            if (tipo.includes("SANGRIA")) sai += Math.abs(valor);
+        });
+        // se não achou saldo inicial, pega do extrato
+        if (ini===0) ini = Number(extrato?.saldo_inicial||0);
+
+        return { inicial: ini, entradas: ent, saidas: sai, atual: ini+ent-sai, qtdVendas: movs.filter((m:any)=> (m.tipo||"").toUpperCase().includes("VENDA")).length };
+    }, [movs, extrato]);
 
     const perPage = 10;
     const totalPages = Math.max(1, Math.ceil(movs.length / perPage));
-    const movsPaginados = useMemo(()=> movs.slice((page-1)*perPage, page*perPage), [movs, page]);
+    const paginados = useMemo(()=> movs.slice((page-1)*perPage, page*perPage), [movs, page]);
 
-    if (loading) return <div className="bg-white rounded-[22px] p-8 animate-pulse h-[300px]" />;
-
-    const aberto =!!caixa || movs.length > 0 || selectedDate === todayISO();
+    if (loading) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
 
     return (
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
-            {/* BARRA LIVRE - SEM BG WHITE */}
             <div className="flex flex-wrap items-center gap-2">
                 <JCalendarPicker value={selectedDate} onChange={setSelectedDate} />
-                <button onClick={()=>{ setSangriaTipo("SANGRIA"); setSangriaOpen(true)}} className="h-[42px] bg-white border shadow-sm rounded-full text-[11px] font-black text-[#C62828] flex items-center justify-center gap-1.5 px-5"><Minus size={14}/> Sangria</button>
-                <button onClick={()=>{ setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true)}} className="h-[42px] bg-white border shadow-sm rounded-full text-[11px] font-black text-[#2E7D32] flex items-center justify-center gap-1.5 px-5"><Plus size={14}/> Suprimento</button>
-                {!caixa? (
-                    <button onClick={()=>{ setModalMode("abrir"); setModalOpen(true)}} className="h-[42px] px-6 bg-black text-white rounded-full text-[11px] font-black">Abrir Caixa</button>
-                ):(
-                    <button onClick={()=>{ setModalMode("fechar"); setModalOpen(true)}} className="h-[42px] px-6 bg-black text-white rounded-full text-[11px] font-black">Fechar</button>
-                )}
+                <button onClick={()=>{ setSangriaTipo("SANGRIA"); setSangriaOpen(true)}} className="h-[38px] bg-white border rounded-full text-[11px] font-black text-[#C62828] px-5 flex items-center gap-1"><Minus size={14}/> Sangria</button>
+                <button onClick={()=>{ setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true)}} className="h-[38px] bg-white border rounded-full text-[11px] font-black text-[#2E7D32] px-5 flex items-center gap-1"><Plus size={14}/> Suprimento</button>
+                <button onClick={()=>{ setModalMode("fechar"); setModalOpen(true)}} className="h-[38px] bg-black text-white rounded-full text-[11px] font-black px-6">Fechar</button>
             </div>
 
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
-                <div className="min-w-full w-full snap-center md:min-w-0 shrink-0"><MasterCard atual={atual} nomeRestaurante={nomeRestaurante} dataAbertura={dataAbertura} horaAbertura={horaAbertura} /></div>
-                <div className="min-w-full w-full snap-center md:min-w-0 shrink-0"><EntradasCard entradas={entradas} nome={nomeRestaurante} dataHoje={new Date(selectedDate+'T12:00:00').toLocaleDateString('pt-PT').slice(0,5)} qtdVendas={movs.filter((m:any)=>(m.tipo||'').toUpperCase().includes('VENDA')).length} /></div>
-                <div className="min-w-full w-full snap-center md:min-w-0 shrink-0"><SaidasCard saidas={saidas} nome={nomeRestaurante} hora={horaAbertura} retirado={saidas>0?'1':'0'} /></div>
+                <div className="min-w-full w-full snap-center md:min-w-0 shrink-0"><MasterCard atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={selectedDate.slice(5).replace("-","/")} horaAbertura={new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} /></div>
+                <div className="min-w-full w-full snap-center md:min-w-0 shrink-0"><EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={selectedDate.slice(5).replace("-","/")} qtdVendas={qtdVendas} /></div>
+                <div className="min-w-full w-full snap-center md:min-w-0 shrink-0"><SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} retirado={saidas>0?'1':'0'} /></div>
             </div>
 
-            <div className="bg-white rounded-[24px] p-5 border shadow-sm">
+            <div className="bg-white rounded-[24px] p-5 border">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="font-black text-[12px]">Extrato • {movs.length} movimentos • {new Date(selectedDate+'T12:00:00').toLocaleDateString('pt-PT')}</h3>
                     <div className="flex items-center gap-1">
@@ -195,17 +161,17 @@ export function CaixaTab() {
                     </div>
                 </div>
                 <div className="space-y-2 max-h-[420px] overflow-y-auto">
-                    {!movs.length? <p className="text-[11px] text-gray-400 text-center py-10">Sem movimentos em {selectedDate}</p> : movsPaginados.map((m:any)=>(
+                    {!movs.length? <p className="text-[11px] text-gray-400 text-center py-10">Sem movimentos em {selectedDate}</p> : paginados.map((m:any)=>(
                         <div key={m.id} className="flex items-center justify-between bg-[#F5F7FB] rounded-full px-4 py-3">
-                            <div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center ${Number(m.valor)>0?'bg-[#0CC06B]':'bg-[#E53935]'} text-white`}>{Number(m.valor)>0?<TrendingUp size={12}/>:<TrendingDown size={12}/>}</div><div><p className="text-[11px] font-bold">{m.descricao}</p><p className="text-[9px] text-gray-500">{m.tipo} • {new Date(m.criado_em||m.data||selectedDate).toLocaleTimeString('pt-PT')}</p></div></div>
+                            <div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center ${Number(m.valor)>0?'bg-[#0CC06B]':'bg-[#E53935]'} text-white`}>{Number(m.valor)>0?<TrendingUp size={12}/>:<TrendingDown size={12}/>}</div><div><p className="text-[11px] font-bold">{m.descricao}</p><p className="text-[9px] text-gray-500">{m.tipo}</p></div></div>
                             <span className={`text-[12px] font-black ${Number(m.valor)>0?'text-[#0CC06B]':'text-[#E53935]'}`}>Kz {fmt(Number(m.valor))}</span>
                         </div>
                     ))}
                 </div>
             </div>
 
-            <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={caixa} onClose={()=>setModalOpen(false)} onSuccess={()=>{ fetchByDate(selectedDate); toast.success("Atualizado!"); }} />
-            <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={()=>setSangriaOpen(false)} onSuccess={()=>{ fetchByDate(selectedDate); toast.success("Feito!"); }} />
+            <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={extrato} onClose={()=>setModalOpen(false)} onSuccess={()=>{ loadDia(selectedDate); toast.success("Atualizado!"); }} />
+            <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={()=>setSangriaOpen(false)} onSuccess={()=>{ loadDia(selectedDate); toast.success("Feito!"); }} />
         </div>
     )
 }
