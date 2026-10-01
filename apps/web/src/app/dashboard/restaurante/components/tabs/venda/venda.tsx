@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, Search, SlidersHorizontal, Delete, Banknote, Printer, Check, AlertTriangle, Info, CheckCircle } from "lucide-react";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
@@ -19,6 +19,8 @@ type Toast = { id: string; msg: string; type: "success" | "error" | "info" | "wa
 export function VendasTab({ onClose }: { onClose: () => void }) {
   const [activeCat, setActiveCat] = useState("All");
   const [searchV, setSearchV] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [dbProducts, setDbProducts] = useState<any[]>([]);
   const [catsDb, setCatsDb] = useState<string[]>([]);
   const [loadingProd, setLoadingProd] = useState(true);
@@ -35,6 +37,27 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     setToasts(t => [...t, { id, msg, type }]);
     setTimeout(() => setToasts(t => t.filter(x => x.id!== id)), 4000);
   };
+
+  // Atalho busca: / ou Ctrl+K
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key === "/" &&!(e.target instanceof HTMLInputElement)) || (e.ctrlKey && e.key.toLowerCase() === "k")) {
+        e.preventDefault();
+        setShowSearch(true);
+        setTimeout(() => searchRef.current?.focus(), 50);
+      }
+      if (e.key === "Escape" && showSearch) {
+        setShowSearch(false);
+        setSearchV("");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showSearch]);
+
+  useEffect(() => {
+    if (showSearch) searchRef.current?.focus();
+  }, [showSearch]);
 
   useEffect(() => {
     const fetchReal = async () => {
@@ -131,7 +154,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="h-full w-full flex flex-col bg-[#F5F7FB] overflow-hidden relative">
-      {/* TOASTS DIREITA */}
       <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 w-[360px] pointer-events-none">
         {toasts.map(t => (
           <div key={t.id} className={`pointer-events-auto flex gap-2.5 items-start p-3.5 rounded-[14px] border backdrop-blur-xl shadow-2xl text-[12px] font-medium ${t.type==="success"?"bg-[#E8F5E9] border-green-200 text-green-800":t.type==="error"?"bg-[#FDECEA] border-red-200 text-red-800":t.type==="warning"?"bg-[#FFF8E1] border-amber-200 text-amber-900":"bg-white border-gray-200 text-gray-800"}`}>
@@ -145,7 +167,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         ))}
       </div>
 
-      {/* HEADER - SÓ BOTÃO FECHAR A DIREITA */}
+      {/* HEADER - SÓ X NA DIREITA */}
       <div className="h-[48px] px-4 flex items-center justify-end bg-white/80 backdrop-blur-xl border-b border-black/5 shrink-0">
         <button onClick={onClose} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center active:scale-95 hover:bg-zinc-800">
           <X size={16}/>
@@ -153,21 +175,34 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-        {/* SECÇÃO PRODUTOS */}
         <div className="flex-1 overflow-y-auto no-scrollbar bg-[#F5F7FB] p-3 md:p-5">
 
-          {/* LINHA ÚNICA: BUSCA 300px + CATEGORIAS + CONTAGEM A DIREITA */}
+          {/* LINHA: ICONE BUSCA + CATEGORIAS + CONTAGEM */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
-            <div className="flex items-center gap-2 flex-1">
-              {/* BUSCA - 300px - DENTRO DA SECÇÃO DE PRODUTOS */}
-              <div className="relative w-full md:w-[300px] shrink-0 group">
-                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-black"/>
-                <input
-                  value={searchV}
-                  onChange={e=>setSearchV(e.target.value)}
-                  placeholder="Buscar prato..."
-                  className="w-full h-9 bg-white rounded-full pl-9 pr-4 text-[12px] outline-none border border-black/5 focus:border-black/20 shadow-sm"
-                />
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+
+              {/* BUSCA - SÓ ICONE, CLICA ABRE */}
+              <div className="flex items-center shrink-0">
+                {!showSearch? (
+                  <button onClick={()=>setShowSearch(true)} className="w-9 h-9 bg-white border border-black/5 rounded-full flex items-center justify-center hover:border-black/20 shadow-sm group" title="Buscar ( / ou Ctrl+K )">
+                    <Search size={16} className="text-gray-500 group-hover:text-black"/>
+                  </button>
+                ) : (
+                  <div className="relative w-[300px] animate-in fade-in slide-in-from-left-2">
+                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
+                    <input
+                      ref={searchRef}
+                      value={searchV}
+                      onChange={e=>setSearchV(e.target.value)}
+                      onBlur={()=>{ if(!searchV) setShowSearch(false) }}
+                      placeholder="Buscar prato... (ESC pra fechar)"
+                      className="w-full h-9 bg-white rounded-full pl-9 pr-9 text-[12px] outline-none border border-black/10 focus:border-black/20 shadow-sm"
+                    />
+                    <button onClick={()=>{ setSearchV(""); setShowSearch(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 bg-black/5 rounded-full flex items-center justify-center">
+                      <X size={12}/>
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="hidden md:flex items-center gap-2 overflow-x-auto no-scrollbar">
@@ -177,11 +212,9 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             </div>
 
             <div className="flex items-center justify-between md:justify-end gap-3">
-              {/* CATEGORIAS MOBILE */}
               <div className="flex md:hidden items-center gap-2 overflow-x-auto no-scrollbar flex-1">
                 {cats.map(c=><button key={c} onClick={()=>setActiveCat(c)} className={`whitespace-nowrap px-4 py-2 rounded-full text-[12px] border shrink-0 font-bold ${activeCat===c?"bg-black text-white border-black":"bg-white text-gray-600 border-black/5"}`}>{c===""?"Todas":c}</button>)}
               </div>
-              {/* CONTAGEM NA MESMA LINHA A DIREITA */}
               <span className="text-[11px] text-gray-500 font-medium whitespace-nowrap">{loadingProd? "..." : `${filteredByCat.length} produtos`}</span>
             </div>
           </div>
@@ -197,6 +230,11 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                 const stockState = getStockState(p);
                 const isZero = stockState==="zero";
                 const isLow = stockState==="low";
+                const atual = Number(p.stock_atual?? 0);
+
+                // cor da borda e do circulo de qtd - mesma cor
+                const borderBg = isZero? "bg-red-200" : isLow? "bg-amber-200" : "bg-[#F5E6D3]";
+                const qtyCircleBg = isZero? "bg-red-500 text-white" : isLow? "bg-amber-400 text-black" : "bg-[#A67C52] text-white";
 
                 return (
                   <div
@@ -204,33 +242,37 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                     onDoubleClick={()=>!isZero && add(p)}
                     onClick={()=>{ if(window.innerWidth<768 &&!isZero) add(p) }}
                     className={`
-                      group relative rounded-[22px] p-2.5 pt-3 pb-3 md:p-3 md:pt-3.5 md:pb-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.06)] flex flex-col items-center text-center transition-all duration-200 overflow-hidden w-full select-none
-                      ${isZero? "bg-[#FFF5F5] border-2 border-red-200 opacity-70 cursor-not-allowed" : isLow? "bg-[#FFFBEB] border-2 border-amber-300 shadow-[0_8px_24px_rgba(245,158,11,0.15)] cursor-pointer hover:shadow-[0_14px_36px_rgba(245,158,11,0.20)]" : "bg-white border border-white hover:shadow-[0_14px_36px_rgba(0,0,0,0.10)] hover:-translate-y-0.5 cursor-pointer active:scale-[0.98]"}
+                      group relative rounded-[22px] p-2.5 pt-3 pb-3.5 md:p-3 md:pt-3.5 md:pb-4 shadow-[0_8px_24px_rgba(0,0,0,0.06)] flex flex-col items-center text-center transition-all duration-200 overflow-hidden w-full select-none
+                      ${isZero? "bg-[#FFF5F5] border-2 border-red-200 opacity-80 cursor-not-allowed" : isLow? "bg-[#FFFBEB] border-2 border-amber-300 shadow-[0_8px_24px_rgba(245,158,11,0.15)] cursor-pointer" : "bg-white border border-white hover:shadow-[0_14px_36px_rgba(0,0,0,0.10)] hover:-translate-y-0.5 cursor-pointer active:scale-[0.98]"}
                     `}
-                    title={isZero? "Sem stock" : "Duplo clique para adicionar"}
                   >
-                    {isZero && <div className="absolute top-2 left-2 z-10 bg-red-500 text-white text-[8px] font-black px-2 py-1 rounded-full">ESGOTADO</div>}
-                    {isLow &&!isZero && <div className="absolute top-2 left-2 z-10 bg-amber-400 text-black text-[8px] font-black px-2 py-1 rounded-full">STOCK BAIXO</div>}
-
                     {qty>0 && (
-                      <div className="absolute top-2 right-2 z-10 bg-black text-white text-[11px] font-black w-7 h-7 rounded-full flex items-center justify-center shadow-lg">
+                      <div className="absolute top-2.5 right-2.5 z-20 bg-black text-white text-[11px] font-black w-7 h-7 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
                         {qty}
                       </div>
                     )}
 
-                    <div className={`w-[122px] h-[122px] md:w-[118px] md:h-[118px] rounded-full p-[3px] shadow-inner shrink-0 ${isZero? "bg-red-100" : isLow? "bg-amber-100" : "bg-[#F5E6D3]"}`}>
-                      <img src={getImgUrl(p.imagem_url)} onError={(e)=>(e.currentTarget.src=FALLBACK_IMG)} className={`w-full h-full rounded-full object-cover ${isZero? "grayscale" : ""}`} alt={p.nome} />
+                    {/* IMAGEM COM CIRCULO DE ESTOQUE */}
+                    <div className="relative w-[122px] h-[122px] md:w-[118px] md:h-[118px] shrink-0">
+                      <div className={`w-full h-full rounded-full p-[3px] shadow-inner ${borderBg}`}>
+                        <img src={getImgUrl(p.imagem_url)} onError={(e)=>(e.currentTarget.src=FALLBACK_IMG)} className={`w-full h-full rounded-full object-cover ${isZero? "grayscale" : ""}`} alt={p.nome} />
+                      </div>
+
+                      {/* CIRCULO DA QTD - MESMA COR DA BORDA */}
+                      {p.controlar_stock && (
+                        <div className={`absolute -top-1 -left-1 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shadow-md border-2 border-white ${qtyCircleBg}`}>
+                          {atual}
+                        </div>
+                      )}
                     </div>
 
                     <h3 className="mt-2.5 font-black text-[12.5px] md:text-[12px] leading-[1.15] text-black tracking-tight w-full px-1.5 break-words line-clamp-2">{p.nome}</h3>
                     <p className="mt-1 text-[10px] leading-[1.15] text-[#6B6B6B] w-full px-2 h-[28px] md:h-[26px] line-clamp-2 overflow-hidden">{p.descricao || p.categoria || p.codigo}</p>
 
-                    <div className={`mt-2 text-white rounded-full px-4 py-[4px] flex items-baseline gap-0.5 shadow-sm ${isZero? "bg-gray-400" : isLow? "bg-amber-500" : "bg-[#A67C52]"}`}>
+                    <div className={`mt-2.5 text-white rounded-full px-4 py-[4px] flex items-baseline gap-0.5 shadow-sm ${isZero? "bg-gray-400" : isLow? "bg-amber-500" : "bg-[#A67C52]"}`}>
                       <span className="text-[8px] font-bold opacity-90">Kz</span>
                       <span className="text-[12.5px] font-black tracking-wide">{Number(p.preco_venda).toLocaleString('en-US')}</span>
                     </div>
-
-                    {p.controlar_stock && <span className={`mt-1.5 text-[9px] font-bold ${isZero? "text-red-500" : isLow? "text-amber-600" : "text-gray-400"}`}>{Number(p.stock_atual)} un.</span>}
                   </div>
                 )
               })}
