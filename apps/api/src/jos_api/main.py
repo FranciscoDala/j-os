@@ -5,10 +5,17 @@ from jos_api.api.v1.api import api_router
 
 app = FastAPI(title=settings.PROJECT_NAME, version="1.0.0")
 
+# FIX CORS
+origins = settings.origins_list + [
+    "https://jenath-sys.onrender.com",
+    "http://localhost:3000",
+    "http://localhost:3001",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.origins_list,
-    allow_origin_regex=r"https://.*\.(vercel\.app|onrender\.com)",
+    allow_origins=origins,
+    allow_origin_regex=r"https://.*\.(vercel\.app|onrender\.com)|https://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -18,7 +25,7 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():
-    return {"status": "online", "docs": "/docs", "routes": "/api/v1/auth/login"}
+    return {"status": "online", "docs": "/docs"}
 
 @app.get("/health")
 def health():
