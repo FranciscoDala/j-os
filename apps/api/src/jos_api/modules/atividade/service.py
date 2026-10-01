@@ -1,8 +1,24 @@
 from sqlalchemy.orm import Session
 import uuid
 from typing import Optional, Any
+from decimal import Decimal
+import json
 
 from jos_api.modules.atividade.models import AtividadeLog
+
+def _to_jsonable(obj: Any):
+    if isinstance(obj, dict):
+        return {k: _to_jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_to_jsonable(x) for x in obj]
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, uuid.UUID):
+        return str(obj)
+    if hasattr(obj, 'isoformat'): # datetime
+        try: return obj.isoformat()
+        except: pass
+    return obj
 
 def registrar_atividade(
     db: Session,
@@ -19,6 +35,7 @@ def registrar_atividade(
     ip: Optional[str] = None,
     commit: bool = True
 ):
+    clean_detalhes = _to_jsonable(detalhes) if detalhes else None
     entry = AtividadeLog(
         empresa_id=empresa_id,
         user_id=user_id,
@@ -29,7 +46,7 @@ def registrar_atividade(
         entidade_id=entidade_id,
         entidade_nome=entidade_nome,
         descricao=descricao,
-        detalhes=detalhes,
+        detalhes=clean_detalhes,
         ip=ip
     )
     db.add(entry)

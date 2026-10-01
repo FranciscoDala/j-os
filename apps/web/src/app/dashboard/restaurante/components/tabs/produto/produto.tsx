@@ -7,7 +7,6 @@ const API_BASE = `${API_URL}/api/v1/produtos`;
 const TIPOS = ["GENERAL","RESTAURANT_DISH","RESTAURANT_INGREDIENT","RESTAURANT_DRINK","SERVICE","KIT"];
 const UNIDADES = ["UNIT","UN","KG","LITER","PORTION","HOUR","DAY","TASK"];
 const MODAL_TABS = ["Geral","Preços","Stock","Cozinha","Códigos"];
-
 type Toast = { id:string; msg:string; type:"success"|"error"|"info" };
 
 export function ProdutosTab(){
@@ -24,9 +23,9 @@ export function ProdutosTab(){
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const pushToast = (msg:string, type:Toast["type"]="info")=>{
-    const id = Date.now().toString();
+    const id = Date.now().toString() + Math.random().toString().slice(2);
     setToasts(t=>[...t, {id, msg, type}]);
-    setTimeout(()=> setToasts(t=> t.filter(x=> x.id!==id)), 3500);
+    setTimeout(()=> setToasts(t=> t.filter(x=> x.id!==id)), 4000);
   };
 
   const [form, setForm] = useState<any>({
@@ -72,46 +71,42 @@ export function ProdutosTab(){
 
   const handleSave = async()=>{
     const token = localStorage.getItem("access_token");
-    // só campos permitidos pelo schema
     const allowed = ["nome","codigo","preco_venda","preco_custo","tipo","unidade","categoria","descricao","codigo_barras","codigo_qr","iva","tem_iva","peso","ativo","controlar_stock","allow_negative","stock_atual","stock_minimo","prep_time","kitchen_station","is_modifiable","service_duration"];
     const fd = new FormData();
     allowed.forEach(k=>{ const v = form[k]; if(v!=="" && v!==null && v!==undefined) fd.append(k, String(v)); });
     if(imgFile) fd.append("imagem", imgFile);
-
     const url = editId? `${API_BASE}/${editId}` : `${API_BASE}/`;
     const method = editId? "PUT" : "POST";
     try{
       const r = await fetch(url, { method, headers:{ Authorization:`Bearer ${token}` }, body: fd });
-      const data = await r.json().catch(async()=>({detail:await r.text()}));
+      const data = await r.json().catch(async()=>({detail: await r.text()}));
       if(r.ok){
-        pushToast(editId? "Produto atualizado com sucesso!" : "Produto criado com sucesso!", "success");
+        pushToast(editId? "Produto atualizado com sucesso!" : `Produto ${form.nome} criado!`, "success");
         setOpen(false); resetForm(); fetchProds();
       } else {
         pushToast(data.detail || "Erro ao salvar produto", "error");
       }
-    }catch{
-      pushToast("Erro de rede ao salvar", "error");
-    }
+    }catch{ pushToast("Erro de rede ao salvar", "error"); }
   };
 
   const handleDelete = async(id:string)=>{
     if(!confirm("Apagar produto?")) return;
     const token = localStorage.getItem("access_token");
     const r = await fetch(`${API_BASE}/${id}`, { method:"DELETE", headers:{ Authorization:`Bearer ${token}` }});
-    if(r.ok){ pushToast("Produto apagado", "success"); fetchProds(); }
+    if(r.ok){ pushToast("Produto apagado com sucesso", "success"); fetchProds(); }
     else pushToast("Erro ao apagar", "error");
   };
 
   return (
     <div className="w-full space-y-3 relative">
-      {/* TOAST RIGHT */}
-      <div className="fixed top-4 right-4 z-[999] flex flex-col gap-2 w-[320px] pointer-events-none">
+      <div className="fixed top-4 right-4 z-[999] flex flex-col gap-2 w-[340px] pointer-events-none">
         {toasts.map(t=>(
-          <div key={t.id} className={`pointer-events-auto flex gap-2 items-start p-3 rounded-[14px] border backdrop-blur-xl shadow-xl text-[12px] font-medium animate-in slide-in-from-right ${t.type==="success"?"bg-[#E8F5E9] border-green-200 text-green-800": t.type==="error"?"bg-[#FDECEA] border-red-200 text-red-800":"bg-white/90 border-white/60 text-gray-800"}`}>
+          <div key={t.id} className={`pointer-events-auto flex gap-2 items-start p-3 rounded-[14px] border backdrop-blur-xl shadow-2xl text-[12px] font-medium ${t.type==="success"?"bg-[#E8F5E9] border-green-200 text-green-800": t.type==="error"?"bg-[#FDECEA] border-red-200 text-red-800":"bg-white border-gray-200 text-gray-800"}`}>
             {t.type==="success" && <CheckCircle size={16} className="shrink-0 mt-0.5"/>}
             {t.type==="error" && <AlertTriangle size={16} className="shrink-0 mt-0.5"/>}
             {t.type==="info" && <Info size={16} className="shrink-0 mt-0.5"/>}
             <span className="flex-1 leading-[1.2]">{t.msg}</span>
+            <button onClick={()=> setToasts(x=> x.filter(f=> f.id!==t.id))} className="opacity-60"><X size={12}/></button>
           </div>
         ))}
       </div>

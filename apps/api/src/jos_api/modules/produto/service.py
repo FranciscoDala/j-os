@@ -76,7 +76,7 @@ def delete_produto(db: Session, produto_id: uuid.UUID, empresa_id: uuid.UUID | N
     if prod.deleted_at is not None: return {"message": "Já apagado"}
     nome_guardado = prod.nome; codigo_guardado = prod.codigo
     prod.deleted_at = datetime.utcnow(); prod.ativo = False; db.flush()
-    registrar_atividade(db, empresa_id=empresa_id, modulo="PRODUTO", acao="DELETAR", descricao=f"Apagou produto '{nome_guardado}' ({codigo_guardado})", entidade="Product", entidade_id=prod.id, entidade_nome=nome_guardado, user_id=user_id, user_nome=user_nome, detalhes={"codigo": codigo_guardado, "preco": str(prod.preco_venda)}, ip=ip, commit=False)
+    registrar_atividade(db, empresa_id=empresa_id, modulo="PRODUTO", acao="DELETAR", descricao=f"Apagou produto '{nome_guardado}' ({codigo_guardado})", entidade="Product", entidade_id=prod.id, entidade_nome=nome_guardado, user_id=user_id, user_nome=user_nome, detalhes={"codigo": codigo_guardado, "preco": str(prod.preco_venda), "stock": str(prod.stock_atual)}, ip=ip, commit=False)
     db.commit()
     return {"message": f"Produto '{nome_guardado}' apagado"}
 
