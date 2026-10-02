@@ -17,15 +17,20 @@ async function apiFetch(path: string, options: RequestInit = {}) {
     const d = await res.json().catch(() => ({})); if (!res.ok) throw d; return d;
 }
 const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-// data de hoje em Luanda
 const todayISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' });
 
-// converte ISO para data local de Luanda (corrige bug do 01h)
+const toUTCDate = (iso?: string) => {
+    if (!iso) return null;
+    let s = iso;
+    if (s.includes('T') &&!s.endsWith('Z') &&!s.includes('+') && s.lastIndexOf('-') < 11) s += 'Z';
+    const d = new Date(s);
+    return isNaN(d.getTime())? null : d;
+};
 const getLocalDatePart = (iso?: string) => {
     if (!iso) return "";
-    try { return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' }); }
-    catch { return iso.slice(0,10); }
+    const d = toUTCDate(iso);
+    if (!d) return iso.slice(0,10);
+    return d.toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' });
 };
 
 export function CaixaTab() {
@@ -50,9 +55,8 @@ export function CaixaTab() {
 
     useEffect(()=>{ (async()=>{ setLoading(true); await loadAll(); setLoading(false); })(); }, []);
 
-    // acha caixa correto para data selecionada
     const caixaDoDia = useMemo(() => {
-        if (!selectedDate) return null;
+        if (!selectedDate || historico.length===0 &&!status?.aberto) return null;
         if (status?.aberto && status?.caixa_atual?.aberto_em) {
             const ab = getLocalDatePart(status.caixa_atual.aberto_em);
             if (selectedDate >= ab) return status.caixa_atual;
@@ -65,36 +69,36 @@ export function CaixaTab() {
         return achado || historico.find((c:any)=> getLocalDatePart(c.aberto_em) === selectedDate) || null;
     }, [selectedDate, historico, status]);
 
-    // carrega extrato do caixa do dia
     useEffect(()=>{
         (async()=>{
+            if (!caixaDoDia) { setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0, total_entradas: 0, total_saidas: 0 }); return; }
             setLoading(true);
-            if (!caixaDoDia) {
-                setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0 });
-                setLoading(false);
-                return;
-            }
             try {
                 const isAbertoAtual = status?.aberto && caixaDoDia.id === status?.caixa_atual?.id;
                 const ext = isAbertoAtual? await apiFetch("/caixa/extrato") : await apiFetch(`/caixa/${caixaDoDia.id}/extrato`);
                 setExtrato(ext);
             } catch {
-                setExtrato({ movimentos: caixaDoDia.movimentos || [], saldo_inicial: caixaDoDia.saldo_inicial || 0, saldo_atual: caixaDoDia.saldo_atual || caixaDoDia.saldo_final || 0 });
+                setExtrato({ movimentos: [], saldo_inicial: caixaDoDia.saldo_inicial||0, saldo_atual: caixaDoDia.saldo_final_esperado||caixaDoDia.saldo_atual||0, total_entradas: 0, total_saidas: 0 });
             }
             setLoading(false);
         })();
-    },[caixaDoDia, status]);
+    },[caixaDoDia]);
 
     const movs = extrato?.movimentos || [];
     const { entradas, saidas, atual } = useMemo(()=>{
-        const saldoInicial = Number(extrato?.saldo_inicial?? caixaDoDia?.saldo_inicial?? 0);
+        if (extrato?.total_entradas!=null || extrato?.total_saidas!=null) {
+            const ent = Number(extrato.total_entradas||0);
+            const sai = Math.abs(Number(extrato.total_saidas||0));
+            const tot = extrato.saldo_atual!=null? Number(extrato.saldo_atual) : Number(extrato.saldo_inicial||0)+ent-sai;
+            return { entradas: ent, saidas: sai, atual: tot };
+        }
         let ent = 0, sai = 0;
-        (movs || []).forEach((m:any)=>{
+        movs.forEach((m:any)=>{
             if ((m.tipo||"").toUpperCase() === "ABERTURA") return;
             const v = Number(m.valor||0); if (v > 0) ent += v; if (v < 0) sai += Math.abs(v);
         });
-        const total = extrato?.saldo_atual!=null? Number(extrato.saldo_atual) : caixaDoDia?.saldo_final!=null? Number(caixaDoDia.saldo_final) : saldoInicial + ent - sai;
-        return { entradas: ent, saidas: sai, atual: total };
+        const tot = caixaDoDia?.saldo_final_esperado!=null? Number(caixaDoDia.saldo_final_esperado) : Number(extrato?.saldo_inicial||caixaDoDia?.saldo_inicial||0)+ent-sai;
+        return { entradas: ent, saidas: sai, atual: tot };
     }, [extrato, movs, caixaDoDia]);
 
     const handleCardClick = (type: "master" | "entradas" | "saidas") => {
@@ -114,13 +118,14 @@ export function CaixaTab() {
 
     if (loading &&!extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
 
+    const isAbertoNoDia =!!(caixaDoDia &&!caixaDoDia.fechado_em) ||!!(status?.aberto && selectedDate >= getLocalDatePart(status.caixa_atual?.aberto_em));
+
     return (
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div className="w-full md:w-[calc((100%-32px)/3)]"><JCalendarPicker value={selectedDate} onChange={setSelectedDate} /></div>
-
                 <label className="flex items-center gap-3 bg-white border rounded-full px-4 h-[42px] cursor-pointer select-none w-fit">
                     <div className="relative">
                         <input type="checkbox" checked={showExtrato} onChange={e=>setShowExtrato(e.target.checked)} className="sr-only" />
@@ -133,7 +138,7 @@ export function CaixaTab() {
 
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div onClick={()=>handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
-                    <MasterCard aberto={!!(caixaDoDia &&!caixaDoDia.fechado_em) ||!!status?.aberto && selectedDate >= getLocalDatePart(status.caixa_atual.aberto_em)} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={selectedDate.slice(5).replace("-","/")} horaAbertura={caixaDoDia? new Date(caixaDoDia.aberto_em).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}): "--:--"} />
+                    <MasterCard aberto={isAbertoNoDia} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={selectedDate.slice(5).replace("-","/")} horaAbertura={caixaDoDia? (toUTCDate(caixaDoDia.aberto_em)?.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit', timeZone: 'Africa/Luanda'})||"--:--") : "--:--"} />
                 </div>
                 <div onClick={()=>handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={selectedDate.slice(5).replace("-","/")} qtdVendas={movs.filter((m:any)=> (m.tipo||"").toUpperCase().includes("VENDA")).length} />
