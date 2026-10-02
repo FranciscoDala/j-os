@@ -121,9 +121,9 @@ export function CaixaTab() {
                     </button>
                     {menuOpen && (
                         <div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-50">
-                            <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button>
+                            <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black hover:bg-zinc-50">Baixar Relatório</button>
                             <div className="h-[1px] bg-zinc-100" />
-                            <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button>
+                            <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black hover:bg-zinc-50">Imprimir Relatório</button>
                         </div>
                     )}
                 </div>
