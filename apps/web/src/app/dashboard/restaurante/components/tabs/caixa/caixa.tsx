@@ -75,11 +75,11 @@ export function CaixaTab() {
             else setConfirm({ open: true, title: "Abrir caixa?", desc: "Iniciar novo turno.", type: "black", action: ()=>{ setModalMode("abrir"); setModalOpen(true); } });
         }
         if (type === "entradas") {
-            if (!status?.aberto) { toast.error("Abra o caixa primeiro"); return; }
+            if (!status?.aberto) { toast.error("ATT: você não podes adicionar valores sem antes abrir um caixa, porfavor abra o seu caixa para prosseguir!"); return; }
             setConfirm({ open: true, title: "Suprimento?", desc: "Adicionar?", type: "green", action: ()=>{ setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true); } });
         }
         if (type === "saidas") {
-            if (!status?.aberto) { toast.error("Abra o caixa primeiro"); return; }
+            if (!status?.aberto) { toast.error("ATT: você não podes adicionar valores sem antes abrir um caixa, porfavor abra o seu caixa para prosseguir!"); return; }
             setConfirm({ open: true, title: "Sangria?", desc: "Retirar?", type: "red", action: ()=>{ setSangriaTipo("SANGRIA"); setSangriaOpen(true); } });
         }
     };
