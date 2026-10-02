@@ -5,16 +5,9 @@ from jos_api.api.v1.api import api_router
 
 app = FastAPI(title=settings.PROJECT_NAME, version="1.0.0")
 
-origins = settings.origins_list + [
-    "https://jenath-sys.onrender.com",
-    "http://localhost:3000",
-    "http://localhost:3001",
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_origin_regex=r"https://.*\.(vercel\.app|onrender\.com)|https://.*\.onrender\.com",
+    allow_origins=["*"],  # WS no Render precisa de * pra handshake
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
