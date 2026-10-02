@@ -111,11 +111,13 @@ export function CaixaTab() {
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
-            {/* DESKTOP - OK, NAO MEXER */}
-            <div className="hidden md:grid md:grid-cols-3 gap-4 items-center">
-                <div className="h-[46px] w-full"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
-                <div className="h-[46px] w-full"><JCalendarPicker value={fim} onChange={setFim} /></div>
-                <div className="relative flex justify-end col-span-1" ref={menuRef}>
+            {/* DESKTOP - 2 INPUTS PEQUENOS JUNTOS = LARGURA DO CARD PRETO */}
+            <div className="hidden md:flex items-center justify-between">
+                <div className="flex gap-2 w-[calc((100%-32px)/3)]">
+                    <div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
+                    <div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={fim} onChange={setFim} /></div>
+                </div>
+                <div className="relative" ref={menuRef}>
                     <button onClick={()=>setMenuOpen(o=>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     </button>
