@@ -1,6 +1,6 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const BASE = `${API_URL}/api/v1`;
-export const WS_URL = API_URL.replace("http", "ws") + "/api/v1/realtime/ws";
+export const WS_URL = API_URL.replace(/^http/, "ws") + "/api/v1/realtime/ws";
 
 async function apiFetch(path: string, options: RequestInit = {}) {
     const token = typeof window !== 'undefined' ? localStorage.getItem("access_token") : null;

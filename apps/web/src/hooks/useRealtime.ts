@@ -9,27 +9,55 @@ type RealtimeEvent = {
 
 export function useRealtime(onEvent: (ev: RealtimeEvent) => void) {
     const wsRef = useRef<WebSocket | null>(null);
+    const retryRef = useRef(1000);
+    const onEventRef = useRef(onEvent);
+    onEventRef.current = onEvent;
 
     useEffect(() => {
-        const token = localStorage.getItem("access_token");
-        if (!token) return;
+        let closedByUs = false;
+        let timer: ReturnType<typeof setTimeout>;
 
-        const ws = new WebSocket(`${WS_URL}?token=${token}`);
-        wsRef.current = ws;
+        const connect = () => {
+            const token = localStorage.getItem("access_token");
+            if (!token) return;
 
-        ws.onopen = () => console.log("[realtime] conectado");
-        ws.onmessage = (msg) => {
             try {
-                const data = JSON.parse(msg.data);
-                onEvent(data);
-            } catch { }
-        };
-        ws.onclose = () => {
-            console.log("[realtime] desconectado, reconectando em 3s");
-            setTimeout(() => onEvent({ type: "__RECONNECT__" }), 3000);
+                const ws = new WebSocket(`${WS_URL}?token=${token}`);
+                wsRef.current = ws;
+
+                ws.onopen = () => {
+                    console.log("[realtime] conectado");
+                    retryRef.current = 1000;
+                };
+                ws.onmessage = (msg) => {
+                    try {
+                        const data = JSON.parse(msg.data);
+                        onEventRef.current(data);
+                    } catch { }
+                };
+                ws.onclose = () => {
+                    if (closedByUs) return;
+                    console.log(`[realtime] desconectado, reconectando em ${retryRef.current}ms`);
+                    timer = setTimeout(() => {
+                        retryRef.current = Math.min(retryRef.current * 1.5, 15000);
+                        connect();
+                    }, retryRef.current);
+                };
+                ws.onerror = () => {
+                    ws.close();
+                };
+            } catch {
+                timer = setTimeout(connect, retryRef.current);
+            }
         };
 
-        return () => ws.close();
+        connect();
+
+        return () => {
+            closedByUs = true;
+            clearTimeout(timer);
+            try { wsRef.current?.close(); } catch {}
+        };
     }, []);
 
     return wsRef;
