@@ -40,7 +40,7 @@ export function ExtratoList({ movimentos, selectedDate }: { movimentos: any[], s
                             return (
                                 <tr key={m.id} className="border-b last:border-0">
                                     <td className="px-4 py-2">
-                                        <p className="text-[11px] font-bold text-black leading-tight capitalize">{cleanDesc(m.descricao)}</p>
+                                        <p className="text-[11px] font-bold text-black leading-tight">{cleanDesc(m.descricao)}</p>
                                         <p className="text-[9px] text-gray-400 leading-none mt-0.5">{new Date(m.criado_em || m.data || Date.now()).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</p>
                                     </td>
                                     <td className={`px-4 py-2 text-[11px] font-black capitalize ${isPos? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>
