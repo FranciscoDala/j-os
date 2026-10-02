@@ -3,7 +3,7 @@ from sqlalchemy import func
 from fastapi import HTTPException
 from decimal import Decimal
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Tuple
 from jos_api.modules.caixa.models import Caixa, CaixaStatus, MotivoFechamento, CaixaMovimento, TipoMovimento, OrigemMovimento
 from jos_api.modules.venda.models import Venda
@@ -13,9 +13,8 @@ def get_caixa_aberto(db: Session, empresa_id: uuid.UUID) -> Caixa | None:
     return db.query(Caixa).filter(Caixa.empresa_id == empresa_id, Caixa.status == CaixaStatus.ABERTO).order_by(Caixa.aberto_em.desc()).first()
 
 def calcular_saldo_atual(db: Session, caixa: Caixa) -> Decimal:
-    total_mov = db.query(func.coalesce(func.sum(CaixaMovimento.valor), 0)).filter(CaixaMovimento.caixa_id == caixa.id).scalar()
-    if total_mov is None: total_mov = Decimal("0")
-    return caixa.saldo_inicial + Decimal(str(total_mov))
+    total_mov = db.query(func.coalesce(func.sum(CaixaMovimento.valor), 0)).filter(CaixaMovimento.caixa_id == caixa.id, CaixaMovimento.tipo!= TipoMovimento.ABERTURA).scalar()
+    return caixa.saldo_inicial + Decimal(str(total_mov or 0))
 
 def registrar_movimento(db: Session, caixa: Caixa, tipo: TipoMovimento, valor: Decimal, descricao: str, user_id: uuid.UUID, user_nome: str, venda_id: uuid.UUID | None = None, forma_pagamento: str | None = None, origem: OrigemMovimento = OrigemMovimento.MANUAL, commit: bool = True) -> CaixaMovimento:
     mov = CaixaMovimento(empresa_id=caixa.empresa_id, caixa_id=caixa.id, tipo=tipo, origem=origem, valor=valor, descricao=descricao, venda_id=venda_id, forma_pagamento=forma_pagamento, criado_por=user_id, criado_por_nome=user_nome)
@@ -32,8 +31,6 @@ def abrir_caixa(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nom
         raise HTTPException(status_code=409, detail={"code": "CAIXA_ABERTO_POR_OUTRO", "message": f"Já tem um caixa aberto por {caixa_existente.aberto_por_nome}", "caixa": caixa_info})
     novo = Caixa(empresa_id=empresa_id, aberto_por=user_id, aberto_por_nome=user_nome, saldo_inicial=saldo_inicial, status=CaixaStatus.ABERTO, motivo_fechamento=MotivoFechamento.NORMAL.value)
     db.add(novo); db.flush()
-    if saldo_inicial > Decimal("0"):
-        registrar_movimento(db, novo, TipoMovimento.ABERTURA, saldo_inicial, f"Abertura de caixa por {user_nome}", user_id, user_nome, origem=OrigemMovimento.SISTEMA, commit=False)
     registrar_atividade(db, empresa_id=empresa_id, modulo="CAIXA", acao="ABRIR", descricao=f"Abriu caixa com R$ {saldo_inicial} - por {user_nome}", entidade="Caixa", entidade_id=novo.id, entidade_nome=f"Caixa R$ {saldo_inicial}", user_id=user_id, user_nome=user_nome, detalhes={"saldo_inicial": str(saldo_inicial)}, ip=ip, commit=False)
     db.commit(); db.refresh(novo); return novo
 
@@ -42,10 +39,9 @@ def forcar_abertura(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, user
     if caixa_antigo is None:
         novo = abrir_caixa(db, empresa_id, user_id, user_nome, saldo_inicial, ip); return novo, None
     saldo_esperado = calcular_saldo_atual(db, caixa_antigo)
-    caixa_antigo.status = CaixaStatus.FECHADO; caixa_antigo.fechado_em = datetime.utcnow(); caixa_antigo.fechado_por = user_id; caixa_antigo.fechado_por_nome = user_nome; caixa_antigo.motivo_fechamento = MotivoFechamento.FORCADO_TROCA_TURNO.value; caixa_antigo.observacao = f"Fechado por {user_nome} para abrir novo caixa. Motivo: {motivo}. Caixa original de {caixa_antigo.aberto_por_nome}"; caixa_antigo.saldo_final_esperado = saldo_esperado; caixa_antigo.saldo_final_informado = saldo_esperado; caixa_antigo.divergencia = Decimal("0")
+    caixa_antigo.status = CaixaStatus.FECHADO; caixa_antigo.fechado_em = datetime.now(timezone.utc); caixa_antigo.fechado_por = user_id; caixa_antigo.fechado_por_nome = user_nome; caixa_antigo.motivo_fechamento = MotivoFechamento.FORCADO_TROCA_TURNO.value; caixa_antigo.observacao = f"Fechado por {user_nome} para abrir novo caixa. Motivo: {motivo}. Caixa original de {caixa_antigo.aberto_por_nome}"; caixa_antigo.saldo_final_esperado = saldo_esperado; caixa_antigo.saldo_final_informado = saldo_esperado; caixa_antigo.divergencia = Decimal("0")
     novo = Caixa(empresa_id=empresa_id, aberto_por=user_id, aberto_por_nome=user_nome, saldo_inicial=saldo_inicial, status=CaixaStatus.ABERTO, motivo_fechamento=MotivoFechamento.NORMAL.value)
     db.add(novo); db.flush()
-    if saldo_inicial > Decimal("0"): registrar_movimento(db, novo, TipoMovimento.ABERTURA, saldo_inicial, f"Abertura forçada por {user_nome} - Motivo: {motivo}", user_id, user_nome, origem=OrigemMovimento.SISTEMA, commit=False)
     registrar_atividade(db, empresa_id=empresa_id, modulo="CAIXA", acao="FORCAR_ABERTURA", descricao=f"Forçou abertura - fechou caixa de {caixa_antigo.aberto_por_nome} R$ {saldo_esperado} - novo R$ {saldo_inicial} - {motivo}", entidade="Caixa", entidade_id=novo.id, entidade_nome=f"Caixa R$ {saldo_inicial}", user_id=user_id, user_nome=user_nome, detalhes={"motivo": motivo, "antigo_id": str(caixa_antigo.id)}, ip=ip, commit=False)
     db.commit(); db.refresh(novo); db.refresh(caixa_antigo); return novo, caixa_antigo
 
@@ -56,7 +52,7 @@ def fechar_caixa(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, saldo_i
     mesas_ocupadas = db.query(Mesa).filter(Mesa.empresa_id == empresa_id, Mesa.status == MesaStatus.OCUPADA).count()
     if mesas_ocupadas > 0: raise HTTPException(status_code=400, detail=f"Existem {mesas_ocupadas} mesas ocupadas. Feche as comandas antes.")
     saldo_esperado = calcular_saldo_atual(db, caixa)
-    caixa.status = CaixaStatus.FECHADO; caixa.fechado_em = datetime.utcnow(); caixa.fechado_por = user_id; caixa.fechado_por_nome = fechado_por_nome; caixa.saldo_final_esperado = saldo_esperado; caixa.saldo_final_informado = saldo_informado; caixa.divergencia = saldo_informado - saldo_esperado; caixa.motivo_fechamento = MotivoFechamento.NORMAL.value
+    caixa.status = CaixaStatus.FECHADO; caixa.fechado_em = datetime.now(timezone.utc); caixa.fechado_por = user_id; caixa.fechado_por_nome = fechado_por_nome; caixa.saldo_final_esperado = saldo_esperado; caixa.saldo_final_informado = saldo_informado; caixa.divergencia = saldo_informado - saldo_esperado; caixa.motivo_fechamento = MotivoFechamento.NORMAL.value
     db.flush()
     registrar_atividade(db, empresa_id=empresa_id, modulo="CAIXA", acao="FECHAR", descricao=f"Fechou caixa - Esperado R$ {saldo_esperado} Informado R$ {saldo_informado} Divergência R$ {caixa.divergencia}", entidade="Caixa", entidade_id=caixa.id, entidade_nome=f"Caixa R$ {saldo_esperado}", user_id=user_id, user_nome=fechado_por_nome, detalhes={"esperado": str(saldo_esperado), "informado": str(saldo_informado), "divergencia": str(caixa.divergencia)}, ip=ip, commit=False)
     db.commit(); db.refresh(caixa); return caixa

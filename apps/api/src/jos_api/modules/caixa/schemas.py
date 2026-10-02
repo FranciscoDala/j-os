@@ -44,11 +44,6 @@ class CaixaMovimentoResponse(BaseModel):
     class Config:
         from_attributes = True
 
-class MovimentoCreateRequest(BaseModel):
-    valor: Decimal
-    motivo: str
-    tipo: str = "SANGRIA" # SANGRIA ou SUPRIMENTO
-
 class ExtratoResponse(BaseModel):
     caixa_id: UUID
     saldo_inicial: Decimal
@@ -56,3 +51,7 @@ class ExtratoResponse(BaseModel):
     total_entradas: Decimal
     total_saidas: Decimal
     movimentos: List[CaixaMovimentoResponse]
+    # extras para periodo
+    qtd_caixas: Optional[int] = 1
+    periodo_inicio: Optional[str] = None
+    periodo_fim: Optional[str] = None
