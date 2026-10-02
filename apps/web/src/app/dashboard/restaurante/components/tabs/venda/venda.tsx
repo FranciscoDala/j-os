@@ -7,6 +7,7 @@ import { Toasts, PayModal, ConfirmModal } from "./modals/venda";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const API_BASE = `${API_URL}/api/v1/produtos`;
+const VENDAS_API = `${API_URL}/api/v1/vendas`;
 
 type Toast = { id: string; msg: string; type: "success" | "error" | "info" | "warning" };
 
@@ -24,6 +25,8 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const [showConfirm, setShowConfirm] = useState(false);
     const [recebido, setRecebido] = useState("");
     const [forma, setForma] = useState<"dinheiro" | "transferencia" | "tpa">("dinheiro");
+    const [finalizando, setFinalizando] = useState(false);
+    const [ultimaVenda, setUltimaVenda] = useState<any>(null);
 
     const pushToast = (msg: string, type: Toast["type"] = "info") => {
         const id = Date.now().toString() + Math.random().toString().slice(2);
@@ -104,11 +107,58 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         else { setRecebido((s) => (s + val).slice(0, 10)); }
     };
 
+    // FINALIZA VENDA REAL -> CAIXA
+    const finalizarVenda = async () => {
+        if (cart.length === 0) return;
+        if (forma === "dinheiro" && recebidoNum < total) {
+            pushToast("Valor recebido insuficiente", "error");
+            return;
+        }
+        setFinalizando(true);
+        try {
+            const token = localStorage.getItem("access_token");
+            const payload = {
+                itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })),
+                mesa_id: null,
+                dinheiro_recebido: forma === "dinheiro" ? recebidoNum : total,
+                forma_pagamento: forma.toUpperCase()
+            };
+            const r = await fetch(`${VENDAS_API}/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify(payload)
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.detail || "Erro ao finalizar venda");
+            setUltimaVenda(data);
+            setShowPay(false);
+            setShowConfirm(true);
+            pushToast(`Venda #${data.numero} finalizada - Kz ${Number(data.total).toLocaleString("de-DE")}`, "success");
+        } catch (e: any) {
+            pushToast(e.message, "error");
+        } finally {
+            setFinalizando(false);
+        }
+    };
+
+    const imprimirFatura = () => {
+        const win = window.open("", "_blank", "width=320,height=600");
+        if (!win) return;
+        const vendaNum = ultimaVenda?.numero ? ` #${ultimaVenda.numero}` : "";
+        const html = `<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px;color:#000}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}td{padding:2px 0}</style></head><body><div class="center bold">RESTAURANTE JENATH${vendaNum}<br/>NIF: 123456789<br/>Talatona, Luanda<br/>${forma.toUpperCase()}</div><div class="line"></div><div>Data: ${new Date().toLocaleString()}<br/>Mesa: Balcão<br/>Operador: Admin</div><div class="line"></div><table>${cart.map(i => `<tr><td>${i.name} x${i.qtd}</td><td style="text-align:right">Kz ${(i.price * i.qtd).toLocaleString("de-DE")}</td></tr>`).join("")}</table><div class="line"></div><table><tr><td class="bold">TOTAL</td><td style="text-align:right" class="bold">Kz ${total.toLocaleString("de-DE")}</td></tr>${forma === "dinheiro" ? `<tr><td>Recebido</td><td style="text-align:right">Kz ${recebidoNum.toLocaleString("de-DE")}</td></tr><tr><td class="bold">TROCO</td><td style="text-align:right" class="bold">Kz ${troco.toLocaleString("de-DE")}</td></tr>` : ``}<tr><td>Pagamento</td><td style="text-align:right">${forma}</td></tr></table><div class="line"></div><div class="center">Obrigado pela preferência!<br/>Volte sempre</div><script>window.print(); window.close();</script></body></html>`;
+        win.document.write(html); win.document.close();
+    };
+
+    const aposVenda = (comRecibo: boolean) => {
+        if (comRecibo) imprimirFatura();
+        setShowConfirm(false); setShowPay(false); setCart([]); setRecebido(""); setUltimaVenda(null);
+    };
+
     useEffect(() => {
         if (!showPay || forma !== "dinheiro") return;
         const onKey = (e: KeyboardEvent) => {
             if (e.key === "Escape") setShowPay(false);
-            else if (e.key === "Enter") { if (recebidoNum >= total) setShowConfirm(true); }
+            else if (e.key === "Enter") { if (recebidoNum >= total) finalizarVenda(); }
             else if (e.key === "Backspace") { e.preventDefault(); handleCalc("DEL"); }
             else if (/^[0-9]$/.test(e.key)) handleCalc(e.key);
             else if (e.key === "." || e.key === ",") handleCalc(".");
@@ -118,14 +168,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     }, [showPay, forma, recebidoNum, total, recebido]);
 
     const filteredByCat = activeCat === "All" ? dbProducts : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
-
-    const imprimirFatura = () => {
-        const win = window.open("", "_blank", "width=320,height=600");
-        if (!win) return;
-        const html = `<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px;color:#000}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}td{padding:2px 0}</style></head><body><div class="center bold">RESTAURANTE JENATH<br/>NIF: 123456789<br/>Talatona, Luanda<br/>${forma.toUpperCase()}</div><div class="line"></div><div>Data: ${new Date().toLocaleString()}<br/>Mesa: Balcão<br/>Operador: Admin</div><div class="line"></div><table>${cart.map(i => `<tr><td>${i.name} x${i.qtd}</td><td style="text-align:right">Kz ${(i.price * i.qtd).toLocaleString("de-DE")}</td></tr>`).join("")}</table><div class="line"></div><table><tr><td class="bold">TOTAL</td><td style="text-align:right" class="bold">Kz ${total.toLocaleString("de-DE")}</td></tr>${forma === "dinheiro" ? `<tr><td>Recebido</td><td style="text-align:right">Kz ${recebidoNum.toLocaleString("de-DE")}</td></tr><tr><td class="bold">TROCO</td><td style="text-align:right" class="bold">Kz ${troco.toLocaleString("de-DE")}</td></tr>` : ``}<tr><td>Pagamento</td><td style="text-align:right">${forma}</td></tr></table><div class="line"></div><div class="center">Obrigado pela preferência!<br/>Volte sempre</div><script>window.print(); window.close();</script></body></html>`;
-        win.document.write(html); win.document.close();
-        setShowConfirm(false); setShowPay(false); setCart([]); setRecebido("");
-    };
 
     return (
         <div className="h-full w-full flex flex-col bg-[#F5F7FB] overflow-hidden relative">
@@ -137,8 +179,8 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                 <ProdutosSection dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd} cats={cats} activeCat={activeCat} setActiveCat={setActiveCat} searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef} getQty={getQty} getStockState={getStockState} add={add} />
                 <CarrinhoSection cart={cart} total={total} forma={forma} setForma={setForma} setShowPay={setShowPay} setRecebido={setRecebido} />
             </div>
-            <PayModal showPay={showPay} setShowPay={setShowPay} total={total} forma={forma} recebido={recebido} recebidoNum={recebidoNum} troco={troco} handleCalc={handleCalc} setShowConfirm={setShowConfirm} />
-            <ConfirmModal showConfirm={showConfirm} setShowConfirm={setShowConfirm} total={total} forma={forma} troco={troco} imprimirFatura={imprimirFatura} />
+            <PayModal showPay={showPay} setShowPay={setShowPay} total={total} forma={forma} recebido={recebido} recebidoNum={recebidoNum} troco={troco} handleCalc={handleCalc} setShowConfirm={finalizarVenda} loading={finalizando} />
+            <ConfirmModal showConfirm={showConfirm} setShowConfirm={setShowConfirm} total={total} forma={forma} troco={troco} imprimirFatura={() => aposVenda(true)} onSemRecibo={() => aposVenda(false)} vendaNumero={ultimaVenda?.numero} />
             <style jsx>{`.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none;}`}</style>
         </div>
     );
