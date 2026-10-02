@@ -15,10 +15,20 @@ def _to_jsonable(obj: Any):
         return float(obj)
     if isinstance(obj, uuid.UUID):
         return str(obj)
-    if hasattr(obj, 'isoformat'): # datetime
+    if hasattr(obj, 'isoformat'):
         try: return obj.isoformat()
         except: pass
     return obj
+
+def _try_broadcast(empresa_id, payload):
+    try:
+        from jos_api.core.realtime import manager
+        import asyncio
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(manager.broadcast(str(empresa_id), payload))
+    except:
+        pass
 
 def registrar_atividade(
     db: Session,
@@ -53,6 +63,18 @@ def registrar_atividade(
     if commit:
         db.commit()
         db.refresh(entry)
+        _try_broadcast(empresa_id, {
+            "type": "ATIVIDADE_NOVA",
+            "log": {
+                "id": str(entry.id),
+                "user_nome": entry.user_nome,
+                "modulo": entry.modulo,
+                "acao": entry.acao,
+                "entidade_nome": entry.entidade_nome,
+                "descricao": entry.descricao,
+                "created_at": entry.created_at.isoformat() if entry.created_at else None
+            }
+        })
     return entry
 
 log = registrar_atividade

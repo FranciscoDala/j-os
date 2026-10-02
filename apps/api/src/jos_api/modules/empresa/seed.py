@@ -3,6 +3,16 @@ from sqlalchemy.orm import Session
 from .models import TipoEmpresaEnum
 from .perfis_models import Perfil
 
+def _try_broadcast(empresa_id, payload):
+    try:
+        from jos_api.core.realtime import manager
+        import asyncio
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(manager.broadcast(str(empresa_id), payload))
+    except:
+        pass
+
 TEMPLATE_PERFIS = {
     TipoEmpresaEnum.RESTAURANTE: [
         {"nome": "DONO", "slug": "dono", "permissoes": {"all": True}},
@@ -43,7 +53,11 @@ TEMPLATE_PERFIS = {
 
 def seed_perfis_por_tipo(db: Session, empresa_id: UUID, tipo: TipoEmpresaEnum):
     templates = TEMPLATE_PERFIS.get(tipo, TEMPLATE_PERFIS[TipoEmpresaEnum.VAREJO])
+    criados = []
     for t in templates:
         p = Perfil(empresa_id=empresa_id, nome=t["nome"], slug=t["slug"], permissoes=t["permissoes"], is_system=True)
         db.add(p)
+        criados.append(p)
     db.flush()
+    # broadcast perfis criados
+    _try_broadcast(empresa_id, {"type": "PERFIS_CRIADOS", "perfis": [{"id": str(c.id), "nome": c.nome, "slug": c.slug} for c in criados]})

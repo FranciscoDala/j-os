@@ -72,3 +72,15 @@ class TransferirMesaRequest(BaseModel):
 
 class UpdateItemStatusRequest(BaseModel):
     status: str # PENDENTE, EM_PREPARO, PRONTO, ENTREGUE, CANCELADO
+
+class ReservaRequest(BaseModel):
+    produto_id: UUID
+    quantidade: Decimal
+
+class ReservaResponse(BaseModel):
+    id: UUID
+    produto_id: UUID
+    quantidade: Decimal
+    expira_em: datetime
+    class Config:
+        from_attributes = True

@@ -64,6 +64,43 @@ export function CaixaTab() {
         document.addEventListener("mousedown", h); return ()=>document.removeEventListener("mousedown", h);
     }, []);
 
+    // REALTIME - apenas adicionado
+    useEffect(() => {
+        const onCaixaUpdate = () => load();
+        const onExtratoPush = (e: any) => {
+            const mov = e.detail;
+            if (!mov) return;
+            // só injeta se estiver no dia de hoje
+            const hoje = todayISO();
+            if (inicio === hoje && fim === hoje) {
+                setExtrato((prev: any) => {
+                    if (!prev) return prev;
+                    const exists = prev.movimentos?.some((m:any)=> m.id === mov.id);
+                    if (exists) return prev;
+                    return {
+                        ...prev,
+                        movimentos: [mov, ...(prev.movimentos || [])],
+                        saldo_atual: Number(prev.saldo_atual || 0) + Number(mov.valor || 0),
+                        total_entradas: Number(mov.valor) > 0 ? Number(prev.total_entradas||0) + Number(mov.valor) : prev.total_entradas,
+                        total_saidas: Number(mov.valor) < 0 ? Number(prev.total_saidas||0) + Number(mov.valor) : prev.total_saidas,
+                    };
+                });
+                // atualiza status também
+                setStatus((s:any) => s ? {...s, aberto: true} : s);
+            }
+        };
+        const onVendaNova = () => load();
+
+        window.addEventListener("caixa:update" as any, onCaixaUpdate);
+        window.addEventListener("caixa:extrato" as any, onExtratoPush);
+        window.addEventListener("venda:nova" as any, onVendaNova);
+        return () => {
+            window.removeEventListener("caixa:update" as any, onCaixaUpdate);
+            window.removeEventListener("caixa:extrato" as any, onExtratoPush);
+            window.removeEventListener("venda:nova" as any, onVendaNova);
+        };
+    }, [inicio, fim]);
+
     const movs = extrato?.movimentos || [];
     const entradas = Number(extrato?.total_entradas || 0);
     const saidas = Math.abs(Number(extrato?.total_saidas || 0));

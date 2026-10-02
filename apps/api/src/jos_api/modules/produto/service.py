@@ -8,6 +8,16 @@ from decimal import Decimal
 from datetime import datetime
 from jos_api.modules.atividade.service import registrar_atividade
 
+def _try_broadcast(empresa_id, payload):
+    try:
+        from jos_api.core.realtime import manager
+        import asyncio
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(manager.broadcast(str(empresa_id), payload))
+    except:
+        pass
+
 def get_produto_by_id(db: Session, produto_id: uuid.UUID, empresa_id: uuid.UUID | None):
     if not empresa_id: raise HTTPException(403, "Sem empresa")
     p = db.query(models.Product).filter(models.Product.id == produto_id, models.Product.empresa_id == empresa_id, models.Product.deleted_at == None).first()
@@ -45,6 +55,7 @@ def create_produto(db: Session, produto: schemas.ProdutoCreateRequest, empresa_i
         db.add(db_prod); db.flush()
         registrar_atividade(db, empresa_id=empresa_id, modulo="PRODUTO", acao="CRIAR", descricao=f"Criou produto '{db_prod.nome}' ({db_prod.codigo})", entidade="Product", entidade_id=db_prod.id, entidade_nome=db_prod.nome, user_id=created_by, user_nome=criado_por_nome, detalhes=data, ip=ip, commit=False)
         db.commit(); db.refresh(db_prod)
+        _try_broadcast(empresa_id, {"type": "PRODUTO_CRIADO", "produto": {"id": str(db_prod.id), "nome": db_prod.nome, "codigo": db_prod.codigo, "preco_venda": str(db_prod.preco_venda), "stock_atual": str(db_prod.stock_atual), "controlar_stock": db_prod.controlar_stock, "ativo": db_prod.ativo, "categoria": db_prod.categoria, "tem_iva": db_prod.tem_iva, "iva": str(db_prod.iva)}})
         return db_prod
     except IntegrityError as e:
         db.rollback()
@@ -67,6 +78,7 @@ def update_produto(db: Session, produto_id: uuid.UUID, update: schemas.ProdutoUp
     db.flush()
     registrar_atividade(db, empresa_id=empresa_id, modulo="PRODUTO", acao="EDITAR", descricao=f"Editou produto '{antes}' -> '{prod.nome}'", entidade="Product", entidade_id=prod.id, entidade_nome=prod.nome, user_id=user_id, user_nome=user_nome, detalhes={"alterado": d, "antes": antes}, ip=ip, commit=False)
     db.commit(); db.refresh(prod)
+    _try_broadcast(empresa_id, {"type": "PRODUTO_ATUALIZADO", "produto": {"id": str(prod.id), "nome": prod.nome, "codigo": prod.codigo, "preco_venda": str(prod.preco_venda), "stock_atual": str(prod.stock_atual), "controlar_stock": prod.controlar_stock, "ativo": prod.ativo, "categoria": prod.categoria, "tem_iva": prod.tem_iva, "iva": str(prod.iva), "imagem_url": prod.imagem_url}})
     return prod
 
 def delete_produto(db: Session, produto_id: uuid.UUID, empresa_id: uuid.UUID | None, user_id: uuid.UUID | None = None, user_nome: str = "Sistema", ip: str | None = None):
@@ -78,6 +90,7 @@ def delete_produto(db: Session, produto_id: uuid.UUID, empresa_id: uuid.UUID | N
     prod.deleted_at = datetime.utcnow(); prod.ativo = False; db.flush()
     registrar_atividade(db, empresa_id=empresa_id, modulo="PRODUTO", acao="DELETAR", descricao=f"Apagou produto '{nome_guardado}' ({codigo_guardado})", entidade="Product", entidade_id=prod.id, entidade_nome=nome_guardado, user_id=user_id, user_nome=user_nome, detalhes={"codigo": codigo_guardado, "preco": str(prod.preco_venda), "stock": str(prod.stock_atual)}, ip=ip, commit=False)
     db.commit()
+    _try_broadcast(empresa_id, {"type": "PRODUTO_DELETADO", "produto_id": str(prod.id)})
     return {"message": f"Produto '{nome_guardado}' apagado"}
 
 def baixar_stock(db: Session, produto_id: uuid.UUID, qtd: Decimal, empresa_id: uuid.UUID | None):
@@ -85,7 +98,9 @@ def baixar_stock(db: Session, produto_id: uuid.UUID, qtd: Decimal, empresa_id: u
     prod = get_produto_by_id(db, produto_id, empresa_id)
     if not prod.controlar_stock: return prod
     if prod.stock_atual < qtd and not prod.allow_negative: raise ValueError(f"Stock insuficiente: {prod.stock_atual}")
-    prod.stock_atual -= qtd; db.commit(); return prod
+    prod.stock_atual -= qtd; db.commit(); db.refresh(prod)
+    _try_broadcast(empresa_id, {"type": "PRODUTO_ATUALIZADO", "produto": {"id": str(prod.id), "stock_atual": str(prod.stock_atual)}})
+    return prod
 
 def get_categorias(db: Session, empresa_id: uuid.UUID | None):
     if not empresa_id: raise HTTPException(403, "Sem empresa")

@@ -31,12 +31,12 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const pushToast = (msg: string, type: Toast["type"] = "info") => {
         const id = Date.now().toString() + Math.random().toString().slice(2);
         setToasts(t => [...t, { id, msg, type }]);
-        setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000);
+        setTimeout(() => setToasts(t => t.filter(x => x.id!== id)), 4000);
     };
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if ((e.key === "/" && !(e.target instanceof HTMLInputElement)) || (e.ctrlKey && e.key.toLowerCase() === "k")) {
+            if ((e.key === "/" &&!(e.target instanceof HTMLInputElement)) || (e.ctrlKey && e.key.toLowerCase() === "k")) {
                 e.preventDefault(); setShowSearch(true); setTimeout(() => searchRef.current?.focus(), 50);
             }
             if (e.key === "Escape" && showSearch) { setShowSearch(false); setSearchV(""); }
@@ -47,20 +47,19 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
     useEffect(() => { if (showSearch) searchRef.current?.focus(); }, [showSearch]);
 
-    useEffect(() => {
-        const fetchReal = async () => {
-            setLoadingProd(true);
-            try {
-                const token = localStorage.getItem("access_token");
-                const qs = new URLSearchParams({ skip: "0", limit: "100", search: searchV });
-                const r = await fetch(`${API_BASE}/?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
-                const data = await r.json();
-                if (r.ok) setDbProducts((data.items || []).filter((p: any) => p.ativo !== false));
-            } catch { }
-            setLoadingProd(false);
-        };
-        fetchReal();
-    }, [searchV]);
+    const fetchReal = async () => {
+        setLoadingProd(true);
+        try {
+            const token = localStorage.getItem("access_token");
+            const qs = new URLSearchParams({ skip: "0", limit: "100", search: searchV });
+            const r = await fetch(`${API_BASE}/?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+            const data = await r.json();
+            if (r.ok) setDbProducts((data.items || []).filter((p: any) => p.ativo!== false));
+        } catch { }
+        setLoadingProd(false);
+    };
+
+    useEffect(() => { fetchReal(); }, [searchV]);
 
     useEffect(() => {
         const fetchCats = async () => {
@@ -73,11 +72,52 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         fetchCats();
     }, []);
 
-    const cats = ["All", ...catsDb];
+    // REALTIME - stock ao vivo
+    useEffect(() => {
+        const onProdutoUpdate = (e: any) => {
+            const p = e.detail;
+            if (!p?.id) return;
+            setDbProducts(prev => prev.map(x => x.id === p.id? {...x,...p} : x));
+            // se produto no carrinho ficou sem stock
+            setCart(prev => prev.map(c => {
+                if (c.id === p.id && p.controlar_stock) {
+                    const atual = Number(p.stock_atual?? 0);
+                    if (c.qtd > atual) {
+                        pushToast(`Stock de "${p.nome}" atualizado para ${atual}. Ajustado no carrinho.`, "warning");
+                        return {...c, qtd: atual};
+                    }
+                }
+                return c;
+            }).filter(c => c.qtd > 0));
+        };
+        const onReserva = (e: any) => {
+            // outro operador reservou, diminui disponível visualmente
+            const d = e.detail;
+            if (!d?.produto_id) return;
+            setDbProducts(prev => prev.map(p => {
+                if (p.id === d.produto_id && p.controlar_stock) {
+                    // não baixa o stock real, só avisa
+                    if (d.acao === "reservado") pushToast(`Alguém reservou ${d.quantidade}x ${p.nome}`, "info");
+                }
+                return p;
+            }));
+        };
+
+        window.addEventListener("produto:update" as any, onProdutoUpdate);
+        window.addEventListener("reserva:update" as any, onReserva);
+        window.addEventListener("venda:nova" as any, () => fetchReal());
+        return () => {
+            window.removeEventListener("produto:update" as any, onProdutoUpdate);
+            window.removeEventListener("reserva:update" as any, onReserva);
+            window.removeEventListener("venda:nova" as any, () => fetchReal());
+        };
+    }, []);
+
+    const cats = ["All",...catsDb];
     const getStockState = (p: any) => {
         if (!p.controlar_stock) return "ok";
-        const atual = Number(p.stock_atual ?? 0);
-        const minimo = Number(p.stock_minimo ?? 0);
+        const atual = Number(p.stock_atual?? 0);
+        const minimo = Number(p.stock_minimo?? 0);
         if (atual <= 0) return "zero";
         if (atual <= minimo || atual <= 5) return "low";
         return "ok";
@@ -85,25 +125,25 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
     const add = (p: any) => {
         const state = getStockState(p);
-        const atual = Number(p.stock_atual ?? 0);
+        const atual = Number(p.stock_atual?? 0);
         const qtyInCart = cart.find(c => c.id === p.id)?.qtd || 0;
         if (state === "zero") { pushToast(`Sem stock: "${p.nome}" está esgotado. Repor stock para continuar a vender.`, "error"); return; }
         if (p.controlar_stock && qtyInCart >= atual) { pushToast(`Stock insuficiente: só temos ${atual} un. de "${p.nome}" disponível.`, "warning"); return; }
         const ex = cart.find((c) => c.id === p.id);
-        if (ex) setCart(cart.map((c) => (c.id === p.id ? { ...c, qtd: c.qtd + 1 } : c)));
+        if (ex) setCart(cart.map((c) => (c.id === p.id? {...c, qtd: c.qtd + 1 } : c)));
         else setCart([...cart, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: `${API_URL}${p.imagem_url}` || "", qtd: 1 }]);
     };
 
     const getQty = (id: string) => cart.find((c) => c.id === id)?.qtd || 0;
     const total = cart.reduce((s, i) => s + i.price * i.qtd, 0);
-    const recebidoNum = recebido ? parseFloat(recebido) : 0;
+    const recebidoNum = recebido? parseFloat(recebido) : 0;
     const troco = recebidoNum - total;
 
     const handleCalc = (val: string) => {
         if (val === "C") setRecebido("");
         else if (val === "DEL") setRecebido((s) => s.slice(0, -1));
-        else if (val === "00") { if (recebido !== "") setRecebido((s) => s + "00"); }
-        else if (val === ".") { if (!recebido.includes(".")) setRecebido((s) => (s === "" ? "0." : s + ".")); }
+        else if (val === "00") { if (recebido!== "") setRecebido((s) => s + "00"); }
+        else if (val === ".") { if (!recebido.includes(".")) setRecebido((s) => (s === ""? "0." : s + ".")); }
         else { setRecebido((s) => (s + val).slice(0, 10)); }
     };
 
@@ -120,7 +160,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             const payload = {
                 itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })),
                 mesa_id: null,
-                dinheiro_recebido: forma === "dinheiro" ? recebidoNum : total,
+                dinheiro_recebido: forma === "dinheiro"? recebidoNum : total,
                 forma_pagamento: forma.toUpperCase()
             };
             const r = await fetch(`${VENDAS_API}/`, {
@@ -144,8 +184,8 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const imprimirFatura = () => {
         const win = window.open("", "_blank", "width=320,height=600");
         if (!win) return;
-        const vendaNum = ultimaVenda?.numero ? ` #${ultimaVenda.numero}` : "";
-        const html = `<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px;color:#000}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}td{padding:2px 0}</style></head><body><div class="center bold">RESTAURANTE JENATH${vendaNum}<br/>NIF: 123456789<br/>Talatona, Luanda<br/>${forma.toUpperCase()}</div><div class="line"></div><div>Data: ${new Date().toLocaleString()}<br/>Mesa: Balcão<br/>Operador: Admin</div><div class="line"></div><table>${cart.map(i => `<tr><td>${i.name} x${i.qtd}</td><td style="text-align:right">Kz ${(i.price * i.qtd).toLocaleString("de-DE")}</td></tr>`).join("")}</table><div class="line"></div><table><tr><td class="bold">TOTAL</td><td style="text-align:right" class="bold">Kz ${total.toLocaleString("de-DE")}</td></tr>${forma === "dinheiro" ? `<tr><td>Recebido</td><td style="text-align:right">Kz ${recebidoNum.toLocaleString("de-DE")}</td></tr><tr><td class="bold">TROCO</td><td style="text-align:right" class="bold">Kz ${troco.toLocaleString("de-DE")}</td></tr>` : ``}<tr><td>Pagamento</td><td style="text-align:right">${forma}</td></tr></table><div class="line"></div><div class="center">Obrigado pela preferência!<br/>Volte sempre</div><script>window.print(); window.close();</script></body></html>`;
+        const vendaNum = ultimaVenda?.numero? ` #${ultimaVenda.numero}` : "";
+        const html = `<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px;color:#000}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}td{padding:2px 0}</style></head><body><div class="center bold">RESTAURANTE JENATH${vendaNum}<br/>NIF: 123456789<br/>Talatona, Luanda<br/>${forma.toUpperCase()}</div><div class="line"></div><div>Data: ${new Date().toLocaleString()}<br/>Mesa: Balcão<br/>Operador: Admin</div><div class="line"></div><table>${cart.map(i => `<tr><td>${i.name} x${i.qtd}</td><td style="text-align:right">Kz ${(i.price * i.qtd).toLocaleString("de-DE")}</td></tr>`).join("")}</table><div class="line"></div><table><tr><td class="bold">TOTAL</td><td style="text-align:right" class="bold">Kz ${total.toLocaleString("de-DE")}</td></tr>${forma === "dinheiro"? `<tr><td>Recebido</td><td style="text-align:right">Kz ${recebidoNum.toLocaleString("de-DE")}</td></tr><tr><td class="bold">TROCO</td><td style="text-align:right" class="bold">Kz ${troco.toLocaleString("de-DE")}</td></tr>` : ``}<tr><td>Pagamento</td><td style="text-align:right">${forma}</td></tr></table><div class="line"></div><div class="center">Obrigado pela preferência!<br/>Volte sempre</div><script>window.print(); window.close();</script></body></html>`;
         win.document.write(html); win.document.close();
     };
 
@@ -155,7 +195,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     };
 
     useEffect(() => {
-        if (!showPay || forma !== "dinheiro") return;
+        if (!showPay || forma!== "dinheiro") return;
         const onKey = (e: KeyboardEvent) => {
             if (e.key === "Escape") setShowPay(false);
             else if (e.key === "Enter") { if (recebidoNum >= total) finalizarVenda(); }
@@ -167,7 +207,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         return () => window.removeEventListener("keydown", onKey);
     }, [showPay, forma, recebidoNum, total, recebido]);
 
-    const filteredByCat = activeCat === "All" ? dbProducts : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
+    const filteredByCat = activeCat === "All"? dbProducts : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
 
     return (
         <div className="h-full w-full flex flex-col bg-[#F5F7FB] overflow-hidden relative">

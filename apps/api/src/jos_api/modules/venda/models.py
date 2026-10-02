@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 import enum
 from sqlalchemy import String, DateTime, ForeignKey, Numeric, UniqueConstraint, Boolean
@@ -61,3 +61,14 @@ class VendaItem(Base):
     status: Mapped[VendaItemStatus] = mapped_column(SAEnum(VendaItemStatus, name="vendaitemstatus", create_type=False), default=VendaItemStatus.PENDENTE, nullable=False, index=True)
     observacao: Mapped[str | None] = mapped_column(String(500), nullable=True)
     venda: Mapped[Venda] = relationship("Venda", back_populates="itens")
+
+# NOVO - RESERVA TEMPORÁRIA DE CARRINHO
+class ReservaCarrinho(Base):
+    __tablename__ = "reservas_carrinho"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    empresa_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True, nullable=False)
+    produto_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True, nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True, nullable=False)
+    quantidade: Mapped[Decimal] = mapped_column(Numeric(12,3), nullable=False)
+    expira_em: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow() + timedelta(minutes=5), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

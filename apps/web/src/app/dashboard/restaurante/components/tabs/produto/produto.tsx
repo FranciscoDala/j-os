@@ -83,6 +83,33 @@ export function ProdutosTab() {
     };
     useEffect(() => { fetchProds(); fetchCats(); }, [search, cat]);
 
+    // REALTIME - apenas adicionado
+    useEffect(() => {
+        const onProdutoUpdate = (e: any) => {
+            const p = e.detail;
+            if (!p?.id) return;
+            setItems(prev => {
+                const exists = prev.find(x => x.id === p.id);
+                if (exists) {
+                    return prev.map(x => x.id === p.id? {...x,...p } : x);
+                }
+                // se for produto novo e estamos sem filtro, adiciona no topo
+                if (!search &&!cat) return [p,...prev].slice(0, 20);
+                return prev;
+            });
+        };
+        const onVenda = () => fetchProds(); // venda consome stock, recarrega
+
+        window.addEventListener("produto:update" as any, onProdutoUpdate);
+        window.addEventListener("venda:nova" as any, onVenda);
+        window.addEventListener("reserva:update" as any, onVenda);
+        return () => {
+            window.removeEventListener("produto:update" as any, onProdutoUpdate);
+            window.removeEventListener("venda:nova" as any, onVenda);
+            window.removeEventListener("reserva:update" as any, onVenda);
+        };
+    }, [search, cat]);
+
     const genCode = () => `P-${Date.now().toString().slice(-6)}`;
     const resetForm = () => {
         setForm({ nome: "", codigo: genCode(), preco_venda: "", preco_custo: "0", tipo: "RESTAURANT_DISH", unidade: "UNIT", categoria: "", descricao: "", codigo_barras: "", codigo_qr: "", iva: "0", tem_iva: false, peso: "", ativo: true, controlar_stock: true, allow_negative: false, stock_atual: "0", stock_minimo: "0", prep_time: "", kitchen_station: "", is_modifiable: false, service_duration: "", imagem_url: "" });
