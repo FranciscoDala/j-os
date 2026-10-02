@@ -19,87 +19,40 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const todayISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' });
 
-const toUTCDate = (iso?: string) => {
-    if (!iso) return null;
-    let s = iso;
-    if (s.includes('T') &&!s.endsWith('Z') &&!s.includes('+') && s.lastIndexOf('-') < 11) s += 'Z';
-    const d = new Date(s);
-    return isNaN(d.getTime())? null : d;
-};
-const getLocalDatePart = (iso?: string) => {
-    if (!iso) return "";
-    const d = toUTCDate(iso);
-    if (!d) return iso.slice(0,10);
-    return d.toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' });
-};
-
 export function CaixaTab() {
     const [status, setStatus] = useState<any>(null);
     const [extrato, setExtrato] = useState<any>(null);
     const [historico, setHistorico] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState(todayISO());
-    const [showExtrato, setShowExtrato] = useState(false);
+    const [showExtrato, setShowExtrato] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<"abrir" | "fechar" | "forcar">("abrir");
     const [sangriaOpen, setSangriaOpen] = useState(false);
     const [sangriaTipo, setSangriaTipo] = useState<"SANGRIA" | "SUPRIMENTO">("SANGRIA");
     const [confirm, setConfirm] = useState<{open: boolean, title: string, desc: string, type: "black"|"green"|"red", action: ()=>void}>({open: false, title:"", desc:"", type:"black", action: ()=>{}});
 
-    const loadAll = async () => {
+    const loadAll = async (date = selectedDate) => {
         const s = await apiFetch("/caixa/status").catch(()=>null);
         setStatus(s);
-        const h = await apiFetch("/caixa/historico").catch(async()=> await apiFetch("/caixa/").catch(()=>[]));
+        const h = await apiFetch("/caixa/historico").catch(()=>[]);
         setHistorico(Array.isArray(h)? h : []);
+        // busca extrato pela data selecionada - é aqui que corrige
+        try {
+            const ext = date === todayISO() && s?.aberto? await apiFetch("/caixa/extrato") : await apiFetch(`/caixa/extrato-por-data/${date}`);
+            setExtrato(ext);
+        } catch {
+            setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0, total_entradas: 0, total_saidas: 0 });
+        }
     };
 
-    useEffect(()=>{ (async()=>{ setLoading(true); await loadAll(); setLoading(false); })(); }, []);
-
-    const caixaDoDia = useMemo(() => {
-        if (!selectedDate || historico.length===0 &&!status?.aberto) return null;
-        if (status?.aberto && status?.caixa_atual?.aberto_em) {
-            const ab = getLocalDatePart(status.caixa_atual.aberto_em);
-            if (selectedDate >= ab) return status.caixa_atual;
-        }
-        const achado = historico.find((c:any)=> {
-            const ab = getLocalDatePart(c.aberto_em);
-            const fe = c.fechado_em? getLocalDatePart(c.fechado_em) : todayISO();
-            return selectedDate >= ab && selectedDate <= fe;
-        });
-        return achado || historico.find((c:any)=> getLocalDatePart(c.aberto_em) === selectedDate) || null;
-    }, [selectedDate, historico, status]);
-
-    useEffect(()=>{
-        (async()=>{
-            if (!caixaDoDia) { setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0, total_entradas: 0, total_saidas: 0 }); return; }
-            setLoading(true);
-            try {
-                const isAbertoAtual = status?.aberto && caixaDoDia.id === status?.caixa_atual?.id;
-                const ext = isAbertoAtual? await apiFetch("/caixa/extrato") : await apiFetch(`/caixa/${caixaDoDia.id}/extrato`);
-                setExtrato(ext);
-            } catch {
-                setExtrato({ movimentos: [], saldo_inicial: caixaDoDia.saldo_inicial||0, saldo_atual: caixaDoDia.saldo_final_esperado||caixaDoDia.saldo_atual||0, total_entradas: 0, total_saidas: 0 });
-            }
-            setLoading(false);
-        })();
-    },[caixaDoDia]);
+    useEffect(()=>{ (async()=>{ setLoading(true); await loadAll(selectedDate); setLoading(false); })(); }, []);
+    useEffect(()=>{ (async()=>{ setLoading(true); await loadAll(selectedDate); setLoading(false); })(); }, [selectedDate]);
 
     const movs = extrato?.movimentos || [];
-    const { entradas, saidas, atual } = useMemo(()=>{
-        if (extrato?.total_entradas!=null || extrato?.total_saidas!=null) {
-            const ent = Number(extrato.total_entradas||0);
-            const sai = Math.abs(Number(extrato.total_saidas||0));
-            const tot = extrato.saldo_atual!=null? Number(extrato.saldo_atual) : Number(extrato.saldo_inicial||0)+ent-sai;
-            return { entradas: ent, saidas: sai, atual: tot };
-        }
-        let ent = 0, sai = 0;
-        movs.forEach((m:any)=>{
-            if ((m.tipo||"").toUpperCase() === "ABERTURA") return;
-            const v = Number(m.valor||0); if (v > 0) ent += v; if (v < 0) sai += Math.abs(v);
-        });
-        const tot = caixaDoDia?.saldo_final_esperado!=null? Number(caixaDoDia.saldo_final_esperado) : Number(extrato?.saldo_inicial||caixaDoDia?.saldo_inicial||0)+ent-sai;
-        return { entradas: ent, saidas: sai, atual: tot };
-    }, [extrato, movs, caixaDoDia]);
+    const entradas = Number(extrato?.total_entradas || 0);
+    const saidas = Math.abs(Number(extrato?.total_saidas || 0));
+    const atual = Number(extrato?.saldo_atual?? extrato?.saldo_inicial?? 0);
 
     const handleCardClick = (type: "master" | "entradas" | "saidas") => {
         if (type === "master") {
@@ -118,12 +71,11 @@ export function CaixaTab() {
 
     if (loading &&!extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
 
-    const isAbertoNoDia =!!(caixaDoDia &&!caixaDoDia.fechado_em) ||!!(status?.aberto && selectedDate >= getLocalDatePart(status.caixa_atual?.aberto_em));
+    const caixaAberto = status?.aberto && selectedDate >= new Date(status.caixa_atual.aberto_em).toLocaleDateString('en-CA', {timeZone: 'Africa/Luanda'});
 
     return (
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
-
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div className="w-full md:w-[calc((100%-32px)/3)]"><JCalendarPicker value={selectedDate} onChange={setSelectedDate} /></div>
                 <label className="flex items-center gap-3 bg-white border rounded-full px-4 h-[42px] cursor-pointer select-none w-fit">
@@ -138,7 +90,7 @@ export function CaixaTab() {
 
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div onClick={()=>handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
-                    <MasterCard aberto={isAbertoNoDia} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={selectedDate.slice(5).replace("-","/")} horaAbertura={caixaDoDia? (toUTCDate(caixaDoDia.aberto_em)?.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit', timeZone: 'Africa/Luanda'})||"--:--") : "--:--"} />
+                    <MasterCard aberto={caixaAberto} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={selectedDate.slice(5).replace("-","/")} horaAbertura={extrato?.movimentos?.[0]? new Date(extrato.movimentos[0].criado_em).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) : "--:--"} />
                 </div>
                 <div onClick={()=>handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={selectedDate.slice(5).replace("-","/")} qtdVendas={movs.filter((m:any)=> (m.tipo||"").toUpperCase().includes("VENDA")).length} />
@@ -151,8 +103,8 @@ export function CaixaTab() {
             {showExtrato && <ExtratoList movimentos={movs} selectedDate={selectedDate} />}
 
             <JConfirm open={confirm.open} title={confirm.title} desc={confirm.desc} type={confirm.type} onClose={()=>setConfirm(s=>({...s, open:false}))} onConfirm={confirm.action} />
-            <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={status?.caixa_atual || caixaDoDia || extrato} onClose={()=>setModalOpen(false)} onSuccess={async()=>{ await loadAll(); toast.success("Atualizado!"); }} />
-            <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={()=>setSangriaOpen(false)} onSuccess={async()=>{ await loadAll(); toast.success("Feito!"); }} />
+            <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={status?.caixa_atual || extrato} onClose={()=>setModalOpen(false)} onSuccess={async()=>{ await loadAll(selectedDate); toast.success("Atualizado!"); }} />
+            <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={()=>setSangriaOpen(false)} onSuccess={async()=>{ await loadAll(selectedDate); toast.success("Feito!"); }} />
         </div>
     )
 }
