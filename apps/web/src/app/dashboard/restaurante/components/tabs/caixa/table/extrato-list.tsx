@@ -37,11 +37,11 @@ export function ExtratoList({ movimentos, selectedDate }: { movimentos: any[], s
                                         <p className="text-[11px] font-bold text-black leading-tight">{m.descricao}</p>
                                         <p className="text-[9px] text-gray-400 leading-none mt-0.5">{new Date(m.criado_em || m.data || Date.now()).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</p>
                                     </td>
-                                    <td className={`px-2 py-2 text-[9px] font-normal leading-none ${isPos? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>
-                                        {m.tipo}
+                                    <td className={`px-2 py-2 text-[9px] font-normal leading-none capitalize ${isPos? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>
+                                        {String(m.tipo).toLowerCase()}
                                     </td>
                                     <td className={`px-4 py-2 text-right text-[11px] font-black ${isPos? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>
-                                        {isPos? ' ' : ' '}{fmt(Number(m.valor))}
+                                        {fmt(Number(m.valor))}
                                     </td>
                                 </tr>
                             )
