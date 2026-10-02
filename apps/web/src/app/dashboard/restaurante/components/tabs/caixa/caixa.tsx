@@ -64,40 +64,38 @@ export function CaixaTab() {
         document.addEventListener("mousedown", h); return ()=>document.removeEventListener("mousedown", h);
     }, []);
 
-    // REALTIME - apenas adicionado
-    useEffect(() => {
-        const onCaixaUpdate = () => load();
+    // REALTIME CIRÚRGICO - sem load(), sem refresh
+    useEffect(()=>{
         const onExtratoPush = (e: any) => {
-            const mov = e.detail;
-            if (!mov) return;
-            // só injeta se estiver no dia de hoje
+            const m = e.detail;
+            if (!m?.id) return;
             const hoje = todayISO();
-            if (inicio === hoje && fim === hoje) {
-                setExtrato((prev: any) => {
-                    if (!prev) return prev;
-                    const exists = prev.movimentos?.some((m:any)=> m.id === mov.id);
-                    if (exists) return prev;
-                    return {
-                        ...prev,
-                        movimentos: [mov, ...(prev.movimentos || [])],
-                        saldo_atual: Number(prev.saldo_atual || 0) + Number(mov.valor || 0),
-                        total_entradas: Number(mov.valor) > 0 ? Number(prev.total_entradas||0) + Number(mov.valor) : prev.total_entradas,
-                        total_saidas: Number(mov.valor) < 0 ? Number(prev.total_saidas||0) + Number(mov.valor) : prev.total_saidas,
-                    };
-                });
-                // atualiza status também
-                setStatus((s:any) => s ? {...s, aberto: true} : s);
-            }
-        };
-        const onVendaNova = () => load();
+            // só injeta se estiver vendo hoje
+            if (inicio !== hoje || fim !== hoje) return;
 
-        window.addEventListener("caixa:update" as any, onCaixaUpdate);
+            setExtrato((prev: any) => {
+                if (!prev) return prev;
+                if (prev.movimentos?.some((x: any)=> x.id === m.id)) return prev;
+                return {
+                    ...prev,
+                    movimentos: [m, ...(prev.movimentos || [])],
+                    saldo_atual: Number(prev.saldo_atual || 0) + Number(m.valor || 0),
+                    total_entradas: Number(m.valor) > 0 ? Number(prev.total_entradas || 0) + Number(m.valor) : prev.total_entradas,
+                    total_saidas: Number(m.valor) < 0 ? Number(prev.total_saidas || 0) + Number(m.valor) : prev.total_saidas,
+                };
+            });
+        };
+        const onCaixaStatus = (e: any) => {
+            const s = e.detail;
+            if (s) setStatus((prev: any)=> ({...prev, ...s}));
+        };
         window.addEventListener("caixa:extrato" as any, onExtratoPush);
-        window.addEventListener("venda:nova" as any, onVendaNova);
+        window.addEventListener("venda:nova" as any, onExtratoPush);
+        window.addEventListener("caixa:update" as any, onCaixaStatus);
         return () => {
-            window.removeEventListener("caixa:update" as any, onCaixaUpdate);
             window.removeEventListener("caixa:extrato" as any, onExtratoPush);
-            window.removeEventListener("venda:nova" as any, onVendaNova);
+            window.removeEventListener("venda:nova" as any, onExtratoPush);
+            window.removeEventListener("caixa:update" as any, onCaixaStatus);
         };
     }, [inicio, fim]);
 
@@ -148,7 +146,6 @@ export function CaixaTab() {
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
-            {/* DESKTOP - 2 INPUTS PEQUENOS JUNTOS = LARGURA DO CARD PRETO */}
             <div className="hidden md:flex items-center justify-between">
                 <div className="flex gap-2 w-[calc((100%-32px)/3)]">
                     <div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
@@ -168,7 +165,6 @@ export function CaixaTab() {
                 </div>
             </div>
 
-            {/* CELULAR - ICONE CALENDARIO + ICONE RELATORIO */}
             <div className="flex md:hidden justify-end items-center gap-2">
                 <button onClick={()=>setShowDateModal(true)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
@@ -187,7 +183,6 @@ export function CaixaTab() {
                 </div>
             </div>
 
-            {/* MODAL DE DATAS - SO CELULAR - CENTRO DA TELA */}
             {showDateModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:hidden">
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={()=>setShowDateModal(false)} />
@@ -202,7 +197,6 @@ export function CaixaTab() {
                 </div>
             )}
 
-            {/* CARDS */}
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div onClick={()=>handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={inicio.slice(5).replace("-","/")} horaAbertura={movs[0]? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}): "--:--"} />

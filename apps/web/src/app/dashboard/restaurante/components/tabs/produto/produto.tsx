@@ -83,30 +83,60 @@ export function ProdutosTab() {
     };
     useEffect(() => { fetchProds(); fetchCats(); }, [search, cat]);
 
-    // REALTIME - apenas adicionado
+    // REALTIME CIRÚRGICO - sem fetch, sem refresh
     useEffect(() => {
-        const onProdutoUpdate = (e: any) => {
+        const onUpdate = (e: any) => {
             const p = e.detail;
             if (!p?.id) return;
             setItems(prev => {
-                const exists = prev.find(x => x.id === p.id);
-                if (exists) {
-                    return prev.map(x => x.id === p.id? {...x,...p } : x);
-                }
-                // se for produto novo e estamos sem filtro, adiciona no topo
-                if (!search &&!cat) return [p,...prev].slice(0, 20);
-                return prev;
+                const exists = prev.some(x => x.id === p.id);
+                if (!exists) return prev;
+                return prev.map(x => x.id === p.id? {...x,...p } : x);
             });
         };
-        const onVenda = () => fetchProds(); // venda consome stock, recarrega
+        const onCreated = (e: any) => {
+            const p = e.detail;
+            if (!p?.id) return;
+            // se ainda não tem na lista e está na categoria atual, adiciona no topo
+            if (!search && (!cat || (p.categoria||"").toLowerCase() === cat.toLowerCase())) {
+                setItems(prev => {
+                    if (prev.some(x => x.id === p.id)) return prev;
+                    return [p,...prev].slice(0, 20);
+                });
+                setTotal(t => t + 1);
+            }
+        };
+        const onVenda = (e: any) => {
+            const venda = e.detail;
+            const itens = venda?.itens || venda?.data?.itens || venda?.produtos || [];
+            if (!itens.length) return;
+            itens.forEach((it: any) => {
+                const pid = it.produto_id || it.produto?.id || it.id;
+                const qtd = Number(it.quantidade || 1);
+                setItems(prev => prev.map(p =>
+                    p.id === pid && p.controlar_stock
+                       ? {...p, stock_atual: Number(p.stock_atual || 0) - qtd }
+                        : p
+                ));
+            });
+        };
+        const onDelete = (e: any) => {
+            const d = e.detail;
+            const id = d?.id || d?.produto_id;
+            if (!id) return;
+            setItems(prev => prev.filter(x => x.id!== id));
+            setTotal(t => Math.max(0, t - 1));
+        };
 
-        window.addEventListener("produto:update" as any, onProdutoUpdate);
+        window.addEventListener("produto:update" as any, onUpdate);
+        window.addEventListener("produto:created" as any, onCreated);
+        window.addEventListener("produto:deleted" as any, onDelete);
         window.addEventListener("venda:nova" as any, onVenda);
-        window.addEventListener("reserva:update" as any, onVenda);
         return () => {
-            window.removeEventListener("produto:update" as any, onProdutoUpdate);
+            window.removeEventListener("produto:update" as any, onUpdate);
+            window.removeEventListener("produto:created" as any, onCreated);
+            window.removeEventListener("produto:deleted" as any, onDelete);
             window.removeEventListener("venda:nova" as any, onVenda);
-            window.removeEventListener("reserva:update" as any, onVenda);
         };
     }, [search, cat]);
 
@@ -204,7 +234,6 @@ export function ProdutosTab() {
                 </div>
             </div>
 
-            {/* GRID - 5 POR LINHA - FIXO */}
             <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 {items.map(p => (
                     <ProdutoCard key={p.id} p={p} onEdit={openEdit} onDelete={(prod) => setDeleteModal({ id: prod.id, nome: prod.nome, img: prod.imagem_url })} />

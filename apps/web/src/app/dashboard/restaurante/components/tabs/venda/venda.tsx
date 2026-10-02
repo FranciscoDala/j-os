@@ -47,19 +47,20 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
     useEffect(() => { if (showSearch) searchRef.current?.focus(); }, [showSearch]);
 
-    const fetchReal = async () => {
-        setLoadingProd(true);
-        try {
-            const token = localStorage.getItem("access_token");
-            const qs = new URLSearchParams({ skip: "0", limit: "100", search: searchV });
-            const r = await fetch(`${API_BASE}/?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await r.json();
-            if (r.ok) setDbProducts((data.items || []).filter((p: any) => p.ativo!== false));
-        } catch { }
-        setLoadingProd(false);
-    };
-
-    useEffect(() => { fetchReal(); }, [searchV]);
+    useEffect(() => {
+        const fetchReal = async () => {
+            setLoadingProd(true);
+            try {
+                const token = localStorage.getItem("access_token");
+                const qs = new URLSearchParams({ skip: "0", limit: "100", search: searchV });
+                const r = await fetch(`${API_BASE}/?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+                const data = await r.json();
+                if (r.ok) setDbProducts((data.items || []).filter((p: any) => p.ativo!== false));
+            } catch { }
+            setLoadingProd(false);
+        };
+        fetchReal();
+    }, [searchV]);
 
     useEffect(() => {
         const fetchCats = async () => {
@@ -72,13 +73,13 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         fetchCats();
     }, []);
 
-    // REALTIME - stock ao vivo
+    // REALTIME CIRÚRGICO - sem fetch, só atualiza o que mudou
     useEffect(() => {
         const onProdutoUpdate = (e: any) => {
             const p = e.detail;
             if (!p?.id) return;
             setDbProducts(prev => prev.map(x => x.id === p.id? {...x,...p} : x));
-            // se produto no carrinho ficou sem stock
+            // ajusta carrinho se stock ficou menor
             setCart(prev => prev.map(c => {
                 if (c.id === p.id && p.controlar_stock) {
                     const atual = Number(p.stock_atual?? 0);
@@ -90,28 +91,40 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                 return c;
             }).filter(c => c.qtd > 0));
         };
-        const onReserva = (e: any) => {
-            // outro operador reservou, diminui disponível visualmente
-            const d = e.detail;
-            if (!d?.produto_id) return;
-            setDbProducts(prev => prev.map(p => {
-                if (p.id === d.produto_id && p.controlar_stock) {
-                    // não baixa o stock real, só avisa
-                    if (d.acao === "reservado") pushToast(`Alguém reservou ${d.quantidade}x ${p.nome}`, "info");
-                }
-                return p;
-            }));
+        const onProdutoCreated = (e: any) => {
+            const p = e.detail;
+            if (!p?.id) return;
+            if (p.ativo === false) return;
+            if (!searchV || p.nome?.toLowerCase().includes(searchV.toLowerCase())) {
+                setDbProducts(prev => {
+                    if (prev.some(x => x.id === p.id)) return prev;
+                    return [p,...prev];
+                });
+            }
         };
-
+        const onVendaNova = (e: any) => {
+            const venda = e.detail;
+            const itens = venda?.itens || venda?.data?.itens || [];
+            if (!itens.length) return;
+            itens.forEach((it: any) => {
+                const pid = it.produto_id || it.produto?.id;
+                const qtd = Number(it.quantidade || 0);
+                setDbProducts(prev => prev.map(p =>
+                    p.id === pid && p.controlar_stock
+                       ? {...p, stock_atual: Number(p.stock_atual || 0) - qtd }
+                        : p
+                ));
+            });
+        };
         window.addEventListener("produto:update" as any, onProdutoUpdate);
-        window.addEventListener("reserva:update" as any, onReserva);
-        window.addEventListener("venda:nova" as any, () => fetchReal());
+        window.addEventListener("produto:created" as any, onProdutoCreated);
+        window.addEventListener("venda:nova" as any, onVendaNova);
         return () => {
             window.removeEventListener("produto:update" as any, onProdutoUpdate);
-            window.removeEventListener("reserva:update" as any, onReserva);
-            window.removeEventListener("venda:nova" as any, () => fetchReal());
+            window.removeEventListener("produto:created" as any, onProdutoCreated);
+            window.removeEventListener("venda:nova" as any, onVendaNova);
         };
-    }, []);
+    }, [searchV]);
 
     const cats = ["All",...catsDb];
     const getStockState = (p: any) => {
@@ -147,7 +160,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         else { setRecebido((s) => (s + val).slice(0, 10)); }
     };
 
-    // FINALIZA VENDA REAL -> CAIXA
     const finalizarVenda = async () => {
         if (cart.length === 0) return;
         if (forma === "dinheiro" && recebidoNum < total) {
@@ -174,6 +186,14 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             setShowPay(false);
             setShowConfirm(true);
             pushToast(`Venda #${data.numero} finalizada - Kz ${Number(data.total).toLocaleString("de-DE")}`, "success");
+            // baixa local também, sem precisar esperar WS
+            setDbProducts(prev => prev.map(p => {
+                const inCart = cart.find(c => c.id === p.id);
+                if (inCart && p.controlar_stock) {
+                    return {...p, stock_atual: Number(p.stock_atual || 0) - inCart.qtd};
+                }
+                return p;
+            }));
         } catch (e: any) {
             pushToast(e.message, "error");
         } finally {
