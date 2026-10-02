@@ -41,7 +41,7 @@ export function ExtratoList({ movimentos, selectedDate }: { movimentos: any[], s
                                         {m.tipo}
                                     </td>
                                     <td className={`px-4 py-2 text-right text-[11px] font-black ${isPos? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>
-                                        {isPos? '+Kz ' : 'Kz '}{fmt(Number(m.valor))}
+                                        {isPos? ' ' : ' '}{fmt(Number(m.valor))}
                                     </td>
                                 </tr>
                             )
