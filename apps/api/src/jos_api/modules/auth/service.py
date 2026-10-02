@@ -7,16 +7,7 @@ from jose import jwt
 from jos_api.core.config import settings
 import uuid
 from jos_api.modules.atividade.service import registrar_atividade
-
-def _try_broadcast(empresa_id, payload):
-    try:
-        from jos_api.core.realtime import manager
-        import asyncio
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.create_task(manager.broadcast(str(empresa_id), payload))
-    except:
-        pass
+from jos_api.core.events import emit
 
 def to_role_enum(role) -> RoleEnum:
     if isinstance(role, RoleEnum): return role
@@ -33,7 +24,7 @@ def criar_usuario(db: Session, dados: schemas.UserCreate, criado_por_id: uuid.UU
     db.flush()
     registrar_atividade(db, empresa_id=dados.empresa_id, modulo="USUARIO", acao="CRIAR", descricao=f"Criou usuário '{user.nome}' ({user.email}) - {user.role.value}", entidade="User", entidade_id=user.id, entidade_nome=user.nome, user_id=criado_por_id, user_nome=criado_por_nome, detalhes={"email": user.email, "role": user.role.value}, ip=ip, commit=False)
     db.commit(); db.refresh(user)
-    _try_broadcast(dados.empresa_id, {"type": "USUARIO_CRIADO", "user": {"id": str(user.id), "nome": user.nome, "email": user.email, "role": str(user.role.value)}})
+    emit(str(dados.empresa_id), "usuario:created", data={"id": str(user.id), "nome": user.nome, "email": user.email, "role": str(user.role.value)})
     return user
 
 def _get_empresas_do_user(db: Session, user: models.User):

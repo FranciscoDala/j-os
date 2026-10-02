@@ -8,17 +8,7 @@ from typing import Tuple
 from jos_api.modules.caixa.models import Caixa, CaixaStatus, MotivoFechamento, CaixaMovimento, TipoMovimento, OrigemMovimento
 from jos_api.modules.venda.models import Venda
 from jos_api.modules.atividade.service import registrar_atividade
-
-# helper broadcast sem travar
-def _try_broadcast(empresa_id, payload):
-    try:
-        from jos_api.core.realtime import manager
-        import asyncio
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.create_task(manager.broadcast(str(empresa_id), payload))
-    except:
-        pass
+from jos_api.core.events import emit
 
 def get_caixa_aberto(db: Session, empresa_id: uuid.UUID) -> Caixa | None:
     return db.query(Caixa).filter(Caixa.empresa_id == empresa_id, Caixa.status == CaixaStatus.ABERTO).order_by(Caixa.aberto_em.desc()).first()
@@ -32,7 +22,7 @@ def registrar_movimento(db: Session, caixa: Caixa, tipo: TipoMovimento, valor: D
     db.add(mov)
     if commit:
         db.commit(); db.refresh(mov)
-        _try_broadcast(caixa.empresa_id, {"type": "CAIXA_MOVIMENTO", "caixa_id": str(caixa.id), "movimento": {"id": str(mov.id), "tipo": str(mov.tipo), "valor": str(mov.valor), "descricao": mov.descricao}, "saldo_atual": str(calcular_saldo_atual(db, caixa))})
+        emit(str(caixa.empresa_id), "caixa:extrato", data={"id": str(mov.id), "tipo": str(mov.tipo), "valor": str(mov.valor), "descricao": mov.descricao, "caixa_id": str(caixa.id)}, saldo_atual=str(calcular_saldo_atual(db, caixa)))
     return mov
 
 def abrir_caixa(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, saldo_inicial: Decimal, ip: str | None = None) -> Caixa:
@@ -46,7 +36,7 @@ def abrir_caixa(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nom
     db.add(novo); db.flush()
     registrar_atividade(db, empresa_id=empresa_id, modulo="CAIXA", acao="ABRIR", descricao=f"Abriu caixa com R$ {saldo_inicial} - por {user_nome}", entidade="Caixa", entidade_id=novo.id, entidade_nome=f"Caixa R$ {saldo_inicial}", user_id=user_id, user_nome=user_nome, detalhes={"saldo_inicial": str(saldo_inicial)}, ip=ip, commit=False)
     db.commit(); db.refresh(novo)
-    _try_broadcast(empresa_id, {"type": "CAIXA_ABERTO", "caixa": {"id": str(novo.id), "aberto_por_nome": novo.aberto_por_nome, "saldo_inicial": str(novo.saldo_inicial)}})
+    emit(str(empresa_id), "caixa:update", data={"id": str(novo.id), "aberto_por_nome": novo.aberto_por_nome, "saldo_inicial": str(novo.saldo_inicial), "status": "ABERTO"})
     return novo
 
 def forcar_abertura(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, saldo_inicial: Decimal, motivo: str, ip: str | None = None) -> Tuple[Caixa, Caixa | None]:
@@ -59,7 +49,7 @@ def forcar_abertura(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, user
     db.add(novo); db.flush()
     registrar_atividade(db, empresa_id=empresa_id, modulo="CAIXA", acao="FORCAR_ABERTURA", descricao=f"Forçou abertura - fechou caixa de {caixa_antigo.aberto_por_nome} R$ {saldo_esperado} - novo R$ {saldo_inicial} - {motivo}", entidade="Caixa", entidade_id=novo.id, entidade_nome=f"Caixa R$ {saldo_inicial}", user_id=user_id, user_nome=user_nome, detalhes={"motivo": motivo, "antigo_id": str(caixa_antigo.id)}, ip=ip, commit=False)
     db.commit(); db.refresh(novo); db.refresh(caixa_antigo)
-    _try_broadcast(empresa_id, {"type": "CAIXA_FORCADO", "caixa_antigo": str(caixa_antigo.id), "caixa_novo": str(novo.id)})
+    emit(str(empresa_id), "caixa:update", data={"id": str(novo.id), "status": "ABERTO", "antigo_id": str(caixa_antigo.id)})
     return novo, caixa_antigo
 
 def fechar_caixa(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, saldo_informado: Decimal, fechado_por_nome: str, ip: str | None = None) -> Caixa:
@@ -73,7 +63,7 @@ def fechar_caixa(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, saldo_i
     db.flush()
     registrar_atividade(db, empresa_id=empresa_id, modulo="CAIXA", acao="FECHAR", descricao=f"Fechou caixa - Esperado R$ {saldo_esperado} Informado R$ {saldo_informado} Divergência R$ {caixa.divergencia}", entidade="Caixa", entidade_id=caixa.id, entidade_nome=f"Caixa R$ {saldo_esperado}", user_id=user_id, user_nome=fechado_por_nome, detalhes={"esperado": str(saldo_esperado), "informado": str(saldo_informado), "divergencia": str(caixa.divergencia)}, ip=ip, commit=False)
     db.commit(); db.refresh(caixa)
-    _try_broadcast(empresa_id, {"type": "CAIXA_FECHADO", "caixa_id": str(caixa.id), "divergencia": str(caixa.divergencia)})
+    emit(str(empresa_id), "caixa:update", data={"id": str(caixa.id), "status": "FECHADO", "divergencia": str(caixa.divergencia)})
     return caixa
 
 def registrar_venda_no_caixa(db: Session, caixa: Caixa, venda: Venda, user_id: uuid.UUID, user_nome: str) -> CaixaMovimento:

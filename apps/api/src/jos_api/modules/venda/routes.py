@@ -10,6 +10,7 @@ from jos_api.modules.auth.models import User
 from jos_api.modules.caixa.models import Caixa
 from jos_api.core.realtime import manager
 from jos_api.core.config import settings
+from jos_api.core.events import emit
 from jose import jwt
 import json
 
@@ -49,7 +50,7 @@ async def ws_vendas(ws: WebSocket, token: str = Query(...), db: Session = Depend
     await manager.connect(str(empresa_id), ws)
     try:
         reservas = service.get_reservas_ativas(db, uuid.UUID(empresa_id))
-        await ws.send_text(json.dumps({"type": "RESERVAS_INIT", "reservas": [{"produto_id": str(r.produto_id), "user_id": str(r.user_id), "quantidade": str(r.quantidade)} for r in reservas]}, default=str))
+        await ws.send_text(json.dumps({"type": "reserva:init", "data": [{"produto_id": str(r.produto_id), "user_id": str(r.user_id), "quantidade": str(r.quantidade)} for r in reservas]}, default=str))
         while True:
             await ws.receive_text()
     except WebSocketDisconnect:
@@ -60,35 +61,28 @@ async def ws_vendas(ws: WebSocket, token: str = Query(...), db: Session = Depend
 def reservar(dados: schemas.ReservaRequest, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user)):
     empresa_id = _get_empresa_id(perfil_data)
     r = service.reservar_produto(db, empresa_id, dados.produto_id, current_user.id, dados.quantidade)
-    # broadcast async não bloqueia
-    import asyncio
-    try:
-        loop = asyncio.get_event_loop()
-        payload = {"type": "RESERVA_UPDATE", "produto_id": str(r.produto_id), "user_id": str(r.user_id), "quantidade": str(r.quantidade), "reservas": [{"produto_id": str(x.produto_id), "user_id": str(x.user_id), "quantidade": str(x.quantidade)} for x in service.get_reservas_ativas(db, empresa_id)]}
-        if loop.is_running():
-            loop.create_task(manager.broadcast(str(empresa_id), payload))
-    except:
-        pass
+    emit(str(empresa_id), "reserva:update", data={
+        "produto_id": str(r.produto_id),
+        "user_id": str(r.user_id),
+        "quantidade": str(r.quantidade)
+    }, reservas=[{"produto_id": str(x.produto_id), "user_id": str(x.user_id), "quantidade": str(x.quantidade)} for x in service.get_reservas_ativas(db, empresa_id)])
     return r
 
 @router.delete("/reservas/{produto_id}")
 def liberar(produto_id: uuid.UUID, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user)):
     empresa_id = _get_empresa_id(perfil_data)
     service.liberar_reserva(db, empresa_id, produto_id, current_user.id)
-    import asyncio
-    try:
-        loop = asyncio.get_event_loop()
-        payload = {"type": "RESERVA_LIBERADA", "produto_id": str(produto_id), "user_id": str(current_user.id), "reservas": [{"produto_id": str(x.produto_id), "user_id": str(x.user_id), "quantidade": str(x.quantidade)} for x in service.get_reservas_ativas(db, empresa_id)]}
-        if loop.is_running():
-            loop.create_task(manager.broadcast(str(empresa_id), payload))
-    except:
-        pass
+    emit(str(empresa_id), "reserva:liberada", data={
+        "produto_id": str(produto_id),
+        "user_id": str(current_user.id)
+    }, reservas=[{"produto_id": str(x.produto_id), "user_id": str(x.user_id), "quantidade": str(x.quantidade)} for x in service.get_reservas_ativas(db, empresa_id)])
     return {"ok": True}
 
 @router.delete("/reservas")
 def liberar_todas(db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user)):
     empresa_id = _get_empresa_id(perfil_data)
     service.liberar_todas_reservas_user(db, empresa_id, current_user.id)
+    emit(str(empresa_id), "reserva:liberada_todas", data={"user_id": str(current_user.id)})
     return {"ok": True}
 
 @mesa_router.get("/", response_model=list[schemas.MesaResponse])
@@ -105,49 +99,48 @@ def get_comanda_mesa(mesa_id: uuid.UUID, db: Session = Depends(get_db), perfil_d
     return db.query(Venda).filter(Venda.mesa_id == mesa_id, Venda.empresa_id == empresa_id, Venda.status == VendaStatus.ABERTA).first()
 
 @router.post("/", response_model=schemas.VendaResponse, status_code=201)
-async def criar_venda(dados: schemas.VendaCreateRequest, request: Request, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), caixa_aberto: Caixa = Depends(precisa_caixa_aberto), current_user: User = Depends(get_current_user)):
+def criar_venda(dados: schemas.VendaCreateRequest, request: Request, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), caixa_aberto: Caixa = Depends(precisa_caixa_aberto), current_user: User = Depends(get_current_user)):
     empresa_id = _get_empresa_id(perfil_data)
     nome = _get_nome(current_user, perfil_data)
     venda, produtos_afectados = service.create_venda(db, dados, empresa_id, current_user.id, caixa_aberto, nome, ip=_get_ip(request))
-    await manager.broadcast(str(empresa_id), {
-        "type": "VENDA_CONCLUIDA",
-        "venda": {"id": str(venda.id), "numero": venda.numero, "total": str(venda.total)},
-        "produtos": produtos_afectados,
-        "caixa": {"id": str(caixa_aberto.id)},
-        "reservas": [{"produto_id": str(x.produto_id), "user_id": str(x.user_id), "quantidade": str(x.quantidade)} for x in service.get_reservas_ativas(db, empresa_id)]
-    })
+    emit(str(empresa_id), "venda:nova", data={
+        "id": str(venda.id), "numero": venda.numero, "total": str(venda.total)
+    }, produtos=produtos_afectados, caixa={"id": str(caixa_aberto.id)}, reservas=[{"produto_id": str(x.produto_id), "user_id": str(x.user_id), "quantidade": str(x.quantidade)} for x in service.get_reservas_ativas(db, empresa_id)])
     return venda
 
 @router.post("/{venda_id}/itens", response_model=schemas.VendaResponse)
 def add_item(venda_id: uuid.UUID, dados: schemas.AddItemRequest, request: Request, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user)):
-    return service.add_item_comanda(db, venda_id, dados, _get_empresa_id(perfil_data), current_user.id, _get_nome(current_user, perfil_data), ip=_get_ip(request))
+    venda = service.add_item_comanda(db, venda_id, dados, _get_empresa_id(perfil_data), current_user.id, _get_nome(current_user, perfil_data), ip=_get_ip(request))
+    emit(str(_get_empresa_id(perfil_data)), "venda:update", data={"id": str(venda.id), "status": str(venda.status.value)})
+    return venda
 
 @router.put("/{venda_id}/itens/{item_id}/status")
 def update_status_item(venda_id: uuid.UUID, item_id: uuid.UUID, dados: schemas.UpdateItemStatusRequest, request: Request, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user)):
     try:
         novo = VendaItemStatus(dados.status.upper())
     except: raise HTTPException(400, f"Status inválido: {dados.status}. Use PENDENTE, EM_PREPARO, PRONTO, ENTREGUE, CANCELADO")
-    return service.update_item_status(db, venda_id, item_id, novo, _get_empresa_id(perfil_data), current_user.id, _get_nome(current_user, perfil_data), ip=_get_ip(request))
+    venda = service.update_item_status(db, venda_id, item_id, novo, _get_empresa_id(perfil_data), current_user.id, _get_nome(current_user, perfil_data), ip=_get_ip(request))
+    emit(str(_get_empresa_id(perfil_data)), "venda:item_status", data={"venda_id": str(venda_id), "item_id": str(item_id), "status": novo.value})
+    return venda
 
 @router.post("/{venda_id}/transferir", response_model=schemas.VendaResponse)
 def transferir(venda_id: uuid.UUID, dados: schemas.TransferirMesaRequest, request: Request, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user)):
-    return service.transferir_mesa(db, venda_id, dados.nova_mesa_id, _get_empresa_id(perfil_data), current_user.id, _get_nome(current_user, perfil_data), ip=_get_ip(request))
+    venda = service.transferir_mesa(db, venda_id, dados.nova_mesa_id, _get_empresa_id(perfil_data), current_user.id, _get_nome(current_user, perfil_data), ip=_get_ip(request))
+    emit(str(_get_empresa_id(perfil_data)), "mesa:transferida", data={"venda_id": str(venda.id), "nova_mesa_id": str(dados.nova_mesa_id)})
+    return venda
 
 @router.post("/{venda_id}/fechar", response_model=schemas.VendaResponse)
-async def fechar(venda_id: uuid.UUID, dinheiro_recebido: Decimal, request: Request, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user)):
+def fechar(venda_id: uuid.UUID, dinheiro_recebido: Decimal, request: Request, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user)):
     empresa_id = _get_empresa_id(perfil_data)
     venda, produtos_afectados = service.fechar_comanda(db, venda_id, empresa_id, dinheiro_recebido, current_user.id, _get_nome(current_user, perfil_data), ip=_get_ip(request))
-    await manager.broadcast(str(empresa_id), {
-        "type": "VENDA_CONCLUIDA",
-        "venda": {"id": str(venda.id), "numero": venda.numero, "total": str(venda.total)},
-        "produtos": produtos_afectados,
-        "caixa": {"id": str(venda.caixa_id)}
-    })
+    emit(str(empresa_id), "venda:fechada", data={"id": str(venda.id), "numero": venda.numero, "total": str(venda.total)}, produtos=produtos_afectados, caixa={"id": str(venda.caixa_id)})
     return venda
 
 @router.post("/{venda_id}/cancelar", response_model=schemas.VendaResponse)
 def cancelar(venda_id: uuid.UUID, request: Request, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user)):
-    return service.cancelar_venda(db, venda_id, _get_empresa_id(perfil_data), current_user.id, _get_nome(current_user, perfil_data), ip=_get_ip(request))
+    venda = service.cancelar_venda(db, venda_id, _get_empresa_id(perfil_data), current_user.id, _get_nome(current_user, perfil_data), ip=_get_ip(request))
+    emit(str(_get_empresa_id(perfil_data)), "venda:cancelada", data={"id": str(venda.id)})
+    return venda
 
 @router.get("/cozinha/pendentes", response_model=list[schemas.VendaResponse])
 def cozinha_pendentes(db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):

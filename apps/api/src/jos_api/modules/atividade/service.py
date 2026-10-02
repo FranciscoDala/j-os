@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 import uuid
 from typing import Optional, Any
 from decimal import Decimal
-import json
+import asyncio
 
 from jos_api.modules.atividade.models import AtividadeLog
 
@@ -23,12 +23,15 @@ def _to_jsonable(obj: Any):
 def _try_broadcast(empresa_id, payload):
     try:
         from jos_api.core.realtime import manager
-        import asyncio
-        loop = asyncio.get_event_loop()
+        # FIX RENDER: usa get_running_loop, nunca run_until_complete
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
         if loop.is_running():
             loop.create_task(manager.broadcast(str(empresa_id), payload))
-    except:
-        pass
+    except Exception as e:
+        print(f"[atividade broadcast fail] {e}")
 
 def registrar_atividade(
     db: Session,
@@ -63,13 +66,15 @@ def registrar_atividade(
     if commit:
         db.commit()
         db.refresh(entry)
+        # NOME IGUAL AO FRONTEND ESCUTA
         _try_broadcast(empresa_id, {
-            "type": "ATIVIDADE_NOVA",
-            "log": {
+            "type": "atividade:nova",
+            "data": {
                 "id": str(entry.id),
                 "user_nome": entry.user_nome,
                 "modulo": entry.modulo,
                 "acao": entry.acao,
+                "entidade": entry.entidade,
                 "entidade_nome": entry.entidade_nome,
                 "descricao": entry.descricao,
                 "created_at": entry.created_at.isoformat() if entry.created_at else None

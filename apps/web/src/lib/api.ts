@@ -1,4 +1,4 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 const BASE = `${API_URL}/api/v1`;
 export const WS_URL = API_URL.replace(/^http/, "ws") + "/api/v1/realtime/ws";
 
@@ -13,8 +13,11 @@ async function apiFetch(path: string, options: RequestInit = {}) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
         if (res.status === 401 && typeof window !== 'undefined') {
-            localStorage.removeItem("access_token");
-            window.location.href = "/login";
+            // evita loop se já estiver no login
+            if (!window.location.pathname.includes("/login")) {
+                localStorage.removeItem("access_token");
+                window.location.href = "/login";
+            }
         }
         throw data;
     }
@@ -40,3 +43,11 @@ export const getAtividades = (params?: any) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return apiFetch(`/atividade/${qs}`);
 }
+
+// AUTH / EMPRESA / VENDA (pra não ficar faltando no seu api.ts)
+export const login = (payload: any) => apiFetch("/auth/login", { method: "POST", body: JSON.stringify(payload) });
+export const selectEmpresa = (payload: any) => apiFetch("/auth/select-empresa", { method: "POST", body: JSON.stringify(payload) });
+export const getMe = () => apiFetch("/auth/me");
+export const getMesas = () => apiFetch("/mesas/");
+export const getVendas = () => apiFetch("/vendas/");
+export const criarVenda = (payload: any) => apiFetch("/vendas/", { method: "POST", body: JSON.stringify(payload) });

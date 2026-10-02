@@ -5,7 +5,6 @@ from jos_api.api.v1.api import api_router
 
 app = FastAPI(title=settings.PROJECT_NAME, version="1.0.0")
 
-# FIX CORS
 origins = settings.origins_list + [
     "https://jenath-sys.onrender.com",
     "http://localhost:3000",
@@ -25,7 +24,7 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():
-    return {"status": "online", "docs": "/docs"}
+    return {"status": "online", "docs": "/docs", "ws": f"{settings.API_V1_STR}/realtime/ws"}
 
 @app.get("/health")
 def health():

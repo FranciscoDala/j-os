@@ -8,20 +8,11 @@ from jos_api.modules.empresa.perfis_models import Perfil
 from jos_api.core.security import hash_password
 from. import models, schemas
 from jos_api.modules.atividade.service import registrar_atividade
+from jos_api.core.events import emit
 
 router = APIRouter(prefix="/entidades", tags=["entidades"])
 
 def _get_ip(request: Request): return request.client.host if request.client else None
-
-def _try_broadcast(empresa_id, payload):
-    try:
-        from jos_api.core.realtime import manager
-        import asyncio
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.create_task(manager.broadcast(str(empresa_id), payload))
-    except:
-        pass
 
 @router.post("/{empresa_id}", response_model=schemas.EntidadeOut)
 def criar_entidade(empresa_id: UUID, dados: schemas.EntidadeCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -51,7 +42,7 @@ def criar_entidade(empresa_id: UUID, dados: schemas.EntidadeCreate, request: Req
     db.add(ent); db.flush()
     registrar_atividade(db, empresa_id=empresa_id, modulo="ENTIDADE", acao="CRIAR", descricao=f"Criou {dados.tipo.value} '{dados.nome}'", entidade="Entidade", entidade_id=ent.id, entidade_nome=dados.nome, user_id=current_user.id, user_nome=getattr(current_user, 'nome', 'Sistema'), detalhes={"tipo": dados.tipo.value, "email": dados.email}, ip=_get_ip(request), commit=False)
     db.commit(); db.refresh(ent)
-    _try_broadcast(empresa_id, {"type": "ENTIDADE_CRIADA", "entidade": {"id": str(ent.id), "tipo": str(ent.tipo.value), "nome": ent.nome, "email": ent.email, "telefone": ent.telefone, "perfil_id": str(ent.perfil_id) if ent.perfil_id else None}})
+    emit(str(empresa_id), "entidade:created", data={"id": str(ent.id), "tipo": str(ent.tipo.value), "nome": ent.nome, "email": ent.email, "telefone": ent.telefone, "perfil_id": str(ent.perfil_id) if ent.perfil_id else None})
     return ent
 
 @router.get("/{empresa_id}", response_model=list[schemas.EntidadeOut])
@@ -68,7 +59,7 @@ def deletar_entidade(empresa_id: UUID, entidade_id: UUID, request: Request, db: 
     ent.ativo = False; db.flush()
     registrar_atividade(db, empresa_id=empresa_id, modulo="ENTIDADE", acao="DELETAR", descricao=f"Apagou {tipo_guardado} '{nome_guardado}'", entidade="Entidade", entidade_id=ent.id, entidade_nome=nome_guardado, user_id=current_user.id, user_nome=getattr(current_user, 'nome', 'Sistema'), detalhes={"tipo": tipo_guardado, "email": ent.email}, ip=_get_ip(request), commit=False)
     db.commit()
-    _try_broadcast(empresa_id, {"type": "ENTIDADE_DELETADA", "entidade_id": str(entidade_id), "tipo": tipo_guardado})
+    emit(str(empresa_id), "entidade:deleted", data={"id": str(entidade_id), "tipo": tipo_guardado})
     return {"message": f"{tipo_guardado} '{nome_guardado}' apagado"}
 
 @router.get("/{empresa_id}/perfis")

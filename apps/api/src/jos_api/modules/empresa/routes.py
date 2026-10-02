@@ -6,18 +6,9 @@ from jos_api.core.deps import get_current_user
 from jos_api.modules.auth.models import User, UserEmpresa, RoleEnum
 from . import models, schemas
 from .seed import seed_perfis_por_tipo
+from jos_api.core.events import emit
 
 router = APIRouter(prefix="/empresas", tags=["empresas"])
-
-def _try_broadcast(empresa_id, payload):
-    try:
-        from jos_api.core.realtime import manager
-        import asyncio
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.create_task(manager.broadcast(str(empresa_id), payload))
-    except:
-        pass
 
 @router.post("", response_model=schemas.EmpresaOut)
 def criar_empresa(
@@ -42,7 +33,7 @@ def criar_empresa(
     db.commit()
     db.refresh(emp)
 
-    _try_broadcast(emp.id, {"type": "EMPRESA_CRIADA", "empresa": {"id": str(emp.id), "nome_fantasia": emp.nome_fantasia, "tipo": str(emp.tipo)}})
+    emit(str(emp.id), "empresa:created", data={"id": str(emp.id), "nome_fantasia": emp.nome_fantasia, "tipo": str(emp.tipo)})
     return emp
 
 @router.get("", response_model=list[schemas.EmpresaOut])
@@ -85,5 +76,5 @@ def vincular_usuario(
     db.add(vinc)
     db.commit()
 
-    _try_broadcast(empresa_id, {"type": "USUARIO_VINCULADO", "user_id": str(user_alvo.id), "role": str(role_enum)})
+    emit(str(empresa_id), "usuario:vinculado", data={"user_id": str(user_alvo.id), "role": str(role_enum)})
     return {"ok": True}

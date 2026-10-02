@@ -2,10 +2,7 @@
 import { useEffect, useRef } from "react";
 import { WS_URL } from "@/lib/api";
 
-type RealtimeEvent = {
-    type: string;
-    [key: string]: any;
-};
+type RealtimeEvent = { type: string; [key: string]: any };
 
 export function useRealtime(onEvent: (ev: RealtimeEvent) => void) {
     const wsRef = useRef<WebSocket | null>(null);
@@ -19,12 +16,13 @@ export function useRealtime(onEvent: (ev: RealtimeEvent) => void) {
 
         const connect = () => {
             const token = localStorage.getItem("access_token");
-            if (!token) return;
-
+            if (!token) {
+                timer = setTimeout(connect, 2000); // espera login
+                return;
+            }
             try {
                 const ws = new WebSocket(`${WS_URL}?token=${token}`);
                 wsRef.current = ws;
-
                 ws.onopen = () => {
                     console.log("[realtime] conectado");
                     retryRef.current = 1000;
@@ -33,26 +31,22 @@ export function useRealtime(onEvent: (ev: RealtimeEvent) => void) {
                     try {
                         const data = JSON.parse(msg.data);
                         onEventRef.current(data);
-                    } catch { }
+                    } catch {}
                 };
                 ws.onclose = () => {
                     if (closedByUs) return;
-                    console.log(`[realtime] desconectado, reconectando em ${retryRef.current}ms`);
                     timer = setTimeout(() => {
                         retryRef.current = Math.min(retryRef.current * 1.5, 15000);
                         connect();
                     }, retryRef.current);
                 };
-                ws.onerror = () => {
-                    ws.close();
-                };
+                ws.onerror = () => ws.close();
             } catch {
                 timer = setTimeout(connect, retryRef.current);
             }
         };
 
         connect();
-
         return () => {
             closedByUs = true;
             clearTimeout(timer);
