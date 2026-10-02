@@ -41,11 +41,8 @@ export function CaixaTab() {
             setStatus(s);
             const hoje = todayISO();
             let ext;
-            if (inicio===hoje && fim===hoje && s?.aberto) {
-                ext = await apiFetch("/caixa/extrato");
-            } else {
-                ext = await apiFetch(`/caixa/extrato-por-periodo?inicio=${inicio}&fim=${fim}`);
-            }
+            if (inicio===hoje && fim===hoje && s?.aberto) ext = await apiFetch("/caixa/extrato");
+            else ext = await apiFetch(`/caixa/extrato-por-periodo?inicio=${inicio}&fim=${fim}`);
             setExtrato(ext);
         } catch { setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0, total_entradas: 0, total_saidas: 0, qtd_caixas: 0, periodo_inicio: inicio, periodo_fim: fim }); }
         setLoading(false);
@@ -90,7 +87,7 @@ export function CaixaTab() {
             linhas.push([data, m.tipo, String(m.valor), (m.descricao||"").replace(/;/g,","), m.criado_por_nome||""]);
         });
         linhas.push([]);
-        linhas.push(["Periodo", `${extrato?.periodo_inicio || inicio} ate ${extrato?.periodo_fim || fim}`]);
+        linhas.push(["Periodo", `${inicio} ate ${fim}`]);
         linhas.push(["Entradas", String(entradas)]);
         linhas.push(["Saidas", String(saidas)]);
         linhas.push(["Saldo", String(atual)]);
@@ -99,13 +96,11 @@ export function CaixaTab() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a"); a.href=url; a.download=`relatorio-caixa-${inicio}_a_${fim}.csv`; a.click();
         URL.revokeObjectURL(url);
-        toast.success("Baixado");
     };
 
     const handleImprimir = () => {
         setMenuOpen(false);
-        const win = window.open("", "_blank");
-        if(!win) return;
+        const win = window.open("", "_blank"); if(!win) return;
         const html = `<html><head><title>Relatorio ${inicio} - ${fim}</title><style>body{font-family:monospace;padding:20px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:6px;font-size:12px} th{background:#000;color:#fff}</style></head><body><h2>J-OS - ${inicio} ate ${fim}</h2><table><thead><tr><th>Data</th><th>Tipo</th><th>Valor</th><th>Descricao</th></tr></thead><tbody>${movs.map((m:any)=>`<tr><td>${new Date(m.criado_em).toLocaleString('pt-PT')}</td><td>${m.tipo}</td><td>${fmt(Number(m.valor))}</td><td>${m.descricao||''}</td></tr>`).join("")}</tbody></table><script>window.print()</script></body></html>`;
         win.document.write(html); win.document.close();
     };
@@ -116,20 +111,20 @@ export function CaixaTab() {
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
-            {/* TOP - SEM OVERFLOW, SEM DIV BRANCA */}
-            <div className="flex items-center gap-2">
-                <div className="w-[185px] h-[46px]">
+            {/* TOP - 2 dates com mesmo width do card preto + btn relatorio na direita */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-center">
+                <div className="h-[46px] w-full">
                     <JCalendarPicker value={inicio} onChange={setInicio} />
                 </div>
-                <div className="w-[185px] h-[46px]">
+                <div className="h-[46px] w-full">
                     <JCalendarPicker value={fim} onChange={setFim} />
                 </div>
-                <div className="relative" ref={menuRef}>
+                <div className="relative flex justify-end md:col-span-1 col-span-2 md:col-start-3" ref={menuRef}>
                     <button onClick={()=>setMenuOpen(o=>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     </button>
                     {menuOpen && (
-                        <div className="absolute left-0 mt-2 w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-50">
+                        <div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-50">
                             <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button>
                             <div className="h-[1px] bg-zinc-100" />
                             <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button>
@@ -138,26 +133,27 @@ export function CaixaTab() {
                 </div>
             </div>
 
-            <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
-                <div onClick={()=>handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
+            {/* CARDS - sem sombra */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div onClick={()=>handleCardClick("master")} className="cursor-pointer active:scale-[0.98] transition [&>div]:!shadow-none">
                     <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={inicio.slice(5).replace("-","/")} horaAbertura={movs[0]? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}): "--:--"} />
                 </div>
-                <div onClick={()=>handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
+                <div onClick={()=>handleCardClick("entradas")} className="cursor-pointer active:scale-[0.98] transition [&>div]:!shadow-none">
                     <EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={inicio.slice(5).replace("-","/")} qtdVendas={movs.filter((m:any)=> (m.tipo||"").toUpperCase().includes("VENDA")).length} />
                 </div>
-                <div onClick={()=>handleCardClick("saidas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
+                <div onClick={()=>handleCardClick("saidas")} className="cursor-pointer active:scale-[0.98] transition [&>div]:!shadow-none">
                     <SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} retirado={saidas>0?'1':'0'} />
                 </div>
             </div>
 
-            <div className="flex justify-end">
-                <label className="flex items-center gap-3 bg-white border rounded-full px-4 h-[42px] cursor-pointer w-fit">
-                    <input type="checkbox" checked={showExtrato} onChange={e=>{ const v=e.target.checked; setShowExtrato(v); localStorage.setItem(STORAGE_KEY, String(v)); }} className="sr-only" />
-                    <div className={`w-[36px] h-[20px] rounded-full transition-colors relative ${showExtrato?'bg-black':'bg-zinc-200'}`}>
-                        <div className={`absolute top-[2px] w-[16px] h-[16px] bg-white rounded-full transition-all ${showExtrato?'left-[18px]':'left-[2px]'}`} />
+            {/* MOSTRAR EXTRATO - sem bg-white, livre na direita, verde quando ativo */}
+            <div className="flex justify-end pt-2">
+                <button onClick={()=>{ const v=!showExtrato; setShowExtrato(v); localStorage.setItem(STORAGE_KEY, String(v)); }} className="flex items-center gap-2 group">
+                    <div className={`w-[44px] h-[26px] rounded-full p-[3px] transition-colors ${showExtrato?'bg-green-500':'bg-zinc-300'}`}>
+                        <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-all ${showExtrato?'translate-x-[18px]':'translate-x-0'}`} />
                     </div>
-                    <span className="text-[10px] font-black uppercase">Mostrar extrato</span>
-                </label>
+                    <span className={`text-[11px] font-black uppercase tracking-widest ${showExtrato?'text-green-600':'text-zinc-500'}`}>Mostrar extrato</span>
+                </button>
             </div>
 
             {showExtrato && <ExtratoList movimentos={movs} selectedDate={extrato?.periodo_inicio || inicio} />}
