@@ -88,16 +88,12 @@ export function CaixaTab() {
         });
         linhas.push([]);
         linhas.push(["Periodo", `${inicio} ate ${fim}`]);
-        linhas.push(["Entradas", String(entradas)]);
-        linhas.push(["Saidas", String(saidas)]);
-        linhas.push(["Saldo", String(atual)]);
         const csv = linhas.map(r=>r.join(";")).join("\n");
         const blob = new Blob(["\uFEFF"+csv], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a"); a.href=url; a.download=`relatorio-caixa-${inicio}_a_${fim}.csv`; a.click();
         URL.revokeObjectURL(url);
     };
-
     const handleImprimir = () => {
         setMenuOpen(false);
         const win = window.open("", "_blank"); if(!win) return;
@@ -111,15 +107,11 @@ export function CaixaTab() {
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
-            {/* TOP - 2 dates com mesmo width do card preto + btn relatorio na direita */}
+            {/* TOP - dates com mesmo width do card + btn na direita */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-center">
-                <div className="h-[46px] w-full">
-                    <JCalendarPicker value={inicio} onChange={setInicio} />
-                </div>
-                <div className="h-[46px] w-full">
-                    <JCalendarPicker value={fim} onChange={setFim} />
-                </div>
-                <div className="relative flex justify-end md:col-span-1 col-span-2 md:col-start-3" ref={menuRef}>
+                <div className="h-[46px] w-full"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
+                <div className="h-[46px] w-full"><JCalendarPicker value={fim} onChange={setFim} /></div>
+                <div className="relative flex justify-end col-span-2 md:col-span-1" ref={menuRef}>
                     <button onClick={()=>setMenuOpen(o=>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     </button>
@@ -133,26 +125,26 @@ export function CaixaTab() {
                 </div>
             </div>
 
-            {/* CARDS - sem sombra */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div onClick={()=>handleCardClick("master")} className="cursor-pointer active:scale-[0.98] transition [&>div]:!shadow-none">
+            {/* CARDS - VOLTEI O SCROLL HORIZONTAL NO CELULAR, UM POR VEZ */}
+            <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
+                <div onClick={()=>handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={inicio.slice(5).replace("-","/")} horaAbertura={movs[0]? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}): "--:--"} />
                 </div>
-                <div onClick={()=>handleCardClick("entradas")} className="cursor-pointer active:scale-[0.98] transition [&>div]:!shadow-none">
+                <div onClick={()=>handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={inicio.slice(5).replace("-","/")} qtdVendas={movs.filter((m:any)=> (m.tipo||"").toUpperCase().includes("VENDA")).length} />
                 </div>
-                <div onClick={()=>handleCardClick("saidas")} className="cursor-pointer active:scale-[0.98] transition [&>div]:!shadow-none">
+                <div onClick={()=>handleCardClick("saidas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} retirado={saidas>0?'1':'0'} />
                 </div>
             </div>
 
-            {/* MOSTRAR EXTRATO - sem bg-white, livre na direita, verde quando ativo */}
+            {/* MOSTRAR EXTRATO - sem bg-white, livre verde */}
             <div className="flex justify-end pt-2">
-                <button onClick={()=>{ const v=!showExtrato; setShowExtrato(v); localStorage.setItem(STORAGE_KEY, String(v)); }} className="flex items-center gap-2 group">
+                <button onClick={()=>{ const v=!showExtrato; setShowExtrato(v); localStorage.setItem(STORAGE_KEY, String(v)); }} className="flex items-center gap-2">
                     <div className={`w-[44px] h-[26px] rounded-full p-[3px] transition-colors ${showExtrato?'bg-green-500':'bg-zinc-300'}`}>
                         <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-all ${showExtrato?'translate-x-[18px]':'translate-x-0'}`} />
                     </div>
-                    <span className={`text-[11px] font-black uppercase tracking-widest ${showExtrato?'text-green-600':'text-zinc-500'}`}>Mostrar extrato</span>
+                    <span className={`text-[11px] font-black  tracking-widest ${showExtrato?'text-green-600':'text-zinc-500'}`}></span>
                 </button>
             </div>
 
