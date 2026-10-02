@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Minus, TrendingUp, TrendingDown, Calendar, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
+import { TrendingUp, TrendingDown, Calendar, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { CaixaModal } from "./modals/open_close";
 import { SangriaModal } from "./modals/saida";
 import { MasterCard, EntradasCard, SaidasCard } from "./cards/cards_master";
@@ -15,7 +15,6 @@ async function apiFetch(path: string, options: RequestInit = {}) {
     const d = await res.json().catch(() => ({})); if (!res.ok) throw d; return d;
 }
 const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
 const todayISO = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -23,29 +22,31 @@ const todayISO = () => {
 const toLocalISO = (date: Date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 const getDatePart = (iso: string) => iso? iso.slice(0,10) : "";
 
-// CONFIRM MODAL ESTILO J-OS
+// MODAL CONFIRMAÇÃO NAS CORES PRIMARIAS - BRANCO
 function JConfirm({ open, title, desc, type, onClose, onConfirm }: { open: boolean, title: string, desc: string, type: "black" | "green" | "red", onClose: ()=>void, onConfirm: ()=>void }) {
     if (!open) return null;
-    const color = type === "green"? "bg-[#0CC06B]" : type === "red"? "bg-[#E53935]" : "bg-black";
+    const accent = type === "green"? "bg-[#0CC06B]" : type === "red"? "bg-[#E53935]" : "bg-[#0B0B0B]";
+    const iconBg = type === "green"? "bg-[#0CC06B]/10 text-[#0CC06B]" : type === "red"? "bg-[#E53935]/10 text-[#E53935]" : "bg-black/5 text-black";
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-[380px] bg-[#0B0B0B] rounded-[28px] border border-white/10 p-6 overflow-hidden">
-                <div className={`absolute top-0 left-0 w-full h-[4px] ${color}`} />
-                <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center mb-4">
-                    <AlertTriangle className="text-white" size={20} />
+            <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative w-full max-w-[380px] bg-white rounded-[24px] border p-6 shadow-xl">
+                <div className={`absolute top-0 left-6 right-6 h-[3px] rounded-full ${accent}`} />
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-4 ${iconBg}`}>
+                    <AlertTriangle size={18} />
                 </div>
-                <h3 className="text-white font-black text-[16px] uppercase leading-tight">{title}</h3>
-                <p className="text-white/50 text-[12px] mt-2 leading-relaxed">{desc}</p>
+                <h3 className="text-black font-black text-[13px] uppercase">{title}</h3>
+                <p className="text-gray-500 text-[11px] mt-2 leading-relaxed">{desc}</p>
                 <div className="grid grid-cols-2 gap-3 mt-6">
-                    <button onClick={onClose} className="h-[44px] rounded-full bg-white/10 text-white font-black text-[11px]">CANCELAR</button>
-                    <button onClick={()=>{ onClose(); onConfirm(); }} className={`h-[44px] rounded-full text-white font-black text-[11px] ${color}`}>CONFIRMAR</button>
+                    <button onClick={onClose} className="h-[42px] rounded-full bg-[#F5F7FB] border text-black font-black text-[11px]">CANCELAR</button>
+                    <button onClick={()=>{ onClose(); onConfirm(); }} className={`h-[42px] rounded-full text-white font-black text-[11px] ${accent}`}>CONFIRMAR</button>
                 </div>
             </div>
         </div>
     )
 }
 
+// DATE INPUT - BRANCO, MESMA LARGURA DO CARD PRETO
 function JCalendarPicker({ value, onChange }: { value: string, onChange: (v:string)=>void }) {
     const [open, setOpen] = useState(false);
     const [viewDate, setViewDate] = useState(()=>{ const [y,m,d]=value.split('-').map(Number); return new Date(y, m-1, d); });
@@ -56,17 +57,38 @@ function JCalendarPicker({ value, onChange }: { value: string, onChange: (v:stri
     const toISO = (d:number) => toLocalISO(new Date(year, month, d));
     return (
         <div className="relative w-full">
-            <button onClick={()=>setOpen(!open)} className="w-full md:w-full flex items-center justify-between bg-black text-white rounded-[20px] px-5 py-4 border border-white/10 h-[62px] hover:bg-[#151515] transition">
+            <button onClick={()=>setOpen(!open)} className="w-full h-[56px] flex items-center justify-between bg-white border rounded-full px-5 shadow-sm hover:bg-gray-50 transition">
                 <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center"><Calendar size={16}/></div>
+                    <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center"><Calendar size={14}/></div>
                     <div className="text-left">
-                        <p className="text-[8px] text-white/40 font-black tracking-widest">DATA SELECIONADA</p>
-                        <p className="text-[14px] font-black -mt-0.5">{value.split('-').reverse().join('/')}</p>
+                        <p className="text-[7px] text-gray-400 font-black tracking-widest">DATA</p>
+                        <p className="text-[12px] font-black text-black -mt-0.5">{value.split('-').reverse().join('/')}</p>
                     </div>
                 </div>
-                <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center"><ChevronRight size={14} className={`transition ${open?'rotate-90':''}`} /></div>
+                <ChevronRight size={14} className={`text-black/40 transition ${open?'rotate-90':''}`} />
             </button>
-            {open && (<><div className="fixed inset-0 z-20" onClick={()=>setOpen(false)} /><div className="absolute z-30 mt-3 left-0 w-full md:w-[320px] rounded-[24px] bg-[#0B0B0B] border border-white/10 p-5 shadow-2xl"><div className="flex items-center justify-between mb-4"><button onClick={()=>setViewDate(new Date(year, month-1, 1))} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center"><ChevronLeft size={16}/></button><p className="text-white font-black text-[13px] uppercase">{viewDate.toLocaleDateString('pt-PT',{month:'long'})} {year}</p><button onClick={()=>setViewDate(new Date(year, month+1, 1))} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center"><ChevronRight size={16}/></button></div><div className="grid grid-cols-7 gap-1 mb-2">{['D','S','T','Q','Q','S','S'].map((d,i)=><div key={i} className="text-[9px] text-white/30 text-center font-black">{d}</div>)}</div><div className="grid grid-cols-7 gap-1">{days.map((d,i)=> d===null? <div key={i}/> : (<button key={i} onClick={()=>{ onChange(toISO(d)); setOpen(false); }} className={`h-9 rounded-full text-[12px] font-bold transition ${toISO(d)===value?'bg-white text-black': toISO(d)===todayISO()?'bg-[#0CC06B] text-white':'text-white/70 hover:bg-white/10'}`}>{d}</button>))}</div><div className="mt-4 flex gap-2"><button onClick={()=>{ onChange(todayISO()); setOpen(false); }} className="flex-1 h-10 rounded-full bg-white/10 text-white text-[11px] font-black">HOJE</button><button onClick={()=>setOpen(false)} className="flex-1 h-10 rounded-full bg-white text-black text-[11px] font-black">OK</button></div></div></>)}
+            {open && (
+                <>
+                    <div className="fixed inset-0 z-20" onClick={()=>setOpen(false)} />
+                    <div className="absolute z-30 mt-2 left-0 w-full md:w-[320px] rounded-[20px] bg-white border shadow-xl p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <button onClick={()=>setViewDate(new Date(year, month-1, 1))} className="w-8 h-8 rounded-full bg-[#F5F7FB] border flex items-center justify-center"><ChevronLeft size={14}/></button>
+                            <p className="font-black text-[12px] uppercase">{viewDate.toLocaleDateString('pt-PT',{month:'long'})} {year}</p>
+                            <button onClick={()=>setViewDate(new Date(year, month+1, 1))} className="w-8 h-8 rounded-full bg-[#F5F7FB] border flex items-center justify-center"><ChevronRight size={14}/></button>
+                        </div>
+                        <div className="grid grid-cols-7 gap-1 mb-1">{['D','S','T','Q','Q','S','S'].map((d,i)=><div key={i} className="text-[8px] text-gray-400 text-center font-bold">{d}</div>)}</div>
+                        <div className="grid grid-cols-7 gap-1">
+                            {days.map((d,i)=> d===null? <div key={i}/> : (
+                                <button key={i} onClick={()=>{ onChange(toISO(d)); setOpen(false); }} className={`h-8 rounded-full text-[11px] font-bold ${toISO(d)===value?'bg-black text-white': toISO(d)===todayISO()?'bg-[#0CC06B] text-white':'hover:bg-gray-100'}`}>{d}</button>
+                            ))}
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                            <button onClick={()=>{ onChange(todayISO()); setOpen(false); }} className="flex-1 h-8 rounded-full bg-[#F5F7FB] border text-[10px] font-black">HOJE</button>
+                            <button onClick={()=>setOpen(false)} className="flex-1 h-8 rounded-full bg-black text-white text-[10px] font-black">OK</button>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     )
 }
@@ -156,18 +178,18 @@ export function CaixaTab() {
     const handleCardClick = (type: "master" | "entradas" | "saidas") => {
         if (type === "master") {
             if (status?.aberto) {
-                setConfirm({ open: true, title: "Fechar caixa?", desc: `Você tem Kz ${fmt(atual)} em caixa. Tem certeza que quer fechar agora?`, type: "black", action: ()=>{ setModalMode("fechar"); setModalOpen(true); } });
+                setConfirm({ open: true, title: "Fechar caixa?", desc: `Saldo atual Kz ${fmt(atual)}. Deseja fechar o caixa agora?`, type: "black", action: ()=>{ setModalMode("fechar"); setModalOpen(true); } });
             } else {
-                setConfirm({ open: true, title: "Abrir caixa?", desc: "Isso vai iniciar um novo turno de caixa.", type: "black", action: ()=>{ setModalMode("abrir"); setModalOpen(true); } });
+                setConfirm({ open: true, title: "Abrir caixa?", desc: "Vai iniciar um novo turno.", type: "black", action: ()=>{ setModalMode("abrir"); setModalOpen(true); } });
             }
         }
         if (type === "entradas") {
             if (!status?.aberto) { toast.error("Abra o caixa primeiro"); return; }
-            setConfirm({ open: true, title: "Suprimento?", desc: "Adicionar dinheiro ao caixa?", type: "green", action: ()=>{ setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true); } });
+            setConfirm({ open: true, title: "Fazer suprimento?", desc: "Adicionar dinheiro ao caixa.", type: "green", action: ()=>{ setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true); } });
         }
         if (type === "saidas") {
             if (!status?.aberto) { toast.error("Abra o caixa primeiro"); return; }
-            setConfirm({ open: true, title: "Sangria?", desc: "Retirar dinheiro do caixa?", type: "red", action: ()=>{ setSangriaTipo("SANGRIA"); setSangriaOpen(true); } });
+            setConfirm({ open: true, title: "Fazer sangria?", desc: "Retirar dinheiro do caixa.", type: "red", action: ()=>{ setSangriaTipo("SANGRIA"); setSangriaOpen(true); } });
         }
     };
 
@@ -177,20 +199,20 @@ export function CaixaTab() {
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
-            {/* DATE 100% NO MOBILE, MESMO TAMANHO DO CARD PRETO */}
-            <div className="w-full">
+            {/* DATE - 100% MOBILE, 1/3 DESKTOP = MESMA LARGURA DO CARD PRETO */}
+            <div className="w-full md:w-[calc((100%-32px)/3)]">
                 <JCalendarPicker value={selectedDate} onChange={setSelectedDate} />
             </div>
 
-            {/* CARDS CLICÁVEIS */}
+            {/* CARDS - CADA UM É UM BOTÃO */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div onClick={()=>handleCardClick("master")} className="cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                <div onClick={()=>handleCardClick("master")} className="cursor-pointer hover:brightness-105 active:scale-[0.98] transition-all">
                     <MasterCard atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={selectedDate.slice(5).replace("-","/")} horaAbertura={status?.caixa_atual? new Date(status.caixa_atual.aberto_em).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}): "--:--"} />
                 </div>
-                <div onClick={()=>handleCardClick("entradas")} className="cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                <div onClick={()=>handleCardClick("entradas")} className="cursor-pointer hover:brightness-105 active:scale-[0.98] transition-all">
                     <EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={selectedDate.slice(5).replace("-","/")} qtdVendas={movs.filter((m:any)=> (m.tipo||"").toUpperCase().includes("VENDA")).length} />
                 </div>
-                <div onClick={()=>handleCardClick("saidas")} className="cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                <div onClick={()=>handleCardClick("saidas")} className="cursor-pointer hover:brightness-105 active:scale-[0.98] transition-all">
                     <SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} retirado={saidas>0?'1':'0'} />
                 </div>
             </div>
