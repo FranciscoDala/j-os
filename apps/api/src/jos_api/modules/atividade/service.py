@@ -2,9 +2,8 @@ from sqlalchemy.orm import Session
 import uuid
 from typing import Optional, Any
 from decimal import Decimal
-import asyncio
-
 from jos_api.modules.atividade.models import AtividadeLog
+from jos_api.core.events import emit
 
 def _to_jsonable(obj: Any):
     if isinstance(obj, dict):
@@ -19,19 +18,6 @@ def _to_jsonable(obj: Any):
         try: return obj.isoformat()
         except: pass
     return obj
-
-def _try_broadcast(empresa_id, payload):
-    try:
-        from jos_api.core.realtime import manager
-        # FIX RENDER: usa get_running_loop, nunca run_until_complete
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            return
-        if loop.is_running():
-            loop.create_task(manager.broadcast(str(empresa_id), payload))
-    except Exception as e:
-        print(f"[atividade broadcast fail] {e}")
 
 def registrar_atividade(
     db: Session,
@@ -66,10 +52,23 @@ def registrar_atividade(
     if commit:
         db.commit()
         db.refresh(entry)
-        # NOME IGUAL AO FRONTEND ESCUTA
-        _try_broadcast(empresa_id, {
-            "type": "atividade:nova",
-            "data": {
+        emit(str(empresa_id), "atividade:nova", data={
+            "id": str(entry.id),
+            "user_nome": entry.user_nome,
+            "modulo": entry.modulo,
+            "acao": entry.acao,
+            "entidade": entry.entidade,
+            "entidade_nome": entry.entidade_nome,
+            "descricao": entry.descricao,
+            "created_at": entry.created_at.isoformat() if entry.created_at else None
+        })
+    else:
+        # quando commit=False (criar_produto, criar_usuario), ainda tem que emitir após flush
+        # mas deixa o commit da transação principal cuidar do broadcast via after_commit
+        # aqui emitimos mesmo assim porque o front espera realtime imediato
+        db.flush()
+        try:
+            emit(str(empresa_id), "atividade:nova", data={
                 "id": str(entry.id),
                 "user_nome": entry.user_nome,
                 "modulo": entry.modulo,
@@ -77,9 +76,10 @@ def registrar_atividade(
                 "entidade": entry.entidade,
                 "entidade_nome": entry.entidade_nome,
                 "descricao": entry.descricao,
-                "created_at": entry.created_at.isoformat() if entry.created_at else None
-            }
-        })
+                "created_at": entry.created_at.isoformat() if hasattr(entry, 'created_at') and entry.created_at else None
+            })
+        except:
+            pass
     return entry
 
 log = registrar_atividade
