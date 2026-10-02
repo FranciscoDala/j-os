@@ -150,7 +150,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         if (p.controlar_stock && qtyInCart >= atual) { pushToast(`Stock insuficiente: só temos ${atual} un. de "${p.nome}" disponível.`, "warning"); return; }
         const ex = cart.find((c) => c.id === p.id);
         if (ex) setCart(cart.map((c) => (c.id === p.id ? { ...c, qtd: c.qtd + 1 } : c)));
-        else setCart([...cart, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: `${API_URL}${p.imagem_url}` || "", qtd: 1 }]);
+        else setCart([...cart, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: p.imagem_url ? `${API_URL}${p.imagem_url}` : "", qtd: 1 }]);
     };
 
     const getQty = (id: string) => cart.find((c) => c.id === id)?.qtd || 0;

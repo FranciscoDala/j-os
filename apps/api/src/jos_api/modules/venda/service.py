@@ -109,7 +109,7 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
         sub += sub_item; iva_tot += iva_v; tot += tot_item
         if venda_status == VendaStatus.CONCLUIDA and getattr(prod, 'controlar_stock', False):
             prod.stock_atual -= it.quantidade
-            produtos_afectados.append({"id": str(prod.id), "stock_atual": str(prod.stock_atual), "nome": prod.nome})
+            produtos_afectados.append({"id": str(prod.id), "stock_atual": str(prod.stock_atual), "nome": prod.nome, "controlar_stock": True})
         db.query(ReservaCarrinho).filter(ReservaCarrinho.empresa_id==empresa_id, ReservaCarrinho.produto_id==prod.id, ReservaCarrinho.user_id==created_by).delete()
 
     venda.subtotal = sub; venda.total_iva = iva_tot; venda.total = tot
@@ -117,24 +117,64 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
     if mesa: mesa.status = MesaStatus.OCUPADA if venda_status == VendaStatus.ABERTA else MesaStatus.LIVRE
     db.add(venda); db.flush()
     nomes = ", ".join([i.nome_produto for i in venda.itens])
+    mov = None
     if venda_status == VendaStatus.CONCLUIDA:
         mov = CaixaMovimento(empresa_id=empresa_id, caixa_id=caixa.id, tipo=TipoMovimento.VENDA, origem=OrigemMovimento.VENDA, valor=venda.total, descricao=f"Venda #{venda.numero} - {venda.forma_pagamento}", venda_id=venda.id, forma_pagamento=venda.forma_pagamento, criado_por=created_by, criado_por_nome=criado_por_nome)
         db.add(mov)
+        db.flush()
     registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="CRIAR", descricao=f"Venda #{venda.numero} - {nomes} - R$ {venda.total}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero} - {nomes}", user_id=created_by, user_nome=criado_por_nome, detalhes={"produtos": nomes, "total": str(venda.total)}, ip=ip, commit=False)
     db.commit(); db.refresh(venda)
+    if mov:
+        db.refresh(mov)
 
-    # ===== EMITS QUE FALTAVAM =====
+    # ===== EMITS CORRIGIDOS COM ID =====
     for p in produtos_afectados:
         emit(str(empresa_id), "produto:update", data=p)
         emit(str(empresa_id), "produto:atualizado", data=p)
-    emit(str(empresa_id), "venda:nova", data={"id": str(venda.id), "numero": venda.numero, "total": str(venda.total), "mesa_id": str(venda.mesa_id) if venda.mesa_id else None})
-    emit(str(empresa_id), "venda:created", data={"id": str(venda.id), "numero": venda.numero, "total": str(venda.total)})
-    emit(str(empresa_id), "caixa:extrato", data={"tipo": "VENDA", "valor": str(venda.total), "descricao": f"Venda #{venda.numero}"})
-    emit(str(empresa_id), "caixa:update", data={"caixa_id": str(caixa.id), "total_venda": str(venda.total)})
-    emit(str(empresa_id), "caixa:atualizado", data={"caixa_id": str(caixa.id), "total_venda": str(venda.total)})
+
+    venda_payload = {
+        "id": str(venda.id),
+        "numero": venda.numero,
+        "total": str(venda.total),
+        "total_venda": str(venda.total),
+        "valor": str(venda.total),
+        "mesa_id": str(venda.mesa_id) if venda.mesa_id else None,
+        "itens": [{"produto_id": str(i.produto_id), "quantidade": str(i.quantidade)} for i in venda.itens]
+    }
+    emit(str(empresa_id), "venda:nova", data=venda_payload)
+    emit(str(empresa_id), "venda:created", data=venda_payload)
+
+    if mov:
+        mov_payload = {
+            "id": str(mov.id),
+            "tipo": mov.tipo.value if hasattr(mov.tipo, 'value') else str(mov.tipo),
+            "valor": str(mov.valor),
+            "descricao": mov.descricao,
+            "criado_em": mov.criado_em.isoformat() if mov.criado_em else datetime.utcnow().isoformat(),
+            "criado_por_nome": mov.criado_por_nome or criado_por_nome,
+            "forma_pagamento": str(mov.forma_pagamento) if mov.forma_pagamento else str(venda.forma_pagamento),
+            "venda_id": str(venda.id)
+        }
+        emit(str(empresa_id), "caixa:extrato", data=mov_payload)
+        emit(str(empresa_id), "caixa:atualizado", data=mov_payload)
+        emit(str(empresa_id), "caixa:update", data=mov_payload)
+    else:
+        fallback = {
+            "id": str(venda.id),
+            "tipo": "VENDA",
+            "valor": str(venda.total),
+            "descricao": f"Venda #{venda.numero}",
+            "criado_em": datetime.utcnow().isoformat(),
+            "criado_por_nome": criado_por_nome,
+            "venda_id": str(venda.id)
+        }
+        emit(str(empresa_id), "caixa:extrato", data=fallback)
+        emit(str(empresa_id), "caixa:atualizado", data=fallback)
+        emit(str(empresa_id), "caixa:update", data=fallback)
 
     return venda, produtos_afectados
 
+    
 def add_item_comanda(db: Session, venda_id: uuid.UUID, data, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
     venda = db.query(Venda).filter(Venda.id == venda_id, Venda.empresa_id == empresa_id).with_for_update().first()
     if not venda or venda.status!= VendaStatus.ABERTA: raise HTTPException(400, "Comanda não está aberta")
