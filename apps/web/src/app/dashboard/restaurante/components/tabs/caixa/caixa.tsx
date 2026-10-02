@@ -31,7 +31,9 @@ export function CaixaTab() {
     const [sangriaOpen, setSangriaOpen] = useState(false);
     const [sangriaTipo, setSangriaTipo] = useState<"SANGRIA" | "SUPRIMENTO">("SANGRIA");
     const [menuOpen, setMenuOpen] = useState(false);
+    const [showDateModal, setShowDateModal] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
+    const menuRefMobile = useRef<HTMLDivElement>(null);
     const [confirm, setConfirm] = useState<{open: boolean, title: string, desc: string, type: "black"|"green"|"red", action: ()=>void}>({open: false, title:"", desc:"", type:"black", action: ()=>{}});
 
     const load = async () => {
@@ -55,7 +57,10 @@ export function CaixaTab() {
     }, []);
     useEffect(()=>{ load(); }, [inicio, fim]);
     useEffect(()=>{
-        const h = (e: MouseEvent) => { if (menuRef.current &&!menuRef.current.contains(e.target as Node)) setMenuOpen(false); };
+        const h = (e: MouseEvent) => {
+            if (menuRef.current &&!menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+            if (menuRefMobile.current &&!menuRefMobile.current.contains(e.target as Node)) setMenuOpen(false);
+        };
         document.addEventListener("mousedown", h); return ()=>document.removeEventListener("mousedown", h);
     }, []);
 
@@ -106,20 +111,30 @@ export function CaixaTab() {
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
-            {/* TOP - 1 DATE POR VEZ NO CELULAR + BTN FIXO NA DIREITA | DESKTOP 2 DATES = WIDTH CARD PRETO */}
-            <div className="flex md:grid md:grid-cols-3 gap-3 items-center">
-                {/* Container que no celular tem scroll snap e no desktop tem exatamente o width do card preto */}
-                <div className="flex-1 md:col-span-1 min-w-0 flex overflow-x-auto md:overflow-visible snap-x snap-mandatory scrollbar-hide gap-2" style={{ overflowY: 'visible' } as any}>
-                    <div className="min-w-full md:min-w-0 md:flex-1 h-[46px] snap-center shrink-0">
-                        <JCalendarPicker value={inicio} onChange={setInicio} />
-                    </div>
-                    <div className="min-w-full md:min-w-0 md:flex-1 h-[46px] snap-center shrink-0">
-                        <JCalendarPicker value={fim} onChange={setFim} />
-                    </div>
+            {/* DESKTOP - OK, NAO MEXER */}
+            <div className="hidden md:grid md:grid-cols-3 gap-4 items-center">
+                <div className="h-[46px] w-full"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
+                <div className="h-[46px] w-full"><JCalendarPicker value={fim} onChange={setFim} /></div>
+                <div className="relative flex justify-end col-span-1" ref={menuRef}>
+                    <button onClick={()=>setMenuOpen(o=>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    </button>
+                    {menuOpen && (
+                        <div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-50">
+                            <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button>
+                            <div className="h-[1px] bg-zinc-100" />
+                            <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button>
+                        </div>
+                    )}
                 </div>
+            </div>
 
-                {/* Btn relatório FIXO fora do scroll, sempre na mesma linha */}
-                <div className="relative shrink-0 md:col-start-3 md:flex md:justify-end" ref={menuRef}>
+            {/* CELULAR - ICONE CALENDARIO + ICONE RELATORIO */}
+            <div className="flex md:hidden justify-end items-center gap-2">
+                <button onClick={()=>setShowDateModal(true)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                </button>
+                <div className="relative" ref={menuRefMobile}>
                     <button onClick={()=>setMenuOpen(o=>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     </button>
@@ -132,6 +147,22 @@ export function CaixaTab() {
                     )}
                 </div>
             </div>
+
+            {/* MODAL DE DATAS - SO CELULAR */}
+            {showDateModal && (
+                <div className="fixed inset-0 z-[100] flex items-end md:hidden">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={()=>setShowDateModal(false)} />
+                    <div className="relative w-full bg-white rounded-t-[24px] p-5 pb-8 animate-in slide-in-from-bottom">
+                        <div className="w-[40px] h-[4px] bg-zinc-300 rounded-full mx-auto mb-5" />
+                        <h3 className="text-[14px] font-black uppercase tracking-widest mb-4">Filtrar por período</h3>
+                        <div className="space-y-3">
+                            <div className="h-[46px] w-full"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
+                            <div className="h-[46px] w-full"><JCalendarPicker value={fim} onChange={setFim} /></div>
+                        </div>
+                        <button onClick={()=>setShowDateModal(false)} className="mt-5 w-full h-[46px] bg-black text-white rounded-full text-[12px] font-black uppercase tracking-widest">Aplicar</button>
+                    </div>
+                </div>
+            )}
 
             {/* CARDS */}
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
@@ -151,7 +182,6 @@ export function CaixaTab() {
                     <div className={`w-[44px] h-[26px] rounded-full p-[3px] transition-colors ${showExtrato?'bg-green-500':'bg-zinc-300'}`}>
                         <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-all ${showExtrato?'translate-x-[18px]':'translate-x-0'}`} />
                     </div>
-                    <span className={`text-[11px] font-black tracking-widest ${showExtrato?'text-green-600':'text-zinc-500'}`}></span>
                 </button>
             </div>
 
