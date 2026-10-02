@@ -53,7 +53,7 @@ function JCalendarPicker({ value, onChange }: { value: string, onChange: (v:stri
     const toISO = (d:number) => toLocalISO(new Date(year, month, d));
     return (
         <div className="relative w-full">
-            <button onClick={()=>setOpen(!open)} className="w-full h-[56px] flex items-center justify-between bg-white border rounded-full px-5 shadow-sm">
+            <button onClick={()=>setOpen(!open)} className="w-full h-[46px] flex items-center justify-between bg-white border rounded-full px-5 shadow-sm">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center"><Calendar size={14}/></div>
                     <div className="text-left">
