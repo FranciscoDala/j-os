@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { CaixaModal } from "./modals/open_close";
 import { SangriaModal } from "./modals/saida";
 import { MasterCard, EntradasCard, SaidasCard } from "./cards/cards_master";
@@ -10,7 +10,6 @@ import { toast } from "sonner";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com";
 const BASE = `${API_URL.replace(/\/$/, "")}/api/v1`;
-
 async function apiFetch(path: string, options: RequestInit = {}) {
     const token = localStorage.getItem("access_token");
     const res = await fetch(`${BASE}${path}`, {...options, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`,...(options.headers || {}) } });
@@ -18,93 +17,132 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 }
 const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const todayISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' });
+const addDays = (iso: string, delta: number) => { const d = new Date(iso); d.setDate(d.getDate()+delta); return d.toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' }); };
+
+type Periodo = "hoje" | "7" | "14" | "30" | "60" | "90" | "personalizado";
 
 export function CaixaTab() {
     const [status, setStatus] = useState<any>(null);
     const [extrato, setExtrato] = useState<any>(null);
-    const [historico, setHistorico] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState(todayISO());
+    const [periodo, setPeriodo] = useState<Periodo>("hoje");
     const [showExtrato, setShowExtrato] = useState(true);
+    const [customOpen, setCustomOpen] = useState(false);
+    const [customInicio, setCustomInicio] = useState(todayISO());
+    const [customFim, setCustomFim] = useState(todayISO());
     const [modalOpen, setModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<"abrir" | "fechar" | "forcar">("abrir");
     const [sangriaOpen, setSangriaOpen] = useState(false);
     const [sangriaTipo, setSangriaTipo] = useState<"SANGRIA" | "SUPRIMENTO">("SANGRIA");
     const [confirm, setConfirm] = useState<{open: boolean, title: string, desc: string, type: "black"|"green"|"red", action: ()=>void}>({open: false, title:"", desc:"", type:"black", action: ()=>{}});
 
-    const loadAll = async (date = selectedDate) => {
-        const s = await apiFetch("/caixa/status").catch(()=>null);
-        setStatus(s);
-        const h = await apiFetch("/caixa/historico").catch(()=>[]);
-        setHistorico(Array.isArray(h)? h : []);
-        // busca extrato pela data selecionada - é aqui que corrige
+    const load = async () => {
+        setLoading(true);
         try {
-            const ext = date === todayISO() && s?.aberto? await apiFetch("/caixa/extrato") : await apiFetch(`/caixa/extrato-por-data/${date}`);
+            const s = await apiFetch("/caixa/status").catch(()=>null);
+            setStatus(s);
+            let ext;
+            if (periodo==="hoje") {
+                ext = s?.aberto? await apiFetch("/caixa/extrato") : await apiFetch(`/caixa/extrato-por-data/${selectedDate}`);
+            } else if (periodo==="personalizado") {
+                ext = await apiFetch(`/caixa/extrato-por-periodo?inicio=${customInicio}&fim=${customFim}`);
+            } else {
+                const dias = Number(periodo);
+                const fim = todayISO();
+                const inicio = addDays(fim, -dias+1);
+                ext = await apiFetch(`/caixa/extrato-por-periodo?inicio=${inicio}&fim=${fim}`);
+            }
             setExtrato(ext);
-        } catch {
-            setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0, total_entradas: 0, total_saidas: 0 });
-        }
+        } catch { setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0, total_entradas: 0, total_saidas: 0 }); }
+        setLoading(false);
     };
 
-    useEffect(()=>{ (async()=>{ setLoading(true); await loadAll(selectedDate); setLoading(false); })(); }, []);
-    useEffect(()=>{ (async()=>{ setLoading(true); await loadAll(selectedDate); setLoading(false); })(); }, [selectedDate]);
+    useEffect(()=>{ load(); }, [selectedDate, periodo, customInicio, customFim]);
 
     const movs = extrato?.movimentos || [];
     const entradas = Number(extrato?.total_entradas || 0);
     const saidas = Math.abs(Number(extrato?.total_saidas || 0));
-    const atual = Number(extrato?.saldo_atual?? extrato?.saldo_inicial?? 0);
+    const atual = Number(extrato?.saldo_atual?? 0);
 
     const handleCardClick = (type: "master" | "entradas" | "saidas") => {
         if (type === "master") {
-            if (status?.aberto) setConfirm({ open: true, title: "Fechar caixa?", desc: `Saldo Kz ${fmt(atual)}. Fechar agora?`, type: "black", action: ()=>{ setModalMode("fechar"); setModalOpen(true); } });
+            if (status?.aberto) setConfirm({ open: true, title: "Fechar caixa?", desc: `Saldo Kz ${fmt(atual)}. Fechar?`, type: "black", action: ()=>{ setModalMode("fechar"); setModalOpen(true); } });
             else setConfirm({ open: true, title: "Abrir caixa?", desc: "Iniciar novo turno.", type: "black", action: ()=>{ setModalMode("abrir"); setModalOpen(true); } });
         }
         if (type === "entradas") {
             if (!status?.aberto) { toast.error("Abra o caixa primeiro"); return; }
-            setConfirm({ open: true, title: "Suprimento?", desc: "Adicionar dinheiro?", type: "green", action: ()=>{ setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true); } });
+            setConfirm({ open: true, title: "Suprimento?", desc: "Adicionar?", type: "green", action: ()=>{ setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true); } });
         }
         if (type === "saidas") {
             if (!status?.aberto) { toast.error("Abra o caixa primeiro"); return; }
-            setConfirm({ open: true, title: "Sangria?", desc: "Retirar dinheiro?", type: "red", action: ()=>{ setSangriaTipo("SANGRIA"); setSangriaOpen(true); } });
+            setConfirm({ open: true, title: "Sangria?", desc: "Retirar?", type: "red", action: ()=>{ setSangriaTipo("SANGRIA"); setSangriaOpen(true); } });
         }
     };
 
     if (loading &&!extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
 
-    const caixaAberto = status?.aberto && selectedDate >= new Date(status.caixa_atual.aberto_em).toLocaleDateString('en-CA', {timeZone: 'Africa/Luanda'});
-
     return (
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="w-full md:w-[calc((100%-32px)/3)]"><JCalendarPicker value={selectedDate} onChange={setSelectedDate} /></div>
-                <label className="flex items-center gap-3 bg-white border rounded-full px-4 h-[42px] cursor-pointer select-none w-fit">
-                    <div className="relative">
-                        <input type="checkbox" checked={showExtrato} onChange={e=>setShowExtrato(e.target.checked)} className="sr-only" />
-                        <div className={`w-[36px] h-[20px] rounded-full transition-all ${showExtrato? 'bg-black' : 'bg-zinc-200'}`} />
-                        <div className={`absolute top-[2px] w-[16px] h-[16px] bg-white rounded-full shadow transition-all ${showExtrato? 'left-[18px]' : 'left-[2px]'}`} />
-                    </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest">Mostrar extrato</span>
+
+            <div className="flex flex-col md:flex-row gap-3 md:items-center justify-between">
+                <div className="flex gap-2 items-center">
+                    {periodo==="hoje" && <div className="w-[200px]"><JCalendarPicker value={selectedDate} onChange={setSelectedDate} /></div>}
+                    <select value={periodo} onChange={e=>{
+                        const v = e.target.value as Periodo;
+                        if (v==="personalizado") setCustomOpen(true);
+                        setPeriodo(v);
+                    }} className="h-[42px] bg-white border rounded-full px-4 text-[12px] font-bold uppercase">
+                        <option value="hoje">Hoje / Dia</option>
+                        <option value="7">Últimos 7 dias</option>
+                        <option value="14">Últimos 14 dias</option>
+                        <option value="30">Últimos 30 dias</option>
+                        <option value="60">Últimos 60 dias</option>
+                        <option value="90">Últimos 90 dias</option>
+                        <option value="personalizado">Personalizado...</option>
+                    </select>
+                </div>
+                <label className="flex items-center gap-3 bg-white border rounded-full px-4 h-[42px] cursor-pointer w-fit">
+                    <input type="checkbox" checked={showExtrato} onChange={e=>setShowExtrato(e.target.checked)} className="sr-only" />
+                    <div className={`w-[36px] h-[20px] rounded-full ${showExtrato?'bg-black':'bg-zinc-200'}`} />
+                    <span className="text-[10px] font-black uppercase">Mostrar extrato</span>
                 </label>
             </div>
 
+            {extrato?.qtd_caixas>1 && <div className="text-[11px] font-bold uppercase tracking-widest text-zinc-500 bg-white rounded-full px-4 py-2 w-fit border">{extrato.qtd_caixas} caixas • {extrato.periodo_inicio} até {extrato.periodo_fim}</div>}
+
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div onClick={()=>handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
-                    <MasterCard aberto={caixaAberto} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={selectedDate.slice(5).replace("-","/")} horaAbertura={extrato?.movimentos?.[0]? new Date(extrato.movimentos[0].criado_em).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) : "--:--"} />
+                    <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={periodo==="hoje"?selectedDate.slice(5).replace("-","/"):`${extrato?.periodo_inicio?.slice(5) || ''}`} horaAbertura={movs[0]? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}): "--:--"} />
                 </div>
                 <div onClick={()=>handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
-                    <EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={selectedDate.slice(5).replace("-","/")} qtdVendas={movs.filter((m:any)=> (m.tipo||"").toUpperCase().includes("VENDA")).length} />
+                    <EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={periodo==="hoje"?selectedDate.slice(5).replace("-","/"): `${periodo}d`} qtdVendas={movs.filter((m:any)=> (m.tipo||"").toUpperCase().includes("VENDA")).length} />
                 </div>
                 <div onClick={()=>handleCardClick("saidas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} retirado={saidas>0?'1':'0'} />
                 </div>
             </div>
 
-            {showExtrato && <ExtratoList movimentos={movs} selectedDate={selectedDate} />}
+            {showExtrato && <ExtratoList movimentos={movs} selectedDate={extrato?.periodo_inicio || selectedDate} />}
+
+            {customOpen && (
+                <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[20px] p-6 w-full max-w-sm space-y-4">
+                        <h3 className="font-black uppercase text-sm">Período personalizado</h3>
+                        <div><p className="text-[10px] font-black uppercase mb-1">Início</p><JCalendarPicker value={customInicio} onChange={setCustomInicio} /></div>
+                        <div><p className="text-[10px] font-black uppercase mb-1">Fim</p><JCalendarPicker value={customFim} onChange={setCustomFim} /></div>
+                        <div className="flex gap-2">
+                            <button onClick={()=>{ setPeriodo("personalizado"); setCustomOpen(false); }} className="flex-1 h-11 bg-black text-white rounded-full text-[11px] font-black uppercase">Aplicar</button>
+                            <button onClick={()=>setCustomOpen(false)} className="flex-1 h-11 bg-zinc-100 rounded-full text-[11px] font-black uppercase">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <JConfirm open={confirm.open} title={confirm.title} desc={confirm.desc} type={confirm.type} onClose={()=>setConfirm(s=>({...s, open:false}))} onConfirm={confirm.action} />
-            <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={status?.caixa_atual || extrato} onClose={()=>setModalOpen(false)} onSuccess={async()=>{ await loadAll(selectedDate); toast.success("Atualizado!"); }} />
-            <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={()=>setSangriaOpen(false)} onSuccess={async()=>{ await loadAll(selectedDate); toast.success("Feito!"); }} />
+            <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={status?.caixa_atual || extrato} onClose={()=>setModalOpen(false)} onSuccess={async()=>{ await load(); toast.success("Atualizado!"); }} />
+            <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={()=>setSangriaOpen(false)} onSuccess={async()=>{ await load(); toast.success("Feito!"); }} />
         </div>
     )
 }
