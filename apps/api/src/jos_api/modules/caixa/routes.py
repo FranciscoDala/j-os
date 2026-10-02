@@ -27,28 +27,26 @@ def _range_luanda_para_utc(data_str: str):
     tz = ZoneInfo("Africa/Luanda")
     dia = datetime.strptime(data_str, "%Y-%m-%d")
     inicio = dia.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=tz)
-    fim = dia.replace(hour=23, minute=59, second=59, microsecond=0, tzinfo=tz)
+    fim = dia.replace(hour=23, minute=59, second=59, microsecond=999999, tzinfo=tz)
     return inicio.astimezone(timezone.utc).replace(tzinfo=None), fim.astimezone(timezone.utc).replace(tzinfo=None)
 
 def _calc_extrato(caixas, db: Session):
     if not caixas:
         return [], Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")
-    ids = [c.id for c in caixas if c is not None]
+    ids = [c.id for c in caixas if c]
     if not ids:
         return [], Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")
     movs = db.query(CaixaMovimento).filter(CaixaMovimento.caixa_id.in_(ids)).order_by(CaixaMovimento.criado_em.asc()).all()
     total_ent = Decimal("0"); total_sai = Decimal("0"); saldo_ini = Decimal("0"); saldo_atu = Decimal("0")
     for c in caixas:
-        if c is None: continue
         saldo_ini += c.saldo_inicial or Decimal("0")
         if c.status==CaixaStatus.ABERTO:
             saldo_atu += service.calcular_saldo_atual(db, c)
         else:
             saldo_atu += (c.saldo_final_esperado or c.saldo_inicial or Decimal("0"))
     for m in movs:
-        if m is None: continue
+        if not m or m.valor is None: continue
         if str(m.tipo)=="ABERTURA": continue
-        if m.valor is None: continue
         if m.valor>0: total_ent+=m.valor
         else: total_sai+=m.valor
     return movs, total_ent, total_sai, saldo_ini, saldo_atu
@@ -84,6 +82,7 @@ def historico_caixas(db: Session = Depends(get_db), perfil_data = Depends(precis
     empresa_id = _get_empresa_id(perfil_data)
     return db.query(Caixa).filter(Caixa.empresa_id == empresa_id).order_by(Caixa.aberto_em.desc()).limit(100).all()
 
+# SEM FALLBACK - só caixas que ABRIRAM nesse dia
 @router.get("/extrato-por-data/{data_str}", response_model=schemas.ExtratoResponse)
 def extrato_por_data(data_str: str, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
     empresa_id = _get_empresa_id(perfil_data)
@@ -93,13 +92,14 @@ def extrato_por_data(data_str: str, db: Session = Depends(get_db), perfil_data =
         raise HTTPException(400, "Data invalida YYYY-MM-DD")
     caixas = db.query(Caixa).filter(Caixa.empresa_id==empresa_id, Caixa.aberto_em>=inicio_utc, Caixa.aberto_em<=fim_utc).order_by(Caixa.aberto_em.asc()).all()
     if not caixas:
-        c = db.query(Caixa).filter(Caixa.empresa_id==empresa_id, Caixa.aberto_em<=fim_utc, (Caixa.fechado_em==None)|(Caixa.fechado_em>=inicio_utc)).order_by(Caixa.aberto_em.desc()).first()
-        caixas = [c] if c else []
-    if not caixas:
         return {"caixa_id": uuid.uuid4(), "saldo_inicial": Decimal("0"), "saldo_atual": Decimal("0"), "total_entradas": Decimal("0"), "total_saidas": Decimal("0"), "movimentos": [], "qtd_caixas":0, "periodo_inicio":data_str, "periodo_fim":data_str}
     movs, ent, sai, ini, atu = _calc_extrato(caixas, db)
     saldo_ini_ret = caixas[0].saldo_inicial if len(caixas)==1 else ini
-    saldo_atu_ret = caixas[0].saldo_final_esperado or atu if len(caixas)==1 and caixas[0].status!=CaixaStatus.ABERTO else atu
+    # se fechado mostra esperado, se aberto mostra atual
+    if len(caixas)==1 and caixas[0].status!=CaixaStatus.ABERTO:
+        saldo_atu_ret = caixas[0].saldo_final_esperado or ini
+    else:
+        saldo_atu_ret = atu
     return {"caixa_id": caixas[0].id, "saldo_inicial": saldo_ini_ret, "saldo_atual": saldo_atu_ret, "total_entradas": ent, "total_saidas": sai, "movimentos": movs, "qtd_caixas": len(caixas), "periodo_inicio":data_str, "periodo_fim":data_str}
 
 @router.get("/extrato-por-periodo", response_model=schemas.ExtratoResponse)

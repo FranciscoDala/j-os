@@ -21,7 +21,7 @@ const addDays = (iso: string, delta: number) => {
     const [y,m,d] = iso.split('-').map(Number);
     const dt = new Date(Date.UTC(y, m-1, d));
     dt.setUTCDate(dt.getUTCDate()+delta);
-    return dt.toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-').replace(/\//g,'-').length? `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}` : iso;
+    return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`;
 };
 
 type Periodo = "hoje" | "dia" | "7" | "14" | "30" | "60" | "90" | "personalizado";
@@ -50,16 +50,13 @@ export function CaixaTab() {
             const hoje = todayISO();
             let ext;
             if (periodo === "hoje") {
-                // REGRA QUE VOCE QUER:
-                // Se tem caixa ABERTO (abriu dia 1 e ainda aberto dia 2,3...), mostra ele
-                // Se NAO tem caixa aberto, busca so o que abriu HOJE (02/10). Se nao abriu nada hoje, vem vazio -> cards zerados
+                // LOGICA FINAL: só mostra se tiver ABERTO agora. Se fechou 01h, hoje fica zerado.
                 if (s?.aberto) {
                     ext = await apiFetch("/caixa/extrato");
                 } else {
                     ext = await apiFetch(`/caixa/extrato-por-data/${hoje}`);
                 }
             } else if (periodo === "dia") {
-                // Dia especifico selecionado no calendario (ex: 01/10)
                 ext = await apiFetch(`/caixa/extrato-por-data/${selectedDate}`);
             } else if (periodo === "personalizado") {
                 ext = await apiFetch(`/caixa/extrato-por-periodo?inicio=${customInicio}&fim=${customFim}`);
@@ -99,7 +96,7 @@ export function CaixaTab() {
 
     if (loading &&!extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
 
-    const isVazioHoje = periodo==="hoje" &&!status?.aberto && movs.length===0;
+    const isVazioHoje = periodo==="hoje" &&!status?.aberto;
 
     return (
         <div className="space-y-4">
@@ -107,9 +104,7 @@ export function CaixaTab() {
 
             <div className="flex flex-col md:flex-row gap-3 md:items-center justify-between">
                 <div className="flex gap-2 items-center flex-wrap">
-                    {/* Calendario só aparece quando for DIA especifico */}
                     {periodo==="dia" && <div className="w-[200px]"><JCalendarPicker value={selectedDate} onChange={setSelectedDate} /></div>}
-
                     <select value={periodo} onChange={e=>{
                         const v = e.target.value as Periodo;
                         if (v==="personalizado") setCustomOpen(true);
@@ -134,10 +129,7 @@ export function CaixaTab() {
             </div>
 
             {extrato?.qtd_caixas>1 && <div className="text-[11px] font-bold uppercase tracking-widest text-zinc-500 bg-white rounded-full px-4 py-2 w-fit border">{extrato.qtd_caixas} caixas • {extrato.periodo_inicio} até {extrato.periodo_fim}</div>}
-
-            {isVazioHoje && (
-                <div className="bg-amber-50 border border-amber-200 rounded-full px-4 py-2 text-[11px] font-bold uppercase">Nenhum caixa aberto hoje ({hojeISO}). Abra um novo caixa.</div>
-            )}
+            {isVazioHoje && <div className="bg-white border rounded-full px-4 py-2 text-[11px] font-bold uppercase text-zinc-500">Nenhum caixa aberto hoje ({hojeISO}) - clique em ABRIR CAIXA</div>}
 
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div onClick={()=>handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
