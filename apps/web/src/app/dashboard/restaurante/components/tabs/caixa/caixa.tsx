@@ -54,11 +54,8 @@ export function CaixaTab() {
     useEffect(()=>{
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved!== null) setShowExtrato(saved === "true");
-        else setShowExtrato(false);
     }, []);
-
     useEffect(()=>{ load(); }, [inicio, fim]);
-
     useEffect(()=>{
         const h = (e: MouseEvent) => { if (menuRef.current &&!menuRef.current.contains(e.target as Node)) setMenuOpen(false); };
         document.addEventListener("mousedown", h); return ()=>document.removeEventListener("mousedown", h);
@@ -96,24 +93,18 @@ export function CaixaTab() {
             const data = new Date(m.criado_em).toLocaleString('pt-PT', { timeZone: 'Africa/Luanda' });
             linhas.push([data, m.tipo, String(m.valor), (m.descricao||"").replace(/;/g,","), m.criado_por_nome||""]);
         });
-        linhas.push([]);
-        linhas.push(["Periodo", `${extrato?.periodo_inicio || inicio} ate ${extrato?.periodo_fim || fim}`]);
-        linhas.push(["Entradas", String(entradas)]);
-        linhas.push(["Saidas", String(saidas)]);
-        linhas.push(["Saldo", String(atual)]);
+        linhas.push([]); linhas.push(["Periodo", `${inicio} ate ${fim}`]);
         const csv = linhas.map(r=>r.join(";")).join("\n");
         const blob = new Blob(["\uFEFF"+csv], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement("a"); a.href=url; a.download=`relatorio-caixa-${inicio}_a_${fim}.csv`; a.click();
+        const a = document.createElement("a"); a.href=url; a.download=`relatorio-${inicio}_a_${fim}.csv`; a.click();
         URL.revokeObjectURL(url);
         toast.success("Baixado");
     };
-
     const handleImprimir = () => {
         setMenuOpen(false);
-        const win = window.open("", "_blank");
-        if(!win) return;
-        const html = `<html><head><title>Relatorio ${inicio} - ${fim}</title><style>body{font-family:monospace;padding:20px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:6px;font-size:12px} th{background:#000;color:#fff}</style></head><body><h2>J-OS - ${inicio} ate ${fim}</h2><table><thead><tr><th>Data</th><th>Tipo</th><th>Valor</th><th>Descricao</th></tr></thead><tbody>${movs.map((m:any)=>`<tr><td>${new Date(m.criado_em).toLocaleString('pt-PT')}</td><td>${m.tipo}</td><td>${fmt(Number(m.valor))}</td><td>${m.descricao||''}</td></tr>`).join("")}</tbody></table><script>window.print()</script></body></html>`;
+        const win = window.open("", "_blank"); if(!win) return;
+        const html = `<html><head><title>${inicio}-${fim}</title><style>body{font-family:monospace;padding:20px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:6px;font-size:12px} th{background:#000;color:#fff}</style></head><body><h2>J-OS ${inicio} ate ${fim}</h2><table><thead><tr><th>Data</th><th>Tipo</th><th>Valor</th></tr></thead><tbody>${movs.map((m:any)=>`<tr><td>${new Date(m.criado_em).toLocaleString('pt-PT')}</td><td>${m.tipo}</td><td>${fmt(Number(m.valor))}</td></tr>`).join("")}</tbody></table><script>window.print()</script></body></html>`;
         win.document.write(html); win.document.close();
     };
 
@@ -121,22 +112,27 @@ export function CaixaTab() {
 
     return (
         <div className="space-y-4">
-            <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
+            <style>{`
+               .scrollbar-hide::-webkit-scrollbar{display:none}
+               .scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}
+                /* força o calendario a aparecer por cima */
+               .date-popover-fix > div { z-index: 9999!important; }
+            `}</style>
 
-            {/* TOP: inputs date + btn relatorio - scroll no mobile */}
-            <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-2 -mx-4 px-4 md:mx-0 md:px-0 pb-1">
-                <div className="min-w-[165px] md:min-w-0 md:w-[180px] h-[46px] snap-start shrink-0">
+            {/* TOP - SEM DIV BRANCA, SCROLL NO MOBILE, SEM CORTAR CONTEUDO */}
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0 py-1" style={{ overflowY: 'visible' }}>
+                <div className="min-w-[175px] w-[175px] md:w-[185px] h-[46px] shrink-0 snap-start relative z-30 date-popover-fix">
                     <JCalendarPicker value={inicio} onChange={setInicio} />
                 </div>
-                <div className="min-w-[165px] md:min-w-0 md:w-[180px] h-[46px] snap-start shrink-0">
+                <div className="min-w-[175px] w-[175px] md:w-[185px] h-[46px] shrink-0 snap-start relative z-20 date-popover-fix">
                     <JCalendarPicker value={fim} onChange={setFim} />
                 </div>
-                <div className="relative snap-start shrink-0" ref={menuRef}>
-                    <button onClick={()=>setMenuOpen(o=>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center shrink-0">
+                <div className="relative shrink-0 snap-start z-40" ref={menuRef}>
+                    <button onClick={()=>setMenuOpen(o=>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     </button>
                     {menuOpen && (
-                        <div className="absolute left-0 mt-2 w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-20">
+                        <div className="absolute left-0 mt-2 w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-[999]">
                             <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button>
                             <div className="h-[1px] bg-zinc-100" />
                             <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button>
@@ -145,7 +141,7 @@ export function CaixaTab() {
                 </div>
             </div>
 
-            {/* CARDS - mesma altura dos inputs */}
+            {/* CARDS */}
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div onClick={()=>handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={inicio.slice(5).replace("-","/")} horaAbertura={movs[0]? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}): "--:--"} />
@@ -158,11 +154,11 @@ export function CaixaTab() {
                 </div>
             </div>
 
-            {/* BTN MOSTRAR EXTRATO EMBAIXO */}
+            {/* MOSTRAR EXTRATO EMBAIXO */}
             <div className="flex justify-end">
                 <label className="flex items-center gap-3 bg-white border rounded-full px-4 h-[42px] cursor-pointer w-fit">
                     <input type="checkbox" checked={showExtrato} onChange={e=>toggleExtrato(e.target.checked)} className="sr-only" />
-                    <div className={`w-[36px] h-[20px] rounded-full transition-colors relative ${showExtrato?'bg-black':'bg-zinc-200'}`}>
+                    <div className={`w-[36px] h-[20px] rounded-full relative transition-colors ${showExtrato?'bg-black':'bg-zinc-200'}`}>
                         <div className={`absolute top-[2px] w-[16px] h-[16px] bg-white rounded-full transition-all ${showExtrato?'left-[18px]':'left-[2px]'}`} />
                     </div>
                     <span className="text-[10px] font-black uppercase">Mostrar extrato</span>
