@@ -36,7 +36,7 @@ export function ExtratoList({ movimentos, selectedDate }: { movimentos: any[], s
                                     <td className="px-4 py-2 text-[11px] font-bold text-black">
                                         {m.descricao}
                                     </td>
-                                    <td className={`px-2 py-2 text-[9px] font-normal leading-none capitalize ${isPos? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>
+                                    <td className={`px-2 py-2 text-[11px] font-normal leading-none capitalize ${isPos? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>
                                         {String(m.tipo).toLowerCase()}
                                     </td>
                                     <td className={`px-4 py-2 text-right text-[11px] font-black ${isPos? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>
