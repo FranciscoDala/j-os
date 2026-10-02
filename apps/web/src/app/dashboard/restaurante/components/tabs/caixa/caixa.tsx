@@ -121,9 +121,9 @@ export function CaixaTab() {
                     </button>
                     {menuOpen && (
                         <div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-50">
-                            <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black hover:bg-zinc-50">Baixar Relatório</button>
+                            <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button>
                             <div className="h-[1px] bg-zinc-100" />
-                            <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black hover:bg-zinc-50">Imprimir Relatório</button>
+                            <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button>
                         </div>
                     )}
                 </div>
@@ -148,15 +148,15 @@ export function CaixaTab() {
                 </div>
             </div>
 
-            {/* MODAL DE DATAS - SÓ CELULAR - CENTRALIZADA NO MEIO */}
+            {/* MODAL DE DATAS - SO CELULAR - CENTRO DA TELA */}
             {showDateModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:hidden">
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={()=>setShowDateModal(false)} />
-                    <div className="relative w-full max-w-[360px] bg-white rounded-[24px] p-5 shadow-2xl overflow-visible">
+                    <div className="relative w-full max-w-[340px] bg-white rounded-[24px] p-5 shadow-2xl">
                         <h3 className="text-[14px] font-black uppercase tracking-widest mb-4 text-center">Filtrar por período</h3>
-                        <div className="space-y-3 overflow-visible">
-                            <div className="h-[46px] w-full relative z-20"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
-                            <div className="h-[46px] w-full relative z-10"><JCalendarPicker value={fim} onChange={setFim} /></div>
+                        <div className="space-y-3">
+                            <div className="h-[46px] w-full"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
+                            <div className="h-[46px] w-full"><JCalendarPicker value={fim} onChange={setFim} /></div>
                         </div>
                         <button onClick={()=>setShowDateModal(false)} className="mt-5 w-full h-[46px] bg-black text-white rounded-full text-[12px] font-black uppercase tracking-widest">Aplicar</button>
                     </div>
