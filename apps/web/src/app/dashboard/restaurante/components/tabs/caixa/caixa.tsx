@@ -17,6 +17,7 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 }
 const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const todayISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' });
+const STORAGE_KEY = "j-os:mostrar_extrato";
 
 export function CaixaTab() {
     const [status, setStatus] = useState<any>(null);
@@ -24,7 +25,7 @@ export function CaixaTab() {
     const [loading, setLoading] = useState(true);
     const [inicio, setInicio] = useState(todayISO());
     const [fim, setFim] = useState(todayISO());
-    const [showExtrato, setShowExtrato] = useState(true);
+    const [showExtrato, setShowExtrato] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<"abrir" | "fechar" | "forcar">("abrir");
     const [sangriaOpen, setSangriaOpen] = useState(false);
@@ -50,17 +51,26 @@ export function CaixaTab() {
         setLoading(false);
     };
 
+    useEffect(()=>{
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved!== null) setShowExtrato(saved === "true");
+        else setShowExtrato(false);
+    }, []);
     useEffect(()=>{ load(); }, [inicio, fim]);
     useEffect(()=>{
         const h = (e: MouseEvent) => { if (menuRef.current &&!menuRef.current.contains(e.target as Node)) setMenuOpen(false); };
         document.addEventListener("mousedown", h); return ()=>document.removeEventListener("mousedown", h);
     }, []);
 
+    const toggleExtrato = (v: boolean) => {
+        setShowExtrato(v);
+        localStorage.setItem(STORAGE_KEY, String(v));
+    };
+
     const movs = extrato?.movimentos || [];
     const entradas = Number(extrato?.total_entradas || 0);
     const saidas = Math.abs(Number(extrato?.total_saidas || 0));
     const atual = Number(extrato?.saldo_atual?? 0);
-    const hojeISO = todayISO();
 
     const handleCardClick = (type: "master" | "entradas" | "saidas") => {
         if (type === "master") {
@@ -111,35 +121,29 @@ export function CaixaTab() {
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
-            <div className="flex flex-col md:flex-row gap-3 md:items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 bg-white border rounded-full p-1">
-                        <div className="w-[150px]"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
-                        <div className="w-[150px]"><JCalendarPicker value={fim} onChange={setFim} /></div>
-                    </div>
-                    <div className="relative" ref={menuRef}>
-                        <button onClick={()=>setMenuOpen(o=>!o)} className="h-[42px] w-[42px] bg-black text-white rounded-full flex items-center justify-center">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                        </button>
-                        {menuOpen && (
-                            <div className="absolute left-0 mt-2 w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-20">
-                                <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button>
-                                <div className="h-[1px] bg-zinc-100" />
-                                <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button>
-                            </div>
-                        )}
-                    </div>
+            {/* TOP: inputs + btn relatorio - sem div branca, scroll no mobile */}
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0 py-2">
+                <div className="min-w-[175px] w-[175px] md:w-[185px] h-[46px] shrink-0 snap-start relative z-30">
+                    <JCalendarPicker value={inicio} onChange={setInicio} />
                 </div>
-
-                <label className="flex items-center gap-3 bg-white border rounded-full px-4 h-[42px] cursor-pointer w-fit">
-                    <input type="checkbox" checked={showExtrato} onChange={e=>setShowExtrato(e.target.checked)} className="sr-only" />
-                    <div className={`w-[36px] h-[20px] rounded-full transition-colors relative ${showExtrato?'bg-black':'bg-zinc-200'}`}>
-                        <div className={`absolute top-[2px] w-[16px] h-[16px] bg-white rounded-full transition-all ${showExtrato?'left-[18px]':'left-[2px]'}`} />
-                    </div>
-                    <span className="text-[10px] font-black uppercase">Mostrar extrato</span>
-                </label>
+                <div className="min-w-[175px] w-[175px] md:w-[185px] h-[46px] shrink-0 snap-start relative z-20">
+                    <JCalendarPicker value={fim} onChange={setFim} />
+                </div>
+                <div className="relative shrink-0 snap-start z-40" ref={menuRef}>
+                    <button onClick={()=>setMenuOpen(o=>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    </button>
+                    {menuOpen && (
+                        <div className="absolute left-0 mt-2 w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-[999]">
+                            <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button>
+                            <div className="h-[1px] bg-zinc-100" />
+                            <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button>
+                        </div>
+                    )}
+                </div>
             </div>
 
+            {/* CARDS */}
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div onClick={()=>handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={inicio.slice(5).replace("-","/")} horaAbertura={movs[0]? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}): "--:--"} />
@@ -150,6 +154,17 @@ export function CaixaTab() {
                 <div onClick={()=>handleCardClick("saidas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} retirado={saidas>0?'1':'0'} />
                 </div>
+            </div>
+
+            {/* MOSTRAR EXTRATO EMBAIXO */}
+            <div className="flex justify-end">
+                <label className="flex items-center gap-3 bg-white border rounded-full px-4 h-[42px] cursor-pointer w-fit">
+                    <input type="checkbox" checked={showExtrato} onChange={e=>toggleExtrato(e.target.checked)} className="sr-only" />
+                    <div className={`w-[36px] h-[20px] rounded-full transition-colors relative ${showExtrato?'bg-black':'bg-zinc-200'}`}>
+                        <div className={`absolute top-[2px] w-[16px] h-[16px] bg-white rounded-full transition-all ${showExtrato?'left-[18px]':'left-[2px]'}`} />
+                    </div>
+                    <span className="text-[10px] font-black uppercase">Mostrar extrato</span>
+                </label>
             </div>
 
             {showExtrato && <ExtratoList movimentos={movs} selectedDate={extrato?.periodo_inicio || inicio} />}
