@@ -157,19 +157,3 @@ def suprimento(dados: SangriaRequest, request: Request, db: Session = Depends(ge
 def listar_caixas(db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
     empresa_id = _get_empresa_id(perfil_data)
     return db.query(Caixa).filter(Caixa.empresa_id==empresa_id).order_by(Caixa.aberto_em.desc()).limit(50).all()
-
-
-
-@router.get("/debug-dia/{data_str}")
-def debug_dia(data_str: str, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
-    empresa_id = _get_empresa_id(perfil_data)
-    inicio_utc, fim_utc = _range_luanda_para_utc(data_str)
-    caixas = db.query(Caixa).filter(Caixa.empresa_id==empresa_id, Caixa.aberto_em>=inicio_utc, Caixa.aberto_em<=fim_utc).all()
-    todos = db.query(Caixa).filter(Caixa.empresa_id==empresa_id).order_by(Caixa.aberto_em.desc()).limit(5).all()
-    return {
-        "filtro": f"{inicio_utc} até {fim_utc} UTC = {data_str} Luanda",
-        "caixas_achados_no_dia": [{"id": str(c.id), "aberto_em": str(c.aberto_em), "saldo_inicial": float(c.saldo_inicial), "status": str(c.status), "fechado_em": str(c.fechado_em)} for c in caixas],
-        "ultimos_5_caixas_geral": [{"id": str(c.id), "aberto_em": str(c.aberto_em), "empresa": str(c.empresa_id)[:8]} for c in todos],
-        "movimentos_dos_caixas_do_dia": db.query(CaixaMovimento).filter(CaixaMovimento.caixa_id.in_([c.id for c in caixas])).count() if caixas else 0,
-        "total_movimentos_empresa": db.query(CaixaMovimento).filter(CaixaMovimento.empresa_id==empresa_id).count()
-    }
