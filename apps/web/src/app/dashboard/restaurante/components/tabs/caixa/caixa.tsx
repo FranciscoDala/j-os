@@ -107,16 +107,26 @@ export function CaixaTab() {
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
-            {/* TOP - dates com mesmo width do card + btn na direita */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-center">
-                <div className="h-[46px] w-full"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
-                <div className="h-[46px] w-full"><JCalendarPicker value={fim} onChange={setFim} /></div>
-                <div className="relative flex justify-end col-span-2 md:col-span-1" ref={menuRef}>
+            {/* TOP - CELULAR: scroll-x invisivel igual cards, mesma linha com btn. DESKTOP: 2 dates = width do card preto */}
+            <div
+                className="flex md:grid md:grid-cols-3 gap-2 items-center overflow-x-auto md:overflow-visible scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0 pb-2 md:pb-0"
+                style={{ overflowY: 'visible' } as any}
+            >
+                <div className="flex gap-2 flex-1 min-w-[calc(100%-56px)] md:min-w-0 md:col-span-1">
+                    <div className="h-[46px] flex-1 min-w-[155px]">
+                        <JCalendarPicker value={inicio} onChange={setInicio} />
+                    </div>
+                    <div className="h-[46px] flex-1 min-w-[155px]">
+                        <JCalendarPicker value={fim} onChange={setFim} />
+                    </div>
+                </div>
+
+                <div className="relative shrink-0 md:col-start-3 md:flex md:justify-end" ref={menuRef}>
                     <button onClick={()=>setMenuOpen(o=>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     </button>
                     {menuOpen && (
-                        <div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-50">
+                        <div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-[9999]">
                             <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button>
                             <div className="h-[1px] bg-zinc-100" />
                             <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button>
@@ -125,7 +135,7 @@ export function CaixaTab() {
                 </div>
             </div>
 
-            {/* CARDS - VOLTEI O SCROLL HORIZONTAL NO CELULAR, UM POR VEZ */}
+            {/* CARDS - scroll horizontal no celular, um por vez */}
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div onClick={()=>handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={inicio.slice(5).replace("-","/")} horaAbertura={movs[0]? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}): "--:--"} />
@@ -138,13 +148,13 @@ export function CaixaTab() {
                 </div>
             </div>
 
-            {/* MOSTRAR EXTRATO - sem bg-white, livre verde */}
+            {/* MOSTRAR EXTRATO */}
             <div className="flex justify-end pt-2">
                 <button onClick={()=>{ const v=!showExtrato; setShowExtrato(v); localStorage.setItem(STORAGE_KEY, String(v)); }} className="flex items-center gap-2">
                     <div className={`w-[44px] h-[26px] rounded-full p-[3px] transition-colors ${showExtrato?'bg-green-500':'bg-zinc-300'}`}>
                         <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-all ${showExtrato?'translate-x-[18px]':'translate-x-0'}`} />
                     </div>
-                    <span className={`text-[11px] font-black  tracking-widest ${showExtrato?'text-green-600':'text-zinc-500'}`}></span>
+                    <span className={`text-[11px] font-black tracking-widest ${showExtrato?'text-green-600':'text-zinc-500'}`}></span>
                 </button>
             </div>
 
