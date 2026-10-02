@@ -13,7 +13,7 @@ function FilterSelect({ value, onChange, options, placeholder }: { value: string
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
     useEffect(() => {
-        const h = (e: MouseEvent) => { if (ref.current &&!ref.current.contains(e.target as Node)) setOpen(false); };
+        const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
         document.addEventListener("mousedown", h);
         return () => document.removeEventListener("mousedown", h);
     }, []);
@@ -21,14 +21,14 @@ function FilterSelect({ value, onChange, options, placeholder }: { value: string
         <div ref={ref} className="relative">
             <button type="button" onClick={() => setOpen(!open)} className="h-9 bg-white border border-black/10 rounded-full px-4 text-[11px] font-bold flex items-center gap-2 hover:border-black/20 transition-colors outline-none shrink-0">
                 <span className="truncate max-w-[90px]">{value || placeholder || "Todas"}</span>
-                <ChevronDown size={14} className={`shrink-0 transition-transform ${open? "rotate-180" : ""}`} />
+                <ChevronDown size={14} className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
             </button>
             {open && (
                 <div className="absolute top-[44px] right-0 min-w-[160px] bg-white rounded-[18px] border border-black/10 shadow-[0_16px_40px_rgba(0,0,0,0.12)] z-[100] overflow-hidden p-1.5">
                     <div className="max-h-[220px] overflow-y-auto no-scrollbar space-y-0.5">
                         {options.map(opt => (
-                            <button key={opt || "todas"} type="button" onClick={() => { onChange(opt); setOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full text-[11px] font-bold transition-all ${value === opt? "bg-black text-white" : "bg-white text-black hover:bg-[#F5F7FB]"}`}>
-                                {opt === ""? "Todas" : opt}
+                            <button key={opt || "todas"} type="button" onClick={() => { onChange(opt); setOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full text-[11px] font-bold transition-all ${value === opt ? "bg-black text-white" : "bg-white text-black hover:bg-[#F5F7FB]"}`}>
+                                {opt === "" ? "Todas" : opt}
                             </button>
                         ))}
                     </div>
@@ -56,7 +56,7 @@ export function ProdutosTab() {
     const pushToast = (msg: string, type: Toast["type"] = "info") => {
         const id = Date.now().toString() + Math.random().toString().slice(2);
         setToasts(t => [...t, { id, msg, type }]);
-        setTimeout(() => setToasts(t => t.filter(x => x.id!== id)), 4000);
+        setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000);
     };
 
     const [form, setForm] = useState<any>({
@@ -91,17 +91,16 @@ export function ProdutosTab() {
             setItems(prev => {
                 const exists = prev.some(x => x.id === p.id);
                 if (!exists) return prev;
-                return prev.map(x => x.id === p.id? {...x,...p } : x);
+                return prev.map(x => x.id === p.id ? { ...x, ...p } : x);
             });
         };
         const onCreated = (e: any) => {
             const p = e.detail;
             if (!p?.id) return;
-            // se ainda não tem na lista e está na categoria atual, adiciona no topo
-            if (!search && (!cat || (p.categoria||"").toLowerCase() === cat.toLowerCase())) {
+            if (!search && (!cat || (p.categoria || "").toLowerCase() === cat.toLowerCase())) {
                 setItems(prev => {
                     if (prev.some(x => x.id === p.id)) return prev;
-                    return [p,...prev].slice(0, 20);
+                    return [p, ...prev].slice(0, 20);
                 });
                 setTotal(t => t + 1);
             }
@@ -109,13 +108,14 @@ export function ProdutosTab() {
         const onVenda = (e: any) => {
             const venda = e.detail;
             const itens = venda?.itens || venda?.data?.itens || venda?.produtos || [];
+            // fallback: se venda só tem total, não mexe no stock aqui (backend já mandou produto:update)
             if (!itens.length) return;
             itens.forEach((it: any) => {
                 const pid = it.produto_id || it.produto?.id || it.id;
                 const qtd = Number(it.quantidade || 1);
                 setItems(prev => prev.map(p =>
                     p.id === pid && p.controlar_stock
-                       ? {...p, stock_atual: Number(p.stock_atual || 0) - qtd }
+                        ? { ...p, stock_atual: Number(p.stock_atual || 0) - qtd }
                         : p
                 ));
             });
@@ -124,19 +124,23 @@ export function ProdutosTab() {
             const d = e.detail;
             const id = d?.id || d?.produto_id;
             if (!id) return;
-            setItems(prev => prev.filter(x => x.id!== id));
+            setItems(prev => prev.filter(x => x.id !== id));
             setTotal(t => Math.max(0, t - 1));
         };
 
         window.addEventListener("produto:update" as any, onUpdate);
+        window.addEventListener("produto:atualizado" as any, onUpdate);
         window.addEventListener("produto:created" as any, onCreated);
         window.addEventListener("produto:deleted" as any, onDelete);
         window.addEventListener("venda:nova" as any, onVenda);
+        window.addEventListener("venda:fechada" as any, onVenda);
         return () => {
             window.removeEventListener("produto:update" as any, onUpdate);
+            window.removeEventListener("produto:atualizado" as any, onUpdate);
             window.removeEventListener("produto:created" as any, onCreated);
             window.removeEventListener("produto:deleted" as any, onDelete);
             window.removeEventListener("venda:nova" as any, onVenda);
+            window.removeEventListener("venda:fechada" as any, onVenda);
         };
     }, [search, cat]);
 
@@ -163,15 +167,15 @@ export function ProdutosTab() {
         const token = localStorage.getItem("access_token");
         const allowed = ["nome", "codigo", "preco_venda", "preco_custo", "tipo", "unidade", "categoria", "descricao", "codigo_barras", "codigo_qr", "iva", "tem_iva", "peso", "ativo", "controlar_stock", "allow_negative", "stock_atual", "stock_minimo", "prep_time", "kitchen_station", "is_modifiable", "service_duration"];
         const fd = new FormData();
-        allowed.forEach(k => { const v = form[k]; if (v!== "" && v!== null && v!== undefined) fd.append(k, String(v)); });
+        allowed.forEach(k => { const v = form[k]; if (v !== "" && v !== null && v !== undefined) fd.append(k, String(v)); });
         if (imgFile) fd.append("imagem", imgFile);
-        const url = editId? `${API_BASE}/${editId}` : `${API_BASE}/`;
-        const method = editId? "PUT" : "POST";
+        const url = editId ? `${API_BASE}/${editId}` : `${API_BASE}/`;
+        const method = editId ? "PUT" : "POST";
         try {
             const r = await fetch(url, { method, headers: { Authorization: `Bearer ${token}` }, body: fd });
             const data = await r.json().catch(async () => ({ detail: await r.text() }));
             if (r.ok) {
-                pushToast(editId? "Produto atualizado!" : `Produto ${form.nome} criado!`, "success");
+                pushToast(editId ? "Produto atualizado!" : `Produto ${form.nome} criado!`, "success");
                 setOpen(false); resetForm(); fetchProds();
             } else {
                 pushToast(data.detail || "Erro ao salvar", "error");
@@ -192,12 +196,12 @@ export function ProdutosTab() {
         <div className="w-full space-y-3 relative">
             <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 w-[340px] pointer-events-none">
                 {toasts.map(t => (
-                    <div key={t.id} className={`pointer-events-auto flex gap-2 items-start p-3 rounded-[14px] border backdrop-blur-xl shadow-2xl text-[12px] font-medium ${t.type === "success"? "bg-[#E8F5E9] border-green-200 text-green-800" : t.type === "error"? "bg-[#FDECEA] border-red-200 text-red-800" : "bg-white border-gray-200 text-gray-800"}`}>
+                    <div key={t.id} className={`pointer-events-auto flex gap-2 items-start p-3 rounded-[14px] border backdrop-blur-xl shadow-2xl text-[12px] font-medium ${t.type === "success" ? "bg-[#E8F5E9] border-green-200 text-green-800" : t.type === "error" ? "bg-[#FDECEA] border-red-200 text-red-800" : "bg-white border-gray-200 text-gray-800"}`}>
                         {t.type === "success" && <CheckCircle size={16} className="shrink-0 mt-0.5" />}
                         {t.type === "error" && <AlertTriangle size={16} className="shrink-0 mt-0.5" />}
                         {t.type === "info" && <Info size={16} className="shrink-0 mt-0.5" />}
                         <span className="flex-1 leading-[1.2]">{t.msg}</span>
-                        <button onClick={() => setToasts(x => x.filter(f => f.id!== t.id))} className="opacity-60"><X size={12} /></button>
+                        <button onClick={() => setToasts(x => x.filter(f => f.id !== t.id))} className="opacity-60"><X size={12} /></button>
                     </div>
                 ))}
             </div>
@@ -221,12 +225,12 @@ export function ProdutosTab() {
                         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nome, código, barras..." className="w-full h-9 bg-[#F5F7FB] rounded-full pl-9 pr-4 text-[12px] outline-none focus:bg-white border border-transparent focus:border-black/10 focus:shadow-sm transition-all" />
                     </div>
                     <div className="hidden md:block">
-                        <FilterSelect value={cat} onChange={setCat} options={["",...cats]} placeholder="Todas" />
+                        <FilterSelect value={cat} onChange={setCat} options={["", ...cats]} placeholder="Todas" />
                     </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                     <div className="md:hidden">
-                        <FilterSelect value={cat} onChange={setCat} options={["",...cats]} placeholder="Todas" />
+                        <FilterSelect value={cat} onChange={setCat} options={["", ...cats]} placeholder="Todas" />
                     </div>
                     <button onClick={() => { resetForm(); setOpen(true); }} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center hover:bg-zinc-800 active:scale-95 transition-all">
                         <Plus size={18} strokeWidth={3} />

@@ -43,24 +43,28 @@ export function HomeTab({ user }: { user: any }) {
     useEffect(() => {
         const onExtrato = (e: any) => {
             const m = e.detail;
-            if (!m?.id) return;
-            const isVenda = (m.tipo || "").toUpperCase().includes("VENDA");
+            if (!m?.id && !m?.valor) return;
+            const isVenda = (m.tipo || "").toUpperCase().includes("VENDA") || e.type === "venda:nova";
             setStats(s => ({
-               ...s,
-                caixaAtual: Number(s.caixaAtual) + Number(m.valor || 0),
-                faturamento: Number(m.valor) > 0? Number(s.faturamento) + Number(m.valor) : s.faturamento,
-                pending: Number(m.valor) < 0? Number(s.pending) + Math.abs(Number(m.valor)) : s.pending,
-                vendasHoje: isVenda? s.vendasHoje + 1 : s.vendasHoje,
+                ...s,
+                caixaAtual: m.saldo_atual ? Number(m.saldo_atual) : Number(s.caixaAtual) + Number(m.valor || m.total_venda || m.total || 0),
+                faturamento: Number(m.valor || m.total || 0) > 0 ? Number(s.faturamento) + Number(m.valor || m.total || 0) : s.faturamento,
+                pending: Number(m.valor) < 0 ? Number(s.pending) + Math.abs(Number(m.valor)) : s.pending,
+                vendasHoje: isVenda ? s.vendasHoje + 1 : s.vendasHoje,
                 watchlist: s.watchlist + 1,
             }));
             if (isVenda) {
-                setUltimasVendas(prev => [m,...prev].slice(0, 3));
+                setUltimasVendas(prev => [m, ...prev].slice(0, 3));
             }
         };
         window.addEventListener("caixa:extrato" as any, onExtrato);
+        window.addEventListener("caixa:update" as any, onExtrato);
+        window.addEventListener("caixa:atualizado" as any, onExtrato);
         window.addEventListener("venda:nova" as any, onExtrato);
         return () => {
             window.removeEventListener("caixa:extrato" as any, onExtrato);
+            window.removeEventListener("caixa:update" as any, onExtrato);
+            window.removeEventListener("caixa:atualizado" as any, onExtrato);
             window.removeEventListener("venda:nova" as any, onExtrato);
         };
     }, []);
@@ -68,10 +72,10 @@ export function HomeTab({ user }: { user: any }) {
     const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2 });
 
     const cards = [
-        { id: 1, value: loading? "..." : `Kz ${fmt(stats.caixaAtual)}`, label: "Caixa Atual", labelColor: "text-blue-600", bg: "bg-white/90", icon: <FileChartColumn size={16} className="text-blue-700" />, iconBg: "bg-blue-100", bottom: (<div className="flex gap-1.5 mt-4 items-end h-8"><div className="w-full h-2.5 bg-[#A8C7F0] rounded-sm" /><div className="w-full h-4 bg-[#A8C7F0] rounded-sm" /><div className="w-full h-8 bg-[#1E3A8A] rounded-sm" /></div>) },
-        { id: 2, value: loading? "..." : stats.vendasHoje, label: "Vendas Hoje", labelColor: "text-gray-500", bg: "bg-white/90", icon: <TriangleAlert size={16} className="text-orange-500" />, iconBg: "bg-orange-100", bottom: <p className="text-[12px] text-green-600 mt-6 flex items-center gap-1"><ArrowUpRight size={14} />Kz {fmt(stats.faturamento)} faturado</p> },
-        { id: 3, value: loading? "..." : `Kz ${fmt(stats.pending)}`, label: "Saídas Hoje", labelColor: "text-black/70", bg: "bg-[#FFF68F]/95", icon: <File size={16} />, iconBg: "bg-white/70", bottom: (<div className="mt-6"><div className="h-1.5 bg-black/10 rounded-full"><div className="h-1.5 w-1/2 bg-black rounded-full" /></div><p className="text-[11px] mt-2 font-medium">{stats.watchlist} movimentos hoje</p></div>) },
-        { id: 4, value: loading? "..." : stats.active, label: "Caixas no período", labelColor: "text-white/80", bg: "bg-gradient-to-br from-[#5A8AD0] to-[#A9C5F0] text-white", icon: <Eye size={16} className="text-white" />, iconBg: "bg-white/20", bottom: <span className="mt-6 inline-flex bg-white/20 rounded-full px-3 py-1 text-[11px]">◎ ao vivo</span> },
+        { id: 1, value: loading ? "..." : `Kz ${fmt(stats.caixaAtual)}`, label: "Caixa Atual", labelColor: "text-blue-600", bg: "bg-white/90", icon: <FileChartColumn size={16} className="text-blue-700" />, iconBg: "bg-blue-100", bottom: (<div className="flex gap-1.5 mt-4 items-end h-8"><div className="w-full h-2.5 bg-[#A8C7F0] rounded-sm" /><div className="w-full h-4 bg-[#A8C7F0] rounded-sm" /><div className="w-full h-8 bg-[#1E3A8A] rounded-sm" /></div>) },
+        { id: 2, value: loading ? "..." : stats.vendasHoje, label: "Vendas Hoje", labelColor: "text-gray-500", bg: "bg-white/90", icon: <TriangleAlert size={16} className="text-orange-500" />, iconBg: "bg-orange-100", bottom: <p className="text-[12px] text-green-600 mt-6 flex items-center gap-1"><ArrowUpRight size={14} />Kz {fmt(stats.faturamento)} faturado</p> },
+        { id: 3, value: loading ? "..." : `Kz ${fmt(stats.pending)}`, label: "Saídas Hoje", labelColor: "text-black/70", bg: "bg-[#FFF68F]/95", icon: <File size={16} />, iconBg: "bg-white/70", bottom: (<div className="mt-6"><div className="h-1.5 bg-black/10 rounded-full"><div className="h-1.5 w-1/2 bg-black rounded-full" /></div><p className="text-[11px] mt-2 font-medium">{stats.watchlist} movimentos hoje</p></div>) },
+        { id: 4, value: loading ? "..." : stats.active, label: "Caixas no período", labelColor: "text-white/80", bg: "bg-gradient-to-br from-[#5A8AD0] to-[#A9C5F0] text-white", icon: <Eye size={16} className="text-white" />, iconBg: "bg-white/20", bottom: <span className="mt-6 inline-flex bg-white/20 rounded-full px-3 py-1 text-[11px]">◎ ao vivo</span> },
     ];
 
     return (

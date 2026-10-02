@@ -3,19 +3,19 @@ from fastapi import HTTPException
 from decimal import Decimal
 import uuid
 from sqlalchemy import func
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime, timedelta
 from jos_api.modules.venda.models import Venda, VendaItem, VendaTipo, VendaStatus, VendaItemStatus, ReservaCarrinho
 from jos_api.modules.mesa.models import Mesa, MesaStatus
 from jos_api.modules.produto.models import Product
 from jos_api.modules.caixa.models import Caixa, CaixaMovimento, TipoMovimento, OrigemMovimento
 from jos_api.modules.atividade.service import registrar_atividade
+from jos_api.core.events import emit
 
 def _next_numero(db: Session, empresa_id: uuid.UUID) -> int:
     max_n = db.query(func.max(Venda.numero)).filter(Venda.empresa_id == empresa_id).scalar()
     return (max_n or 0) + 1
 
-# ===== NOVAS FUNÇÕES DE RESERVA =====
 def _limpar_expiradas(db: Session, empresa_id: uuid.UUID):
     db.query(ReservaCarrinho).filter(ReservaCarrinho.empresa_id == empresa_id, ReservaCarrinho.expira_em < datetime.utcnow()).delete()
     db.flush()
@@ -40,7 +40,6 @@ def get_reservas_ativas(db: Session, empresa_id: uuid.UUID):
 
 def reservar_produto(db: Session, empresa_id: uuid.UUID, produto_id: uuid.UUID, user_id: uuid.UUID, quantidade: Decimal):
     _limpar_expiradas(db, empresa_id)
-    # remove reserva antiga do mesmo user/produto e cria nova (upsert)
     db.query(ReservaCarrinho).filter(ReservaCarrinho.empresa_id == empresa_id, ReservaCarrinho.produto_id == produto_id, ReservaCarrinho.user_id == user_id).delete()
     db.flush()
     disponivel = get_stock_disponivel(db, empresa_id, produto_id)
@@ -50,15 +49,20 @@ def reservar_produto(db: Session, empresa_id: uuid.UUID, produto_id: uuid.UUID, 
     db.add(r)
     db.commit()
     db.refresh(r)
+    emit(str(empresa_id), "reserva:criada", data={"produto_id": str(produto_id), "user_id": str(user_id), "quantidade": str(quantidade)})
+    emit(str(empresa_id), "reserva:update", data={"produto_id": str(produto_id), "user_id": str(user_id), "quantidade": str(quantidade)})
     return r
 
 def liberar_reserva(db: Session, empresa_id: uuid.UUID, produto_id: uuid.UUID, user_id: uuid.UUID):
     db.query(ReservaCarrinho).filter(ReservaCarrinho.empresa_id == empresa_id, ReservaCarrinho.produto_id == produto_id, ReservaCarrinho.user_id == user_id).delete()
     db.commit()
+    emit(str(empresa_id), "reserva:liberada", data={"produto_id": str(produto_id), "user_id": str(user_id)})
+    emit(str(empresa_id), "reserva:update", data={"produto_id": str(produto_id), "user_id": str(user_id), "quantidade": "0"})
 
 def liberar_todas_reservas_user(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID):
     db.query(ReservaCarrinho).filter(ReservaCarrinho.empresa_id == empresa_id, ReservaCarrinho.user_id == user_id).delete()
     db.commit()
+    emit(str(empresa_id), "reserva:clear", data={"user_id": str(user_id)})
 
 def get_mesas(db: Session, empresa_id: uuid.UUID):
     return db.query(Mesa).filter(Mesa.empresa_id == empresa_id, Mesa.ativa == True).order_by(Mesa.numero).all()
@@ -68,6 +72,7 @@ def criar_mesa(db: Session, empresa_id: uuid.UUID, numero: str, capacidade: int)
     if exists: raise HTTPException(400, f"Mesa {numero} já existe")
     m = Mesa(empresa_id=empresa_id, numero=numero.strip().upper(), capacidade=capacidade, status=MesaStatus.LIVRE)
     db.add(m); db.commit(); db.refresh(m)
+    emit(str(empresa_id), "mesa:created", data={"id": str(m.id), "numero": m.numero})
     return m
 
 def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID, caixa: Caixa, criado_por_nome: str = "Sistema", ip: str | None = None):
@@ -75,7 +80,6 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
     _limpar_expiradas(db, empresa_id)
     mesa: Optional[Mesa] = None
     venda_tipo = VendaTipo.BALCAO
-    # CORREÇÃO BALCÃO SEMPRE CONCLUIDA
     if data.mesa_id:
         mesa = db.query(Mesa).filter(Mesa.id == data.mesa_id, Mesa.empresa_id == empresa_id).with_for_update().first()
         if not mesa: raise HTTPException(404, "Mesa não encontrada")
@@ -91,11 +95,8 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
     for it in data.itens:
         prod = db.query(Product).filter(Product.id == it.produto_id, Product.empresa_id == empresa_id).with_for_update().first()
         if not prod: raise HTTPException(404, f"Produto {it.produto_id} não encontrado")
-        # valida com reservas de OUTROS users
         if getattr(prod, 'controlar_stock', False):
             disp = get_stock_disponivel(db, empresa_id, prod.id, ignorar_user_id=created_by)
-            # como vamos apagar nossa própria reserva depois, temos que somar ela no disponível para validar
-            # então se disp + minha_reserva < qtd -> erro
             minha_reserva_qtd = db.query(func.coalesce(func.sum(ReservaCarrinho.quantidade),0)).filter(ReservaCarrinho.empresa_id==empresa_id, ReservaCarrinho.produto_id==prod.id, ReservaCarrinho.user_id==created_by).scalar() or Decimal("0")
             if (disp + Decimal(str(minha_reserva_qtd))) < it.quantidade and not getattr(prod, 'allow_negative', False):
                 raise HTTPException(400, f"Stock insuficiente: {prod.nome} (disponível {disp + Decimal(str(minha_reserva_qtd))})")
@@ -109,7 +110,6 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
         if venda_status == VendaStatus.CONCLUIDA and getattr(prod, 'controlar_stock', False):
             prod.stock_atual -= it.quantidade
             produtos_afectados.append({"id": str(prod.id), "stock_atual": str(prod.stock_atual), "nome": prod.nome})
-        # apaga reserva deste user/produto após usar
         db.query(ReservaCarrinho).filter(ReservaCarrinho.empresa_id==empresa_id, ReservaCarrinho.produto_id==prod.id, ReservaCarrinho.user_id==created_by).delete()
 
     venda.subtotal = sub; venda.total_iva = iva_tot; venda.total = tot
@@ -122,7 +122,17 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
         db.add(mov)
     registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="CRIAR", descricao=f"Venda #{venda.numero} - {nomes} - R$ {venda.total}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero} - {nomes}", user_id=created_by, user_nome=criado_por_nome, detalhes={"produtos": nomes, "total": str(venda.total)}, ip=ip, commit=False)
     db.commit(); db.refresh(venda)
-    # retorna info extra para broadcast
+
+    # ===== EMITS QUE FALTAVAM =====
+    for p in produtos_afectados:
+        emit(str(empresa_id), "produto:update", data=p)
+        emit(str(empresa_id), "produto:atualizado", data=p)
+    emit(str(empresa_id), "venda:nova", data={"id": str(venda.id), "numero": venda.numero, "total": str(venda.total), "mesa_id": str(venda.mesa_id) if venda.mesa_id else None})
+    emit(str(empresa_id), "venda:created", data={"id": str(venda.id), "numero": venda.numero, "total": str(venda.total)})
+    emit(str(empresa_id), "caixa:extrato", data={"tipo": "VENDA", "valor": str(venda.total), "descricao": f"Venda #{venda.numero}"})
+    emit(str(empresa_id), "caixa:update", data={"caixa_id": str(caixa.id), "total_venda": str(venda.total)})
+    emit(str(empresa_id), "caixa:atualizado", data={"caixa_id": str(caixa.id), "total_venda": str(venda.total)})
+
     return venda, produtos_afectados
 
 def add_item_comanda(db: Session, venda_id: uuid.UUID, data, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
@@ -138,7 +148,9 @@ def add_item_comanda(db: Session, venda_id: uuid.UUID, data, empresa_id: uuid.UU
     venda.subtotal += sub_item; venda.total_iva += iva_v; venda.total += tot_item
     db.flush()
     registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="ADD_ITEM", descricao=f"Adicionou '{prod.nome} x{data.quantidade}' na comanda #{venda.numero}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero} - {prod.nome}", user_id=user_id, user_nome=user_nome, detalhes={"produto": prod.nome, "qtd": str(data.quantidade)}, ip=ip, commit=False)
-    db.commit(); db.refresh(venda); return venda
+    db.commit(); db.refresh(venda)
+    emit(str(empresa_id), "venda:item_adicionado", data={"venda_id": str(venda.id), "produto": prod.nome, "qtd": str(data.quantidade)})
+    return venda
 
 def update_item_status(db: Session, venda_id: uuid.UUID, item_id: uuid.UUID, novo_status: VendaItemStatus, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
     item = db.query(VendaItem).filter(VendaItem.id == item_id, VendaItem.venda_id == venda_id, VendaItem.empresa_id == empresa_id).first()
@@ -147,7 +159,9 @@ def update_item_status(db: Session, venda_id: uuid.UUID, item_id: uuid.UUID, nov
     item.status = novo_status
     db.flush()
     registrar_atividade(db, empresa_id=empresa_id, modulo="COZINHA", acao=novo_status.value, descricao=f"Cozinha: '{item.nome_produto}' {antigo.value} -> {novo_status.value} - Venda #{venda_id}", entidade="VendaItem", entidade_id=item.id, entidade_nome=item.nome_produto, user_id=user_id, user_nome=user_nome, ip=ip, commit=False)
-    db.commit(); return item
+    db.commit()
+    emit(str(empresa_id), "cozinha:update", data={"item_id": str(item.id), "status": novo_status.value})
+    return item
 
 def transferir_mesa(db: Session, venda_id: uuid.UUID, nova_mesa_id: uuid.UUID, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
     venda = db.query(Venda).filter(Venda.id == venda_id, Venda.empresa_id == empresa_id).with_for_update().first()
@@ -161,7 +175,9 @@ def transferir_mesa(db: Session, venda_id: uuid.UUID, nova_mesa_id: uuid.UUID, e
     venda.mesa_id = nova_mesa_id
     db.flush()
     registrar_atividade(db, empresa_id=empresa_id, modulo="MESA", acao="TRANSFERIR", descricao=f"Transferiu comanda #{venda.numero} {mesa_antiga.numero if mesa_antiga else 'BALCAO'} -> {mesa_nova.numero}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero} -> Mesa {mesa_nova.numero}", user_id=user_id, user_nome=user_nome, ip=ip, commit=False)
-    db.commit(); return venda
+    db.commit()
+    emit(str(empresa_id), "mesa:transferida", data={"venda_id": str(venda.id), "nova_mesa": mesa_nova.numero})
+    return venda
 
 def fechar_comanda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, dinheiro_recebido: Decimal, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
     venda = db.query(Venda).filter(Venda.id == venda_id, Venda.empresa_id == empresa_id).with_for_update().first()
@@ -185,6 +201,12 @@ def fechar_comanda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, dinh
         mesa = db.query(Mesa).filter(Mesa.id == venda.mesa_id).first()
         if mesa: mesa.status = MesaStatus.LIVRE
     db.commit(); db.refresh(venda)
+    for p in produtos_afectados:
+        emit(str(empresa_id), "produto:update", data=p)
+        emit(str(empresa_id), "produto:atualizado", data=p)
+    emit(str(empresa_id), "venda:fechada", data={"id": str(venda.id), "total": str(venda.total)})
+    emit(str(empresa_id), "caixa:atualizado", data={"caixa_id": str(caixa.id), "valor": str(venda.total)})
+    emit(str(empresa_id), "caixa:update", data={"caixa_id": str(caixa.id), "valor": str(venda.total)})
     return venda, produtos_afectados
 
 def cancelar_venda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
@@ -196,4 +218,6 @@ def cancelar_venda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, user
         if mesa: mesa.status = MesaStatus.LIVRE
     nomes = ", ".join([i.nome_produto for i in venda.itens])
     registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="CANCELAR", descricao=f"Cancelou venda #{venda.numero} - {nomes}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero} - {nomes}", user_id=user_id, user_nome=user_nome, detalhes={"total": str(venda.total)}, ip=ip, commit=False)
-    db.commit(); return venda
+    db.commit()
+    emit(str(empresa_id), "venda:cancelada", data={"id": str(venda.id)})
+    return venda

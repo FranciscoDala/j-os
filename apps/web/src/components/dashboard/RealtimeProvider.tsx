@@ -10,26 +10,27 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
         console.log("[RT]", ev.type, ev);
 
-        // PRODUTO - criado / update / deletado -> sempre dispara produto:update por compat
+        // PRODUTO - compat: qualquer evento vira produto:update
         if (ev.type.startsWith("produto:")) {
             window.dispatchEvent(new CustomEvent(ev.type, { detail: ev.data || ev }));
             window.dispatchEvent(new CustomEvent("produto:update", { detail: ev.data || ev }));
+            window.dispatchEvent(new CustomEvent("produto:atualizado", { detail: ev.data || ev }));
         }
 
         // VENDA
-        if (ev.type === "venda:nova" || ev.type === "venda:fechada" || ev.type === "venda:update" || ev.type === "venda:cancelada" || ev.type === "venda:item_status") {
+        if (ev.type === "venda:nova" || ev.type === "venda:fechada" || ev.type === "venda:update" || ev.type === "venda:cancelada" || ev.type === "venda:item_status" || ev.type === "venda:created") {
             window.dispatchEvent(new CustomEvent(ev.type, { detail: ev.data || ev }));
-            // compat antigo que só escuta venda:nova
             if (ev.type !== "venda:nova") {
                 window.dispatchEvent(new CustomEvent("venda:nova", { detail: ev.data || ev }));
             }
         }
 
-        // CAIXA - backend manda separado: caixa:update e caixa:extrato
-        if (ev.type === "caixa:update" || ev.type === "caixa:extrato") {
-            window.dispatchEvent(new CustomEvent(ev.type, { detail: ev.data || ev }));
+        // CAIXA - agora emite 3 nomes, tratamos todos
+        if (ev.type === "caixa:update" || ev.type === "caixa:atualizado" || ev.type === "caixa:extrato") {
+            window.dispatchEvent(new CustomEvent("caixa:update", { detail: ev.data || ev }));
+            window.dispatchEvent(new CustomEvent("caixa:atualizado", { detail: ev.data || ev }));
+            window.dispatchEvent(new CustomEvent("caixa:extrato", { detail: ev.data || ev }));
         }
-        // quando vem venda:nova com movimento junto (legado), ainda funciona
         if (ev.type === "venda:nova" && ev.movimento) {
             window.dispatchEvent(new CustomEvent("caixa:extrato", { detail: ev.movimento }));
         }
@@ -45,7 +46,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             window.dispatchEvent(new CustomEvent("atividade:nova", { detail: ev.data || ev }));
         }
 
-        // EMPRESA / ENTIDADE / USUARIO
+        // EMPRESA / ENTIDADE / USUARIO / MESA
         if (ev.type.startsWith("empresa:") || ev.type.startsWith("entidade:") || ev.type.startsWith("usuario:") || ev.type.startsWith("perfis:") || ev.type.startsWith("mesa:")) {
             window.dispatchEvent(new CustomEvent(ev.type, { detail: ev.data || ev }));
         }
