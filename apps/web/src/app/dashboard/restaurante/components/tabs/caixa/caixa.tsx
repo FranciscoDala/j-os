@@ -111,7 +111,7 @@ export function CaixaTab() {
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
-            {/* DESKTOP - NAO MEXER */}
+            {/* DESKTOP - OK, NAO MEXER */}
             <div className="hidden md:grid md:grid-cols-3 gap-4 items-center">
                 <div className="h-[46px] w-full"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
                 <div className="h-[46px] w-full"><JCalendarPicker value={fim} onChange={setFim} /></div>
@@ -129,13 +129,13 @@ export function CaixaTab() {
                 </div>
             </div>
 
-            {/* CELULAR - 2 ICONES */}
+            {/* CELULAR - ICONE CALENDARIO + ICONE RELATORIO */}
             <div className="flex md:hidden justify-end items-center gap-2">
-                <button onClick={()=>setShowDateModal(true)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center active:scale-95 transition">
+                <button onClick={()=>setShowDateModal(true)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
                 </button>
                 <div className="relative" ref={menuRefMobile}>
-                    <button onClick={()=>setMenuOpen(o=>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center active:scale-95 transition">
+                    <button onClick={()=>setMenuOpen(o=>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     </button>
                     {menuOpen && (
@@ -148,30 +148,17 @@ export function CaixaTab() {
                 </div>
             </div>
 
-            {/* MODAL CENTRALIZADA NO MEIO - SEM CORTAR */}
+            {/* MODAL DE DATAS - SÓ CELULAR - CENTRALIZADA NO MEIO */}
             {showDateModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:hidden">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={()=>setShowDateModal(false)} />
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={()=>setShowDateModal(false)} />
                     <div className="relative w-full max-w-[360px] bg-white rounded-[24px] p-5 shadow-2xl overflow-visible">
-                        <div className="flex items-center justify-between mb-5">
-                            <h3 className="text-[13px] font-black uppercase tracking-widest">FILTRAR POR PERÍODO</h3>
-                            <button onClick={()=>setShowDateModal(false)} className="h-8 w-8 bg-zinc-100 rounded-full flex items-center justify-center">✕</button>
+                        <h3 className="text-[14px] font-black uppercase tracking-widest mb-4 text-center">Filtrar por período</h3>
+                        <div className="space-y-3 overflow-visible">
+                            <div className="h-[46px] w-full relative z-20"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
+                            <div className="h-[46px] w-full relative z-10"><JCalendarPicker value={fim} onChange={setFim} /></div>
                         </div>
-
-                        {/* overflow-visible pra calendario nao cortar */}
-                        <div className="space-y-4 overflow-visible">
-                            <div className="relative z-[102] w-full h-[50px]">
-                                <JCalendarPicker value={inicio} onChange={setInicio} />
-                            </div>
-                            <div className="relative z-[101] w-full h-[50px]">
-                                <JCalendarPicker value={fim} onChange={setFim} />
-                            </div>
-                        </div>
-
-                        <div className="mt-6 flex gap-2">
-                            <button onClick={()=>setShowDateModal(false)} className="flex-1 h-[46px] bg-zinc-100 text-black rounded-full text-[11px] font-black uppercase">Cancelar</button>
-                            <button onClick={()=>setShowDateModal(false)} className="flex-1 h-[46px] bg-black text-white rounded-full text-[11px] font-black uppercase">Aplicar</button>
-                        </div>
+                        <button onClick={()=>setShowDateModal(false)} className="mt-5 w-full h-[46px] bg-black text-white rounded-full text-[12px] font-black uppercase tracking-widest">Aplicar</button>
                     </div>
                 </div>
             )}
