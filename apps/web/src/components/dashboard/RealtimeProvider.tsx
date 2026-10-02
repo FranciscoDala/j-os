@@ -1,56 +1,30 @@
 "use client";
-import { createContext } from "react";
+import { createContext, useEffect } from "react";
 import { useRealtime } from "@/hooks/useRealtime";
 
 const Ctx = createContext({});
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
+    useEffect(()=>{ console.log("[RT_PROVIDER] montado, token:", !!localStorage.getItem("access_token")) },[])
     useRealtime((ev) => {
+        console.log("[RT_RAW]", ev);
         if (!ev?.type || ev.type === "__RECONNECT__") return;
-
         console.log("[RT]", ev.type, ev);
-
-        // PRODUTO - compat: qualquer evento vira produto:update
-        if (ev.type.startsWith("produto:")) {
-            window.dispatchEvent(new CustomEvent(ev.type, { detail: ev.data || ev }));
-            window.dispatchEvent(new CustomEvent("produto:update", { detail: ev.data || ev }));
-            window.dispatchEvent(new CustomEvent("produto:atualizado", { detail: ev.data || ev }));
+        const detail = ev.data || ev;
+        window.dispatchEvent(new CustomEvent(ev.type, { detail }));
+        // compat
+        if(ev.type.startsWith("produto:")) {
+          window.dispatchEvent(new CustomEvent("produto:update", { detail }));
+          window.dispatchEvent(new CustomEvent("produto:atualizado", { detail }));
         }
-
-        // VENDA
-        if (ev.type === "venda:nova" || ev.type === "venda:fechada" || ev.type === "venda:update" || ev.type === "venda:cancelada" || ev.type === "venda:item_status" || ev.type === "venda:created") {
-            window.dispatchEvent(new CustomEvent(ev.type, { detail: ev.data || ev }));
-            if (ev.type !== "venda:nova") {
-                window.dispatchEvent(new CustomEvent("venda:nova", { detail: ev.data || ev }));
-            }
+        if(ev.type.startsWith("caixa:")) {
+          window.dispatchEvent(new CustomEvent("caixa:update", { detail }));
+          window.dispatchEvent(new CustomEvent("caixa:atualizado", { detail }));
+          window.dispatchEvent(new CustomEvent("caixa:extrato", { detail }));
         }
-
-        // CAIXA - agora emite 3 nomes, tratamos todos
-        if (ev.type === "caixa:update" || ev.type === "caixa:atualizado" || ev.type === "caixa:extrato") {
-            window.dispatchEvent(new CustomEvent("caixa:update", { detail: ev.data || ev }));
-            window.dispatchEvent(new CustomEvent("caixa:atualizado", { detail: ev.data || ev }));
-            window.dispatchEvent(new CustomEvent("caixa:extrato", { detail: ev.data || ev }));
-        }
-        if (ev.type === "venda:nova" && ev.movimento) {
-            window.dispatchEvent(new CustomEvent("caixa:extrato", { detail: ev.movimento }));
-        }
-
-        // RESERVA
-        if (ev.type.startsWith("reserva:")) {
-            window.dispatchEvent(new CustomEvent(ev.type, { detail: ev.data || ev }));
-            window.dispatchEvent(new CustomEvent("reserva:update", { detail: ev }));
-        }
-
-        // ATIVIDADE
-        if (ev.type === "atividade:nova") {
-            window.dispatchEvent(new CustomEvent("atividade:nova", { detail: ev.data || ev }));
-        }
-
-        // EMPRESA / ENTIDADE / USUARIO / MESA
-        if (ev.type.startsWith("empresa:") || ev.type.startsWith("entidade:") || ev.type.startsWith("usuario:") || ev.type.startsWith("perfis:") || ev.type.startsWith("mesa:")) {
-            window.dispatchEvent(new CustomEvent(ev.type, { detail: ev.data || ev }));
+        if(ev.type.startsWith("venda:")) {
+          window.dispatchEvent(new CustomEvent("venda:nova", { detail }));
         }
     });
-
     return <Ctx.Provider value={{}}>{children}</Ctx.Provider>;
 }
