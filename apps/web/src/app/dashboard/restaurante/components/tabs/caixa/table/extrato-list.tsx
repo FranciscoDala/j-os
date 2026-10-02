@@ -20,7 +20,7 @@ export function ExtratoList({ movimentos, selectedDate }: { movimentos: any[], s
     return (
         <div className="bg-white rounded-[16px] border overflow-hidden">
             <div className="flex justify-between items-center px-4 h-[42px] border-b">
-                <h3 className="font-black text-[11px] tracking-widest">Movimento de caixa • {movimentos.length} • {selectedDate.split('-').reverse().join('/')}</h3>
+                <h3 className="font-black text-[11px] tracking-widest">EXTRATO • {movimentos.length} • {selectedDate.split('-').reverse().join('/')}</h3>
             </div>
 
             <div className="overflow-x-auto">
