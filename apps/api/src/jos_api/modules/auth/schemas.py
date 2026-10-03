@@ -6,7 +6,7 @@ from.models import RoleEnum
 
 class EmpresaResumo(BaseModel):
     id: UUID
-    nome: str | None = "Loja"
+    nome: Optional[str] = "Loja"
     role: RoleEnum
 
 class UserCreate(BaseModel):
@@ -41,3 +41,4 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     empresas: Optional[List[EmpresaResumo]] = None
     user: UserOut
+    empresa_id: Optional[str] = None # novo pra facilitar frontend

@@ -17,30 +17,22 @@ class RoleEnum(str, enum.Enum):
     RH = "rh"
     FUNCIONARIO = "funcionario"
 
-    # para compatibilidade: se vier "DONO" em maiusculo do banco antigo, aceita
     @classmethod
     def _missing_(cls, value):
         if isinstance(value, str):
-            low = value.lower()
+            low = value.lower().strip()
             for member in cls:
-                if member.value == low:
+                if member.value == low or member.name.lower() == low:
                     return member
         return None
 
 class UserEmpresa(Base):
     __tablename__ = "user_empresas"
     __table_args__ = (UniqueConstraint("user_id", "empresa_id", name="uq_user_empresa"),)
-
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     empresa_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("empresas.id", ondelete="CASCADE"), index=True, nullable=False)
-
-    role: Mapped[RoleEnum] = mapped_column(
-        SAEnum(RoleEnum, name="roleenum", create_type=False),
-        default=RoleEnum.FUNCIONARIO,
-        nullable=False,
-        server_default="funcionario"
-    )
+    role: Mapped[RoleEnum] = mapped_column(SAEnum(RoleEnum, name="roleenum", create_type=False), default=RoleEnum.FUNCIONARIO, nullable=False, server_default="funcionario")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, server_default=sa.func.now())
 
 class User(Base):
@@ -50,31 +42,15 @@ class User(Base):
     nome: Mapped[str] = mapped_column(String(150), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     senha_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-
-    # agora aceita todos os perfis
-    role: Mapped[RoleEnum] = mapped_column(
-        SAEnum(RoleEnum, name="roleenum", create_type=False),
-        default=RoleEnum.FUNCIONARIO,
-        nullable=False,
-        server_default="funcionario"
-    )
-
+    role: Mapped[RoleEnum] = mapped_column(SAEnum(RoleEnum, name="roleenum", create_type=False), default=RoleEnum.FUNCIONARIO, nullable=False, server_default="funcionario")
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default=sa.text('true'))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, server_default=sa.func.now())
-
-    empresas_vinculadas: Mapped[list["UserEmpresa"]] = relationship(
-        "UserEmpresa",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-        foreign_keys="[UserEmpresa.user_id]"
-    )
+    empresas_vinculadas: Mapped[list["UserEmpresa"]] = relationship("UserEmpresa", cascade="all, delete-orphan", lazy="selectin", foreign_keys="[UserEmpresa.user_id]")
 
     @property
     def role_slug(self) -> str:
         r = self.role
-        if isinstance(r, str):
-            return r.lower()
-        if isinstance(r, enum.Enum):
-            return str(r.value).lower()
+        if isinstance(r, str): return r.lower()
+        if isinstance(r, enum.Enum): return str(r.value).lower()
         return str(r).lower()
