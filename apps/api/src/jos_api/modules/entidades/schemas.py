@@ -30,25 +30,30 @@ class EntidadeCreate(BaseModel):
             raise ValueError('Nome muito curto')
         return v
 
-    # transforma "" em None e faz strip automático
     @field_validator('telefone', 'email', 'documento', 'endereco', 'cargo', 'departamento', 'empresa_fornecedora', 'categoria_fornecedor', 'senha', mode='before')
     @classmethod
     def empty_to_none(cls, v):
-        if v is None:
-            return None
+        if v is None: return None
         if isinstance(v, str):
             s = v.strip()
             return s if s!= "" else None
         return v
 
-    @field_validator('email')
+    @field_validator('perfil_id', 'data_admissao', 'salario', 'carga_horaria', mode='before')
     @classmethod
-    def validar_email_acesso(cls, v, info):
-        # se tem_acesso_app for True, o router já valida, aqui só normaliza
-        if v:
-            return v.lower()
+    def empty_to_none_all(cls, v):
+        if v == "" or v == "null" or v == "undefined":
+            return None
         return v
 
+    @field_validator('email')
+    @classmethod
+    def validar_email_acesso(cls, v):
+        if v:
+            return v.lower().strip()
+        return v
+
+        
 class EntidadeOut(BaseModel):
     id: UUID
     empresa_id: UUID
