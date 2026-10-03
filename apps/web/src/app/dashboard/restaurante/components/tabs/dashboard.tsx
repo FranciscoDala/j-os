@@ -1,13 +1,17 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, SlidersHorizontal, ArrowUpRight, FileChartColumn, TriangleAlert, File, Eye, ClipboardList, Pill, Calendar } from "lucide-react";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const BASE = `${API_URL}/api/v1`;
 
 async function apiFetch(path: string) {
-    const token = localStorage.getItem("access_token");
-    const r = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+    const token = typeof window!== "undefined"? localStorage.getItem("access_token") : null;
+    if (!token) throw new Error("Sem token");
+    const r = await fetch(`${BASE}${path}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store"
+    });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw d;
     return d;
@@ -17,15 +21,17 @@ export function HomeTab({ user }: { user: any }) {
     const [stats, setStats] = useState({ active: 0, urgent: 0, pending: 0, watchlist: 0, vendasHoje: 0, faturamento: 0, caixaAtual: 0 });
     const [loading, setLoading] = useState(true);
     const [ultimasVendas, setUltimasVendas] = useState<any[]>([]);
+    const mountedRef = useRef(true);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         try {
-            setLoading(true);
+            if (mountedRef.current) setLoading(true);
             const extrato = await apiFetch("/caixa/extrato").catch(() => null);
+            if (!mountedRef.current) return;
             const movs = extrato?.movimentos || [];
             const vendas = movs.filter((m: any) => (m.tipo || "").toUpperCase().includes("VENDA"));
             setStats({
-                active: extrato?.qtd_caixas || 0,
+                active: Number(extrato?.qtd_caixas || 0),
                 urgent: vendas.length,
                 pending: Math.abs(Number(extrato?.total_saidas || 0)),
                 watchlist: movs.length,
@@ -34,48 +40,60 @@ export function HomeTab({ user }: { user: any }) {
                 caixaAtual: Number(extrato?.saldo_atual || 0)
             });
             setUltimasVendas(vendas.slice(0, 3));
-        } catch { } finally { setLoading(false); }
-    };
+        } catch {
+            // silencia para não quebrar UI
+        } finally {
+            if (mountedRef.current) setLoading(false);
+        }
+    }, []);
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => {
+        mountedRef.current = true;
+        load();
+        return () => { mountedRef.current = false; };
+    }, [load]);
 
-    // REALTIME CIRÚRGICO - sem refresh, só injeta
+    // REALTIME CIRÚRGICO - seguro contra memory leak
     useEffect(() => {
         const onExtrato = (e: any) => {
             const m = e.detail;
-            if (!m?.id && !m?.valor) return;
+            if (!m || (!m.id &&!m.valor &&!m.total)) return;
+            const valorNum = Number(m.valor?? m.total_venda?? m.total?? 0);
+            if (isNaN(valorNum)) return;
             const isVenda = (m.tipo || "").toUpperCase().includes("VENDA") || e.type === "venda:nova";
+
             setStats(s => ({
-                ...s,
-                caixaAtual: m.saldo_atual ? Number(m.saldo_atual) : Number(s.caixaAtual) + Number(m.valor || m.total_venda || m.total || 0),
-                faturamento: Number(m.valor || m.total || 0) > 0 ? Number(s.faturamento) + Number(m.valor || m.total || 0) : s.faturamento,
-                pending: Number(m.valor) < 0 ? Number(s.pending) + Math.abs(Number(m.valor)) : s.pending,
-                vendasHoje: isVenda ? s.vendasHoje + 1 : s.vendasHoje,
+               ...s,
+                caixaAtual: m.saldo_atual? Number(m.saldo_atual) : s.caixaAtual + valorNum,
+                faturamento: valorNum > 0? s.faturamento + valorNum : s.faturamento,
+                pending: valorNum < 0? s.pending + Math.abs(valorNum) : s.pending,
+                vendasHoje: isVenda? s.vendasHoje + 1 : s.vendasHoje,
                 watchlist: s.watchlist + 1,
             }));
             if (isVenda) {
-                setUltimasVendas(prev => [m, ...prev].slice(0, 3));
+                setUltimasVendas(prev => [m,...prev].slice(0, 3));
             }
         };
-        window.addEventListener("caixa:extrato" as any, onExtrato);
-        window.addEventListener("caixa:update" as any, onExtrato);
-        window.addEventListener("caixa:atualizado" as any, onExtrato);
-        window.addEventListener("venda:nova" as any, onExtrato);
+
+        const events = ["caixa:extrato", "caixa:update", "caixa:atualizado", "venda:nova", "entidade:created"] as const;
+        events.forEach(ev => window.addEventListener(ev as any, onExtrato));
+
         return () => {
-            window.removeEventListener("caixa:extrato" as any, onExtrato);
-            window.removeEventListener("caixa:update" as any, onExtrato);
-            window.removeEventListener("caixa:atualizado" as any, onExtrato);
-            window.removeEventListener("venda:nova" as any, onExtrato);
+            events.forEach(ev => window.removeEventListener(ev as any, onExtrato));
         };
     }, []);
 
-    const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2 });
+    const fmt = (v: number) => {
+        const n = Number(v);
+        if (isNaN(n)) return "0,00";
+        return n.toLocaleString('pt-PT', { minimumFractionDigits: 2 });
+    };
 
     const cards = [
-        { id: 1, value: loading ? "..." : `Kz ${fmt(stats.caixaAtual)}`, label: "Caixa Atual", labelColor: "text-blue-600", bg: "bg-white/90", icon: <FileChartColumn size={16} className="text-blue-700" />, iconBg: "bg-blue-100", bottom: (<div className="flex gap-1.5 mt-4 items-end h-8"><div className="w-full h-2.5 bg-[#A8C7F0] rounded-sm" /><div className="w-full h-4 bg-[#A8C7F0] rounded-sm" /><div className="w-full h-8 bg-[#1E3A8A] rounded-sm" /></div>) },
-        { id: 2, value: loading ? "..." : stats.vendasHoje, label: "Vendas Hoje", labelColor: "text-gray-500", bg: "bg-white/90", icon: <TriangleAlert size={16} className="text-orange-500" />, iconBg: "bg-orange-100", bottom: <p className="text-[12px] text-green-600 mt-6 flex items-center gap-1"><ArrowUpRight size={14} />Kz {fmt(stats.faturamento)} faturado</p> },
-        { id: 3, value: loading ? "..." : `Kz ${fmt(stats.pending)}`, label: "Saídas Hoje", labelColor: "text-black/70", bg: "bg-[#FFF68F]/95", icon: <File size={16} />, iconBg: "bg-white/70", bottom: (<div className="mt-6"><div className="h-1.5 bg-black/10 rounded-full"><div className="h-1.5 w-1/2 bg-black rounded-full" /></div><p className="text-[11px] mt-2 font-medium">{stats.watchlist} movimentos hoje</p></div>) },
-        { id: 4, value: loading ? "..." : stats.active, label: "Caixas no período", labelColor: "text-white/80", bg: "bg-gradient-to-br from-[#5A8AD0] to-[#A9C5F0] text-white", icon: <Eye size={16} className="text-white" />, iconBg: "bg-white/20", bottom: <span className="mt-6 inline-flex bg-white/20 rounded-full px-3 py-1 text-[11px]">◎ ao vivo</span> },
+        { id: 1, value: loading? "..." : `Kz ${fmt(stats.caixaAtual)}`, label: "Caixa Atual", labelColor: "text-blue-600", bg: "bg-white/90", icon: <FileChartColumn size={16} className="text-blue-700" />, iconBg: "bg-blue-100", bottom: (<div className="flex gap-1.5 mt-4 items-end h-8"><div className="w-full h-2.5 bg-[#A8C7F0] rounded-sm" /><div className="w-full h-4 bg-[#A8C7F0] rounded-sm" /><div className="w-full h-8 bg-[#1E3A8A] rounded-sm" /></div>) },
+        { id: 2, value: loading? "..." : stats.vendasHoje, label: "Vendas Hoje", labelColor: "text-gray-500", bg: "bg-white/90", icon: <TriangleAlert size={16} className="text-orange-500" />, iconBg: "bg-orange-100", bottom: <p className="text-[12px] text-green-600 mt-6 flex items-center gap-1"><ArrowUpRight size={14} />Kz {fmt(stats.faturamento)} faturado</p> },
+        { id: 3, value: loading? "..." : `Kz ${fmt(stats.pending)}`, label: "Saídas Hoje", labelColor: "text-black/70", bg: "bg-[#FFF68F]/95", icon: <File size={16} />, iconBg: "bg-white/70", bottom: (<div className="mt-6"><div className="h-1.5 bg-black/10 rounded-full"><div className="h-1.5 w-1/2 bg-black rounded-full" /></div><p className="text-[11px] mt-2 font-medium">{stats.watchlist} movimentos hoje</p></div>) },
+        { id: 4, value: loading? "..." : stats.active, label: "Caixas no período", labelColor: "text-white/80", bg: "bg-gradient-to-br from-[#5A8AD0] to-[#A9C5F0] text-white", icon: <Eye size={16} className="text-white" />, iconBg: "bg-white/20", bottom: <span className="mt-6 inline-flex bg-white/20 rounded-full px-3 py-1 text-[11px]">◎ ao vivo</span> },
     ];
 
     return (
@@ -128,7 +146,7 @@ export function HomeTab({ user }: { user: any }) {
                             <div key={v.id || i} className="bg-white rounded-[16px] p-3.5 flex justify-between items-center border border-white/80 shadow-sm active:scale-[0.99] transition">
                                 <div className="flex gap-3 items-center min-w-0">
                                     <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center text-[11px] font-black">{v.criado_por_nome?.[0] || 'V'}</div>
-                                    <div className="min-w-0"><p className="font-bold text-[14px] truncate">{v.descricao || 'Venda'}</p><p className="text-[12px] text-gray-500 truncate">{new Date(v.criado_em).toLocaleTimeString('pt-PT')} • {v.criado_por_nome || 'Sistema'}</p></div>
+                                    <div className="min-w-0"><p className="font-bold text-[14px] truncate">{v.descricao || 'Venda'}</p><p className="text-[12px] text-gray-500 truncate">{v.criado_em? new Date(v.criado_em).toLocaleTimeString('pt-PT') : ''} • {v.criado_por_nome || 'Sistema'}</p></div>
                                 </div>
                                 <span className="text-[12px] px-3 py-1 rounded-full font-bold bg-green-100 text-green-700 shrink-0 ml-2">+ Kz {fmt(Number(v.valor || 0))}</span>
                             </div>
@@ -155,8 +173,8 @@ export function HomeTab({ user }: { user: any }) {
             </div>
 
             <style jsx>{`
-           .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
-           .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+          .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
+          .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
         </div>
     );
