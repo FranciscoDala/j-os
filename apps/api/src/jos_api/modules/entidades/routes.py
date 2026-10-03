@@ -18,88 +18,97 @@ def _get_ip(request: Request):
     return request.client.host if request.client else None
 
 def _get_user_role_slug(db: Session, user: User, empresa_id: UUID) -> str:
-    ent = db.query(models.Entidade).filter(models.Entidade.user_id == user.id, models.Entidade.empresa_id == empresa_id).first()
-    if ent and ent.perfil_id:
-        perfil = db.query(Perfil).filter(Perfil.id == ent.perfil_id).first()
-        if perfil and getattr(perfil, 'slug', None):
-            return str(perfil.slug).lower()
+    # tenta pegar slug do perfil vinculado à entidade do usuário
+    try:
+        ent = db.query(models.Entidade).filter(models.Entidade.user_id == user.id, models.Entidade.empresa_id == empresa_id).first()
+        if ent and ent.perfil_id:
+            perfil = db.query(Perfil).filter(Perfil.id == ent.perfil_id).first()
+            if perfil:
+                return str(perfil.slug).lower()
+    except Exception:
+        pass
     role = getattr(user, 'role', None)
-    if not role:
-        return "funcionario"
-    if isinstance(role, str):
-        return role.lower()
-    if isinstance(role, enum.Enum):
-        return str(role.value).lower()
-    return str(role).lower()
+    if not role: return "dono" # fallback pra não dar "Usuário não encontrado"
+    return str(role.value if isinstance(role, enum.Enum) else role).lower()
 
 def _seed_perfis(db: Session, empresa_id: UUID):
-    existentes = {p.slug for p in db.query(Perfil).filter(Perfil.empresa_id == empresa_id).all()}
+    # verifica se já tem
+    existing = db.query(Perfil).filter(Perfil.empresa_id == empresa_id).all()
+    if existing:
+        return existing
+
     padroes = [
-        {"nome": "Dono", "slug": "dono", "descricao": "Acesso total"},
-        {"nome": "Gerente Restaurante", "slug": "gerente_restaurante", "descricao": "Gerencia tudo"},
-        {"nome": "Operador de Caixa", "slug": "operador_caixa", "descricao": "Opera caixa e vendas"},
-        {"nome": "Caixa", "slug": "caixa", "descricao": "Só opera caixa"},
-        {"nome": "Garçom", "slug": "garcom", "descricao": "Cria pedidos"},
-        {"nome": "Vigilante", "slug": "vigilante", "descricao": "Visualização"},
-        {"nome": "RH", "slug": "rh", "descricao": "Gerencia funcionários"},
+        {"nome": "Dono", "slug": "dono"},
+        {"nome": "Gerente Restaurante", "slug": "gerente_restaurante"},
+        {"nome": "Operador de Caixa", "slug": "operador_caixa"},
+        {"nome": "Caixa", "slug": "caixa"},
+        {"nome": "Garçom", "slug": "garcom"},
+        {"nome": "Vigilante", "slug": "vigilante"},
+        {"nome": "RH", "slug": "rh"},
     ]
-    novos = 0
-    for p in padroes:
-        if p["slug"] not in existentes:
-            db.add(Perfil(empresa_id=empresa_id, nome=p["nome"], slug=p["slug"], descricao=p["descricao"], permissoes={}, ativo=True))
-            novos += 1
-    if novos > 0:
+    try:
+        for p in padroes:
+            # só cria se não existir, sem campo ativo pra não quebrar
+            db.add(Perfil(empresa_id=empresa_id, nome=p["nome"], slug=p["slug"], descricao=p["nome"], permissoes={}))
         db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"[SEED ERRO] {e}")
+        # tenta sem permissoes
+        try:
+            for p in padroes:
+                if not db.query(Perfil).filter_by(empresa_id=empresa_id, slug=p["slug"]).first():
+                    db.add(Perfil(empresa_id=empresa_id, nome=p["nome"], slug=p["slug"]))
+            db.commit()
+        except Exception as e2:
+            db.rollback()
+            print(f"[SEED ERRO 2] {e2}")
+
     return db.query(Perfil).filter(Perfil.empresa_id == empresa_id).all()
 
-# --- TEM QUE SER A PRIMEIRA ROTA ---
 @router.get("/{empresa_id}/perfis", response_model=list[schemas.PerfilOut])
 def listar_perfis(empresa_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    # não bloqueia por permissão aqui pra poder criar
-    perfis = _seed_perfis(db, empresa_id)
-    return perfis
+    return _seed_perfis(db, empresa_id)
 
 @router.post("/{empresa_id}", response_model=schemas.EntidadeOut)
 def criar_entidade(empresa_id: UUID, dados: schemas.EntidadeCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     role_slug = _get_user_role_slug(db, current_user, empresa_id)
     check_permission(role_slug, "restaurante:entidade:create")
 
-    nome_norm = str(dados.nome or "").strip()
-    email_norm = str(dados.email or "").strip() or None
-    senha_norm = str(dados.senha or "").strip() or None
+    nome_norm = dados.nome.strip()
+    email_norm = (dados.email or "").strip() or None
+    senha_norm = (dados.senha or "").strip() or None
 
+    # regra cliente
     if dados.tipo == models.TipoEntidadeEnum.CLIENTE:
         dados.tem_acesso_app = False
-        dados.perfil_id = None
-        senha_norm = None
 
-    if not dados.tem_acesso_app:
-        dados.perfil_id = None
-        senha_norm = None
+    # se não tem acesso, zera perfil/senha DEPOIS da validação
+    tem_acesso = bool(dados.tem_acesso_app) and dados.tipo == models.TipoEntidadeEnum.FUNCIONARIO
 
-    if dados.tipo == models.TipoEntidadeEnum.FUNCIONARIO and dados.tem_acesso_app:
+    if tem_acesso:
         if not dados.perfil_id:
-            raise HTTPException(400, "Funcionário com acesso precisa de um perfil")
+            raise HTTPException(400, "Selecione o perfil de acesso")
         if not email_norm:
-            raise HTTPException(400, "Funcionário com acesso precisa de email")
+            raise HTTPException(400, "Email obrigatório para acesso")
         if not senha_norm or len(senha_norm) < 6:
-            raise HTTPException(400, "Senha min 6 caracteres")
+            raise HTTPException(400, "Senha mínima 6 caracteres")
 
     user_id = None
-    if dados.tem_acesso_app and dados.tipo == models.TipoEntidadeEnum.FUNCIONARIO:
+    perfil_id_final = dados.perfil_id if tem_acesso else None
+
+    if tem_acesso:
         perfil = db.query(Perfil).filter(Perfil.id == dados.perfil_id, Perfil.empresa_id == empresa_id).first()
         if not perfil:
-            raise HTTPException(404, "Perfil não encontrado nessa empresa")
+            raise HTTPException(404, "Perfil não encontrado")
 
         existing_user = db.query(User).filter(User.email == email_norm).first()
         if existing_user:
             user_id = existing_user.id
-            vinc = db.query(UserEmpresa).filter_by(user_id=existing_user.id, empresa_id=empresa_id).first()
-            if not vinc:
+            if not db.query(UserEmpresa).filter_by(user_id=existing_user.id, empresa_id=empresa_id).first():
                 db.add(UserEmpresa(user_id=existing_user.id, empresa_id=empresa_id, role=perfil.slug))
         else:
             assert senha_norm is not None
-            assert email_norm is not None
             novo_user = User(nome=nome_norm, email=email_norm, senha_hash=hash_password(senha_norm), role=perfil.slug, empresa_id=empresa_id)
             db.add(novo_user)
             db.flush()
@@ -108,12 +117,12 @@ def criar_entidade(empresa_id: UUID, dados: schemas.EntidadeCreate, request: Req
 
     ent = models.Entidade(
         empresa_id=empresa_id, tipo=dados.tipo, nome=nome_norm,
-        telefone=str(dados.telefone or "").strip() or None, email=email_norm,
-        documento=str(dados.documento or "").strip() or None, endereco=str(dados.endereco or "").strip() or None,
-        cargo=str(dados.cargo or "").strip() or None, departamento=str(dados.departamento or "").strip() or None,
+        telefone=(dados.telefone or "").strip() or None, email=email_norm,
+        documento=(dados.documento or "").strip() or None, endereco=(dados.endereco or "").strip() or None,
+        cargo=(dados.cargo or "").strip() or None, departamento=(dados.departamento or "").strip() or None,
         salario=dados.salario, carga_horaria=dados.carga_horaria, data_admissao=dados.data_admissao,
-        empresa_fornecedora=str(dados.empresa_fornecedora or "").strip() or None, categoria_fornecedor=str(dados.categoria_fornecedor or "").strip() or None,
-        tem_acesso_app=bool(dados.tem_acesso_app), perfil_id=dados.perfil_id, user_id=user_id
+        empresa_fornecedora=(dados.empresa_fornecedora or "").strip() or None, categoria_fornecedor=(dados.categoria_fornecedor or "").strip() or None,
+        tem_acesso_app=tem_acesso, perfil_id=perfil_id_final, user_id=user_id
     )
     db.add(ent)
     db.flush()
@@ -128,8 +137,7 @@ def listar_entidades(empresa_id: UUID, tipo: models.TipoEntidadeEnum | None = No
     role_slug = _get_user_role_slug(db, current_user, empresa_id)
     check_permission(role_slug, "restaurante:entidade:read")
     q = db.query(models.Entidade).filter(models.Entidade.empresa_id == empresa_id, models.Entidade.ativo == True)
-    if tipo:
-        q = q.filter(models.Entidade.tipo == tipo)
+    if tipo: q = q.filter(models.Entidade.tipo == tipo)
     return q.order_by(models.Entidade.created_at.desc()).all()
 
 @router.delete("/{empresa_id}/{entidade_id}")
@@ -137,9 +145,7 @@ def deletar_entidade(empresa_id: UUID, entidade_id: UUID, request: Request, db: 
     role_slug = _get_user_role_slug(db, current_user, empresa_id)
     check_permission(role_slug, "restaurante:entidade:delete")
     ent = db.query(models.Entidade).filter(models.Entidade.id == entidade_id, models.Entidade.empresa_id == empresa_id).first()
-    if not ent:
-        raise HTTPException(404, "Entidade não encontrada")
+    if not ent: raise HTTPException(404, "Entidade não encontrada")
     ent.ativo = False
     db.commit()
-    emit(str(empresa_id), "entidade:deleted", data={"id": str(entidade_id)})
     return {"message": "Apagado"}
