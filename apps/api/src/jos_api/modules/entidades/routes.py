@@ -1,15 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 from uuid import UUID, uuid4
 import enum
 from jos_api.db.session import get_db
 from jos_api.core.deps import get_current_user
-from jos_api.modules.auth.models import User, UserEmpresa
+from jos_api.modules.auth.models import User, UserEmpresa, RoleEnum
 from jos_api.modules.empresa.perfis_models import Perfil
 from jos_api.core.security import hash_password
 from jos_api.core.permissions import check_permission
-from . import models, schemas
+from. import models, schemas
 from jos_api.modules.atividade.service import registrar_atividade
 from jos_api.core.events import emit
 
@@ -22,9 +21,9 @@ def _get_user_role_slug(db: Session, user: User, empresa_id: UUID) -> str:
     try:
         ent = db.query(models.Entidade).filter(models.Entidade.user_id == user.id, models.Entidade.empresa_id == empresa_id).first()
         if ent and ent.perfil_id:
-            perfil = db.query(Perfil).filter(Perfil.id == ent.perfil_id).first()
-            if perfil and getattr(perfil, 'slug', None):
-                return str(perfil.slug).lower()
+            perfil_q = db.query(Perfil).filter(Perfil.id == ent.perfil_id).first()
+            if perfil_q and getattr(perfil_q, 'slug', None):
+                return str(perfil_q.slug).lower()
     except Exception:
         pass
     role = getattr(user, 'role', None)
@@ -33,8 +32,13 @@ def _get_user_role_slug(db: Session, user: User, empresa_id: UUID) -> str:
     return str(role.value if isinstance(role, enum.Enum) else role).lower()
 
 def _seed_perfis(db: Session, empresa_id: UUID):
-    if db.query(Perfil).filter(Perfil.empresa_id == empresa_id).count() > 0:
-        return db.query(Perfil).filter(Perfil.empresa_id == empresa_id).all()
+    existentes = db.query(Perfil).filter(Perfil.empresa_id == empresa_id).all()
+    if existentes:
+        uniq = {}
+        for p in existentes:
+            uniq[p.slug] = p
+        if len(uniq) >= 7:
+            return list(uniq.values())
 
     padroes = [
         ("Dono", "dono"),
@@ -45,29 +49,21 @@ def _seed_perfis(db: Session, empresa_id: UUID):
         ("Vigilante", "vigilante"),
         ("RH", "rh"),
     ]
-
     for nome, slug in padroes:
-        try:
-            db.execute(text("""
-                INSERT INTO perfis (id, empresa_id, nome, slug)
-                VALUES (:id, :empresa_id, :nome, :slug)
-                ON CONFLICT DO NOTHING
-            """), {"id": str(uuid4()), "empresa_id": str(empresa_id), "nome": nome, "slug": slug})
-            db.commit()
-        except Exception:
-            db.rollback()
-            try:
-                if not db.query(Perfil).filter_by(empresa_id=empresa_id, slug=slug).first():
-                    p = Perfil(id=uuid4(), empresa_id=empresa_id, nome=nome, slug=slug)
-                    db.add(p)
-                    db.commit()
-            except Exception:
-                db.rollback()
+        if not db.query(Perfil).filter_by(empresa_id=empresa_id, slug=slug).first():
+            p = Perfil(id=uuid4(), empresa_id=empresa_id, nome=nome, slug=slug)
+            db.add(p)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
 
-    return db.query(Perfil).filter(Perfil.empresa_id == empresa_id).all()
+    all_perfis = db.query(Perfil).filter(Perfil.empresa_id == empresa_id).all()
+    uniq = {}
+    for p in all_perfis:
+        uniq[p.slug] = p
+    return list(uniq.values())
 
-    
-# --- ORDEM IMPORTA: perfis tem que vir antes de /{empresa_id} ---
 @router.get("/{empresa_id}/perfis", response_model=list[schemas.PerfilOut])
 def listar_perfis(empresa_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return _seed_perfis(db, empresa_id)
@@ -76,12 +72,10 @@ def listar_perfis(empresa_id: UUID, db: Session = Depends(get_db), current_user:
 def criar_entidade(empresa_id: UUID, dados: schemas.EntidadeCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     role_slug = _get_user_role_slug(db, current_user, empresa_id)
     check_permission(role_slug, "restaurante:entidade:create")
-
-    # garante perfis antes de validar perfil_id
     _seed_perfis(db, empresa_id)
 
     nome_norm = str(dados.nome or "").strip()
-    email_norm = str(dados.email or "").strip() or None
+    email_norm = str(dados.email or "").strip().lower() or None
     senha_norm = str(dados.senha or "").strip() or None
 
     if dados.tipo == models.TipoEntidadeEnum.CLIENTE:
@@ -99,28 +93,45 @@ def criar_entidade(empresa_id: UUID, dados: schemas.EntidadeCreate, request: Req
 
     user_id = None
     perfil_id_final = dados.perfil_id if tem_acesso else None
+    perfil_obj: Perfil | None = None
 
     if tem_acesso:
-        perfil = db.query(Perfil).filter(Perfil.id == dados.perfil_id, Perfil.empresa_id == empresa_id).first()
-        if not perfil:
-            # tenta só por id se empresa_id falhar por seed antigo
-            perfil = db.query(Perfil).filter(Perfil.id == dados.perfil_id).first()
-            if not perfil:
+        perfil_obj = db.query(Perfil).filter(Perfil.id == dados.perfil_id, Perfil.empresa_id == empresa_id).first()
+        if not perfil_obj:
+            perfil_obj = db.query(Perfil).filter(Perfil.id == dados.perfil_id).first()
+            if not perfil_obj:
                 raise HTTPException(404, "Perfil não encontrado")
+
+        # agora perfil_obj existe com certeza
+        assert perfil_obj is not None
 
         existing_user = db.query(User).filter(User.email == email_norm).first()
         if existing_user:
             user_id = existing_user.id
             if not db.query(UserEmpresa).filter_by(user_id=existing_user.id, empresa_id=empresa_id).first():
-                db.add(UserEmpresa(user_id=existing_user.id, empresa_id=empresa_id, role=perfil.slug))
+                db.add(UserEmpresa(user_id=existing_user.id, empresa_id=empresa_id, role=perfil_obj.slug))
         else:
-            assert senha_norm is not None
             assert email_norm is not None
-            novo_user = User(nome=nome_norm, email=email_norm, senha_hash=hash_password(senha_norm), role=perfil.slug, empresa_id=empresa_id)
+            assert senha_norm is not None
+
+            try:
+                role_enum = RoleEnum.FUNCIONARIO
+            except AttributeError:
+                role_enum = list(RoleEnum)[0]
+
+            novo_user = User(
+                id=uuid4(),
+                nome=nome_norm,
+                email=email_norm,
+                senha_hash=hash_password(senha_norm),
+                role=role_enum,
+                empresa_id=empresa_id,
+                ativo=True
+            )
             db.add(novo_user)
             db.flush()
             user_id = novo_user.id
-            db.add(UserEmpresa(user_id=novo_user.id, empresa_id=empresa_id, role=perfil.slug))
+            db.add(UserEmpresa(user_id=novo_user.id, empresa_id=empresa_id, role=perfil_obj.slug))
 
     ent = models.Entidade(
         empresa_id=empresa_id, tipo=dados.tipo, nome=nome_norm,
@@ -136,7 +147,7 @@ def criar_entidade(empresa_id: UUID, dados: schemas.EntidadeCreate, request: Req
     registrar_atividade(db, empresa_id=empresa_id, modulo="ENTIDADE", acao="CRIAR", descricao=f"Criou {dados.tipo} '{nome_norm}'", entidade="Entidade", entidade_id=ent.id, entidade_nome=nome_norm, user_id=current_user.id, user_nome=getattr(current_user, 'nome', 'Sistema'), ip=_get_ip(request), commit=False)
     db.commit()
     db.refresh(ent)
-    emit(str(empresa_id), "entidade:created", data={"id": str(ent.id), "tipo": str(ent.tipo), "nome": ent.nome})
+    emit(str(empresa_id), "entidade:created", data={"id": str(ent.id), "tipo": str(ent.tipo), "nome": ent.nome, "cargo": ent.cargo, "email": ent.email, "telefone": ent.telefone, "tem_acesso_app": ent.tem_acesso_app})
     return ent
 
 @router.get("/{empresa_id}", response_model=list[schemas.EntidadeOut])
