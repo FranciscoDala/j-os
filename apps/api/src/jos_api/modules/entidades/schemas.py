@@ -58,3 +58,11 @@ class EntidadeOut(BaseModel):
     ativo: bool
     class Config:
         from_attributes = True
+
+class PerfilOut(BaseModel):
+    id: UUID
+    nome: str
+    slug: str
+    descricao: Optional[str] = None
+    class Config:
+        from_attributes = True

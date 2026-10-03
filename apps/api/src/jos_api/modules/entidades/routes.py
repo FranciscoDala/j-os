@@ -26,20 +26,16 @@ def _get_user_role_slug(db: Session, user: User, empresa_id: UUID) -> str:
         perfil = db.query(Perfil).filter(Perfil.id == ent.perfil_id).first()
         if perfil and getattr(perfil, 'slug', None):
             return str(perfil.slug).lower()
-
     role = getattr(user, 'role', None)
     if role is None:
         return "funcionario"
-    # se for string já retorna
     if isinstance(role, str):
         return role.lower()
-    # se for Enum
     if isinstance(role, enum.Enum):
         try:
             return str(role.value).lower()
         except Exception:
             return str(role).lower()
-    # fallback
     return str(role).lower()
 
 @router.post("/{empresa_id}", response_model=schemas.EntidadeOut)
@@ -94,7 +90,7 @@ def criar_entidade(empresa_id: UUID, dados: schemas.EntidadeCreate, request: Req
     registrar_atividade(db, empresa_id=empresa_id, modulo="ENTIDADE", acao="CRIAR", descricao=f"Criou {dados.tipo} '{dados.nome}'", entidade="Entidade", entidade_id=ent.id, entidade_nome=dados.nome, user_id=current_user.id, user_nome=getattr(current_user, 'nome', 'Sistema'), detalhes={"tipo": str(dados.tipo), "email": dados.email, "cargo": dados.cargo}, ip=_get_ip(request), commit=False)
     db.commit()
     db.refresh(ent)
-    emit(str(empresa_id), "entidade:created", data={"id": str(ent.id), "tipo": str(dados.tipo), "nome": ent.nome, "email": ent.email, "telefone": ent.telefone, "cargo": ent.cargo, "perfil_id": str(ent.perfil_id) if ent.perfil_id else None})
+    emit(str(empresa_id), "entidade:created", data={"id": str(ent.id), "tipo": str(ent.tipo), "nome": ent.nome})
     return ent
 
 @router.get("/{empresa_id}", response_model=list[schemas.EntidadeOut])
@@ -116,11 +112,29 @@ def deletar_entidade(empresa_id: UUID, entidade_id: UUID, request: Request, db: 
     tipo_guardado = str(ent.tipo)
     ent.ativo = False
     db.flush()
-    registrar_atividade(db, empresa_id=empresa_id, modulo="ENTIDADE", acao="DELETAR", descricao=f"Apagou {tipo_guardado} '{nome_guardado}'", entidade="Entidade", entidade_id=ent.id, entidade_nome=nome_guardado, user_id=current_user.id, user_nome=getattr(current_user, 'nome', 'Sistema'), detalhes={"tipo": tipo_guardado, "email": ent.email}, ip=_get_ip(request), commit=False)
+    registrar_atividade(db, empresa_id=empresa_id, modulo="ENTIDADE", acao="DELETAR", descricao=f"Apagou {tipo_guardado} '{nome_guardado}'", entidade="Entidade", entidade_id=ent.id, entidade_nome=nome_guardado, user_id=current_user.id, user_nome=getattr(current_user, 'nome', 'Sistema'), ip=_get_ip(request), commit=False)
     db.commit()
     emit(str(empresa_id), "entidade:deleted", data={"id": str(entidade_id), "tipo": tipo_guardado})
     return {"message": f"{tipo_guardado} '{nome_guardado}' apagado"}
 
-@router.get("/{empresa_id}/perfis")
+# ESTE ERA O QUE FALTAVA - COM SEED AUTOMATICO
+@router.get("/{empresa_id}/perfis", response_model=list[schemas.PerfilOut])
 def listar_perfis(empresa_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return db.query(Perfil).filter(Perfil.empresa_id == empresa_id).all()
+    perfis = db.query(Perfil).filter(Perfil.empresa_id == empresa_id).all()
+    if not perfis:
+        padroes = [
+            {"nome": "Dono", "slug": "dono", "descricao": "Acesso total", "permissoes": {"all": True}},
+            {"nome": "Gerente Restaurante", "slug": "gerente_restaurante", "descricao": "Gerencia tudo", "permissoes": {"vendas": True, "produtos": True, "caixa": True, "entidades": True}},
+            {"nome": "Operador de Caixa", "slug": "operador_caixa", "descricao": "Opera caixa e vendas", "permissoes": {"vendas": True, "caixa_operar": True}},
+            {"nome": "Caixa", "slug": "caixa", "descricao": "Só opera caixa", "permissoes": {"caixa_operar": True}},
+            {"nome": "Garçom", "slug": "garcom", "descricao": "Cria pedidos", "permissoes": {"vendas": True, "mesas": True}},
+            {"nome": "Vigilante", "slug": "vigilante", "descricao": "Visualização", "permissoes": {"view_only": True}},
+            {"nome": "RH", "slug": "rh", "descricao": "Gerencia funcionários", "permissoes": {"entidades": True}},
+        ]
+        for p in padroes:
+            # evita duplicar slug
+            if not db.query(Perfil).filter(Perfil.empresa_id == empresa_id, Perfil.slug == p["slug"]).first():
+                db.add(Perfil(empresa_id=empresa_id, **p))
+        db.commit()
+        perfis = db.query(Perfil).filter(Perfil.empresa_id == empresa_id).all()
+    return perfis

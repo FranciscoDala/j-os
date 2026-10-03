@@ -20,23 +20,23 @@ PERMISSIONS = {
     ],
     "garcom": ["restaurante:pedido:create", "restaurante:pedido:read", "restaurante:pedido:read_own", "restaurante:pedido:update_own", "restaurante:produto:read", "restaurante:mesa:read", "restaurante:cliente:read", "restaurante:entidade:read"],
     "vigilante": ["seguranca:ronda:create", "seguranca:ronda:read_own", "seguranca:ocorrencia:create", "seguranca:ocorrencia:read"],
-    "rh": ["rh:*", "financeiro:read_own", "restaurante:entidade:read"],
+    "rh": ["rh:*", "financeiro:read_own", "restaurante:entidade:read", "restaurante:entidade:create", "restaurante:entidade:update"],
     "funcionario": ["restaurante:pedido:read", "restaurante:produto:read"],
 }
 
-NO_DELETE_ROLES = {"operador_caixa", "caixa", "garcom", "vigilante", "funcionario"}
+NO_DELETE_ROLES = {"operador_caixa", "caixa", "garcom", "vigilante", "funcionario", "rh"}
 
 def check_permission(user_role: str, required: str, owner_id: Optional[str] = None, current_user_id: Optional[str] = None, resource_status: Optional[str] = None):
-    perms = PERMISSIONS.get(user_role, [])
+    role = (user_role or "funcionario").lower()
+    perms = PERMISSIONS.get(role, [])
     if "*" in perms:
         return True
-    if user_role in NO_DELETE_ROLES and ":delete" in required:
-        raise HTTPException(status_code=403, detail=f"{user_role} não pode apagar registros")
+    if role in NO_DELETE_ROLES and ":delete" in required:
+        raise HTTPException(status_code=403, detail=f"{role} não pode apagar registros")
     if "_own" in required and owner_id and current_user_id and owner_id!= current_user_id:
         raise HTTPException(status_code=403, detail="Só pode editar seus próprios registros")
-    if resource_status and resource_status.upper() in ["FECHADA", "FECHADO", "FINALIZADA", "CANCELADA"] and user_role in {"operador_caixa", "caixa", "garcom"}:
+    if resource_status and resource_status.upper() in ["FECHADA", "FECHADO", "FINALIZADA", "CANCELADA"] and role in {"operador_caixa", "caixa", "garcom"}:
         raise HTTPException(status_code=403, detail=f"Não pode editar com status {resource_status}")
-
     if required in perms:
         return True
     module = required.split(":")[0] if ":" in required else required
@@ -45,4 +45,4 @@ def check_permission(user_role: str, required: str, owner_id: Optional[str] = No
     parts = required.split(":")
     if len(parts) >= 2 and f"{parts[0]}:{parts[1]}:*" in perms:
         return True
-    raise HTTPException(status_code=403, detail=f"Sem permissão: {required} para {user_role}")
+    raise HTTPException(status_code=403, detail=f"Sem permissão: {required} para {role}")
