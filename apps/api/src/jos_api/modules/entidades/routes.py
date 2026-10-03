@@ -18,50 +18,45 @@ def _get_ip(request: Request):
     return request.client.host if request.client else None
 
 def _get_user_role_slug(db: Session, user: User, empresa_id: UUID) -> str:
-    ent = db.query(models.Entidade).filter(
-        models.Entidade.user_id == user.id,
-        models.Entidade.empresa_id == empresa_id
-    ).first()
+    ent = db.query(models.Entidade).filter(models.Entidade.user_id == user.id, models.Entidade.empresa_id == empresa_id).first()
     if ent and ent.perfil_id:
         perfil = db.query(Perfil).filter(Perfil.id == ent.perfil_id).first()
         if perfil and getattr(perfil, 'slug', None):
             return str(perfil.slug).lower()
     role = getattr(user, 'role', None)
-    if role is None:
+    if not role:
         return "funcionario"
     if isinstance(role, str):
         return role.lower()
     if isinstance(role, enum.Enum):
-        try:
-            return str(role.value).lower()
-        except Exception:
-            return str(role).lower()
+        return str(role.value).lower()
     return str(role).lower()
 
-# <<< TEM QUE VIR ANTES DE /{empresa_id} >>>
+def _seed_perfis(db: Session, empresa_id: UUID):
+    existentes = {p.slug for p in db.query(Perfil).filter(Perfil.empresa_id == empresa_id).all()}
+    padroes = [
+        {"nome": "Dono", "slug": "dono", "descricao": "Acesso total"},
+        {"nome": "Gerente Restaurante", "slug": "gerente_restaurante", "descricao": "Gerencia tudo"},
+        {"nome": "Operador de Caixa", "slug": "operador_caixa", "descricao": "Opera caixa e vendas"},
+        {"nome": "Caixa", "slug": "caixa", "descricao": "Só opera caixa"},
+        {"nome": "Garçom", "slug": "garcom", "descricao": "Cria pedidos"},
+        {"nome": "Vigilante", "slug": "vigilante", "descricao": "Visualização"},
+        {"nome": "RH", "slug": "rh", "descricao": "Gerencia funcionários"},
+    ]
+    novos = 0
+    for p in padroes:
+        if p["slug"] not in existentes:
+            db.add(Perfil(empresa_id=empresa_id, nome=p["nome"], slug=p["slug"], descricao=p["descricao"], permissoes={}, ativo=True))
+            novos += 1
+    if novos > 0:
+        db.commit()
+    return db.query(Perfil).filter(Perfil.empresa_id == empresa_id).all()
+
+# --- TEM QUE SER A PRIMEIRA ROTA ---
 @router.get("/{empresa_id}/perfis", response_model=list[schemas.PerfilOut])
 def listar_perfis(empresa_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    print(f"[PERFIS] Buscando perfis para empresa {empresa_id}")
-    perfis = db.query(Perfil).filter(Perfil.empresa_id == empresa_id).all()
-    print(f"[PERFIS] Encontrados: {len(perfis)}")
-    if not perfis:
-        print("[PERFIS] Criando perfis padrão...")
-        padroes = [
-            {"nome": "Dono", "slug": "dono", "descricao": "Acesso total", "permissoes": {"all": True}},
-            {"nome": "Gerente Restaurante", "slug": "gerente_restaurante", "descricao": "Gerencia tudo", "permissoes": {"vendas": True}},
-            {"nome": "Operador de Caixa", "slug": "operador_caixa", "descricao": "Opera caixa e vendas", "permissoes": {"vendas": True, "caixa_operar": True}},
-            {"nome": "Caixa", "slug": "caixa", "descricao": "Só opera caixa", "permissoes": {"caixa_operar": True}},
-            {"nome": "Garçom", "slug": "garcom", "descricao": "Cria pedidos", "permissoes": {"vendas": True}},
-            {"nome": "Vigilante", "slug": "vigilante", "descricao": "Visualização", "permissoes": {"view_only": True}},
-            {"nome": "RH", "slug": "rh", "descricao": "Gerencia funcionários", "permissoes": {"entidades": True}},
-        ]
-        for p in padroes:
-            exists = db.query(Perfil).filter(Perfil.empresa_id == empresa_id, Perfil.slug == p["slug"]).first()
-            if not exists:
-                db.add(Perfil(empresa_id=empresa_id, **p))
-        db.commit()
-        perfis = db.query(Perfil).filter(Perfil.empresa_id == empresa_id).all()
-        print(f"[PERFIS] Após seed: {len(perfis)}")
+    # não bloqueia por permissão aqui pra poder criar
+    perfis = _seed_perfis(db, empresa_id)
     return perfis
 
 @router.post("/{empresa_id}", response_model=schemas.EntidadeOut)
@@ -69,20 +64,17 @@ def criar_entidade(empresa_id: UUID, dados: schemas.EntidadeCreate, request: Req
     role_slug = _get_user_role_slug(db, current_user, empresa_id)
     check_permission(role_slug, "restaurante:entidade:create")
 
-    # Normaliza strings pra evitar None.strip()
+    nome_norm = str(dados.nome or "").strip()
     email_norm = str(dados.email or "").strip() or None
     senha_norm = str(dados.senha or "").strip() or None
-    nome_norm = str(dados.nome or "").strip()
 
     if dados.tipo == models.TipoEntidadeEnum.CLIENTE:
         dados.tem_acesso_app = False
         dados.perfil_id = None
-        dados.senha = None
         senha_norm = None
 
     if not dados.tem_acesso_app:
         dados.perfil_id = None
-        dados.senha = None
         senha_norm = None
 
     if dados.tipo == models.TipoEntidadeEnum.FUNCIONARIO and dados.tem_acesso_app:
@@ -106,52 +98,30 @@ def criar_entidade(empresa_id: UUID, dados: schemas.EntidadeCreate, request: Req
             if not vinc:
                 db.add(UserEmpresa(user_id=existing_user.id, empresa_id=empresa_id, role=perfil.slug))
         else:
-            # senha_norm já garantido com min 6 acima
-            novo_user = User(
-                nome=nome_norm,
-                email=email_norm,
-                senha_hash=hash_password(senha_norm or ""),
-                role=perfil.slug,
-                empresa_id=empresa_id
-            )
+            assert senha_norm is not None
+            assert email_norm is not None
+            novo_user = User(nome=nome_norm, email=email_norm, senha_hash=hash_password(senha_norm), role=perfil.slug, empresa_id=empresa_id)
             db.add(novo_user)
             db.flush()
             user_id = novo_user.id
             db.add(UserEmpresa(user_id=novo_user.id, empresa_id=empresa_id, role=perfil.slug))
 
     ent = models.Entidade(
-        empresa_id=empresa_id,
-        tipo=dados.tipo,
-        nome=nome_norm,
-        telefone=str(dados.telefone or "").strip() or None,
-        email=email_norm,
-        documento=str(dados.documento or "").strip() or None,
-        endereco=str(dados.endereco or "").strip() or None,
-        cargo=str(dados.cargo or "").strip() or None,
-        departamento=str(dados.departamento or "").strip() or None,
-        salario=dados.salario,
-        carga_horaria=dados.carga_horaria,
-        data_admissao=dados.data_admissao,
-        empresa_fornecedora=str(dados.empresa_fornecedora or "").strip() or None,
-        categoria_fornecedor=str(dados.categoria_fornecedor or "").strip() or None,
-        tem_acesso_app=bool(dados.tem_acesso_app),
-        perfil_id=dados.perfil_id,
-        user_id=user_id
+        empresa_id=empresa_id, tipo=dados.tipo, nome=nome_norm,
+        telefone=str(dados.telefone or "").strip() or None, email=email_norm,
+        documento=str(dados.documento or "").strip() or None, endereco=str(dados.endereco or "").strip() or None,
+        cargo=str(dados.cargo or "").strip() or None, departamento=str(dados.departamento or "").strip() or None,
+        salario=dados.salario, carga_horaria=dados.carga_horaria, data_admissao=dados.data_admissao,
+        empresa_fornecedora=str(dados.empresa_fornecedora or "").strip() or None, categoria_fornecedor=str(dados.categoria_fornecedor or "").strip() or None,
+        tem_acesso_app=bool(dados.tem_acesso_app), perfil_id=dados.perfil_id, user_id=user_id
     )
     db.add(ent)
     db.flush()
-    registrar_atividade(
-        db, empresa_id=empresa_id, modulo="ENTIDADE", acao="CRIAR",
-        descricao=f"Criou {dados.tipo} '{nome_norm}'",
-        entidade="Entidade", entidade_id=ent.id, entidade_nome=nome_norm,
-        user_id=current_user.id, user_nome=getattr(current_user, 'nome', 'Sistema'),
-        ip=_get_ip(request), commit=False
-    )
+    registrar_atividade(db, empresa_id=empresa_id, modulo="ENTIDADE", acao="CRIAR", descricao=f"Criou {dados.tipo} '{nome_norm}'", entidade="Entidade", entidade_id=ent.id, entidade_nome=nome_norm, user_id=current_user.id, user_nome=getattr(current_user, 'nome', 'Sistema'), ip=_get_ip(request), commit=False)
     db.commit()
     db.refresh(ent)
     emit(str(empresa_id), "entidade:created", data={"id": str(ent.id), "tipo": str(ent.tipo), "nome": ent.nome})
     return ent
-
 
 @router.get("/{empresa_id}", response_model=list[schemas.EntidadeOut])
 def listar_entidades(empresa_id: UUID, tipo: models.TipoEntidadeEnum | None = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -167,7 +137,8 @@ def deletar_entidade(empresa_id: UUID, entidade_id: UUID, request: Request, db: 
     role_slug = _get_user_role_slug(db, current_user, empresa_id)
     check_permission(role_slug, "restaurante:entidade:delete")
     ent = db.query(models.Entidade).filter(models.Entidade.id == entidade_id, models.Entidade.empresa_id == empresa_id).first()
-    if not ent: raise HTTPException(404, "Entidade não encontrada")
+    if not ent:
+        raise HTTPException(404, "Entidade não encontrada")
     ent.ativo = False
     db.commit()
     emit(str(empresa_id), "entidade:deleted", data={"id": str(entidade_id)})
