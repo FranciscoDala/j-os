@@ -25,9 +25,29 @@ class EntidadeCreate(BaseModel):
     @field_validator('nome')
     @classmethod
     def validar_nome(cls, v):
-        if not v or len(v.strip()) < 2:
+        v = (v or "").strip()
+        if len(v) < 2:
             raise ValueError('Nome muito curto')
-        return v.strip()
+        return v
+
+    # transforma "" em None e faz strip automático
+    @field_validator('telefone', 'email', 'documento', 'endereco', 'cargo', 'departamento', 'empresa_fornecedora', 'categoria_fornecedor', 'senha', mode='before')
+    @classmethod
+    def empty_to_none(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            s = v.strip()
+            return s if s!= "" else None
+        return v
+
+    @field_validator('email')
+    @classmethod
+    def validar_email_acesso(cls, v, info):
+        # se tem_acesso_app for True, o router já valida, aqui só normaliza
+        if v:
+            return v.lower()
+        return v
 
 class EntidadeOut(BaseModel):
     id: UUID
@@ -36,6 +56,8 @@ class EntidadeOut(BaseModel):
     nome: str
     telefone: Optional[str] = None
     email: Optional[str] = None
+    documento: Optional[str] = None
+    endereco: Optional[str] = None
     cargo: Optional[str] = None
     departamento: Optional[str] = None
     salario: Optional[float] = None
@@ -46,13 +68,22 @@ class EntidadeOut(BaseModel):
     perfil_id: Optional[UUID] = None
     user_id: Optional[UUID] = None
     ativo: bool
+
     class Config:
         from_attributes = True
+        extra = "ignore"
 
 class PerfilOut(BaseModel):
     id: UUID
     nome: str
     slug: str
     descricao: Optional[str] = None
+
+    @field_validator('descricao', mode='before')
+    @classmethod
+    def desc_default(cls, v):
+        return v or None
+
     class Config:
         from_attributes = True
+        extra = "ignore" # <--- ESSENCIAL: ignora se o model não tem descricao
