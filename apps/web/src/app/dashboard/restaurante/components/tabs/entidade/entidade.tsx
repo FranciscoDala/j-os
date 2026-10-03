@@ -4,7 +4,6 @@ import { EntidadeModal } from "./modals/criar";
 import { Search, Trash2, Plus, ChevronDown } from "lucide-react";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
-
 const TIPOS = ["FUNCIONARIO", "CLIENTE", "FORNECEDOR"] as const;
 const TIPO_LABELS: Record<string, string> = { FUNCIONARIO: "Funcionário", CLIENTE: "Cliente", FORNECEDOR: "Fornecedor" };
 
@@ -17,13 +16,13 @@ function CustomSelect({ value, onChange }: any) {
   }, []);
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen(!open)} className="bg-white border border-black/10 rounded-full px-5 py-2.5 text-[11px] font-black flex items-center gap-3 shadow-sm min-w-[140px] justify-between">
-        <span>{TIPO_LABELS[value] || value}</span><ChevronDown size={14} className={`transition ${open? "rotate-180" : ""}`} />
+      <button type="button" onClick={() => setOpen(!open)} className="bg-white border border-[#E8DCCF] rounded-full px-5 py-2.5 text-[11px] font-black flex items-center gap-3 shadow-sm min-w-[150px] justify-between hover:border-[#A67C52] transition-all">
+        <span>{TIPO_LABELS[value] || value}</span><ChevronDown size={14} className={`transition-transform ${open? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-2 bg-white rounded-[18px] border border-black/10 shadow-[0_10px_30px_rgba(0,0,0,0.12)] z-[50] p-1.5 w-[180px] overflow-hidden">
+        <div className="absolute top-full left-0 mt-2 bg-white rounded-[18px] border border-[#E8DCCF] shadow-[0_12px_32px_rgba(0,0,0,0.18)] z-[50] p-1.5 w-[180px]">
           {TIPOS.map((opt) => (
-            <button key={opt} onClick={() => { onChange(opt); setOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full text-[11px] font-black transition ${value === opt? "bg-black text-white" : "hover:bg-black/5 text-black/70"}`}>{TIPO_LABELS[opt]}</button>
+            <button key={opt} onClick={() => { onChange(opt); setOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full text-[11px] font-black transition ${value === opt? "bg-[#A67C52] text-white" : "hover:bg-[#F5E6D3] text-black/70"}`}>{TIPO_LABELS[opt]}</button>
           ))}
         </div>
       )}
@@ -64,17 +63,11 @@ export function EntidadesTab() {
   }, [empresaId]);
 
   useEffect(() => { mounted.current = true; load(); loadPerfis(); return () => { mounted.current = false; }; }, [load, loadPerfis]);
-  useEffect(() => {
-    const onCreated = (e: any) => { const d = e.detail; if (!d?.tipo) return; if (d.tipo === tipoFiltro && mounted.current) load(); window.dispatchEvent(new CustomEvent("entidade:created", { detail: d })); };
-    const onDeleted = () => load();
-    window.addEventListener("entidade:created" as any, onCreated);
-    window.addEventListener("entidade:deleted" as any, onDeleted);
-    return () => { window.removeEventListener("entidade:created" as any, onCreated); window.removeEventListener("entidade:deleted" as any, onDeleted); };
-  }, [tipoFiltro, load]);
 
   const handleSave = async () => {
     if (!form.nome?.trim()) return alert("Nome obrigatório");
     if (form.tipo === "FUNCIONARIO" &&!form.cargo?.trim()) return alert("Cargo obrigatório");
+    if (form.tem_acesso_app &&!form.senha &&!form.perfil_id) return alert("Senha e perfil obrigatórios para acesso");
     setSaving(true);
     try {
       const token = localStorage.getItem("access_token");
@@ -90,7 +83,8 @@ export function EntidadesTab() {
   const handleDelete = async (id: string, nome: string) => {
     if (!confirm(`Apagar ${nome}?`)) return;
     const token = localStorage.getItem("access_token");
-    await fetch(`${API_BASE}/entidades/${empresaId}/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${API_BASE}/entidades/${empresaId}/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    if (res.status === 403) return alert("Sem permissão: só gerente/dono pode apagar");
     load();
   };
 
@@ -99,33 +93,31 @@ export function EntidadesTab() {
   return (
     <div className="bg-white/70 backdrop-blur-xl rounded-[18px] p-4 md:p-6 border border-white/50 space-y-4">
       <div className="flex items-center justify-between gap-3">
+        <CustomSelect value={tipoFiltro} onChange={setTipoFiltro} />
         <div className="flex items-center gap-2">
-          <CustomSelect value={tipoFiltro} onChange={setTipoFiltro} />
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-white border border-black/5 rounded-full px-3 gap-2 shadow-sm">
+          <div className="flex items-center bg-white border border-[#E8DCCF] rounded-full px-3 gap-2 shadow-sm">
             <Search size={14} className="opacity-40" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar..." className="bg-transparent outline-none text-[12px] py-2.5 w-[120px] md:w-[160px]" />
           </div>
-          <button onClick={() => { setForm({...form, tipo: tipoFiltro }); setOpen(true); }} className="w-10 h-10 bg-[#2F4A8A] text-white rounded-full flex items-center justify-center shadow-md active:scale-[0.96] transition"><Plus size={18} strokeWidth={3} /></button>
+          <button onClick={() => { setForm({...form, tipo: tipoFiltro }); setOpen(true); }} className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-md active:scale-[0.96] transition hover:bg-zinc-800"><Plus size={18} strokeWidth={3} /></button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {filtered.map(ent => (
-          <div key={ent.id} className="bg-white rounded-[16px] p-4 border border-black/5 shadow-sm flex flex-col gap-2">
+          <div key={ent.id} className="bg-white rounded-[16px] p-4 border border-[#E8DCCF]/60 shadow-sm flex flex-col gap-2 hover:border-[#A67C52]/40 transition">
             <div className="flex justify-between items-start">
               <div className="min-w-0"><p className="font-black text-[13px] truncate">{ent.nome}</p><p className="text-[11px] opacity-60 truncate">{ent.cargo || ent.empresa_fornecedora || ent.email || ent.telefone || "—"}</p></div>
               <button onClick={() => handleDelete(ent.id, ent.nome)} className="w-7 h-7 bg-red-50 rounded-full flex items-center justify-center text-red-500 hover:bg-red-100"><Trash2 size={12} /></button>
             </div>
             <div className="flex gap-1.5 flex-wrap">
-              <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-black text-white">{ent.tipo}</span>
+              <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-black text-white">{TIPO_LABELS[ent.tipo] || ent.tipo}</span>
               {ent.tem_acesso_app && <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-green-100 text-green-700">ACESSO APP</span>}
               {ent.salario && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#FFF68F]">Kz {Number(ent.salario).toLocaleString('pt-PT')}</span>}
             </div>
           </div>
         ))}
-        {filtered.length === 0 && <p className="text-[12px] text-gray-400 col-span-3 p-6 text-center">Nenhum {tipoFiltro} encontrado.</p>}
+        {filtered.length === 0 && <p className="text-[12px] text-gray-400 col-span-3 p-6 text-center">Nenhum {TIPO_LABELS[tipoFiltro]} encontrado.</p>}
       </div>
       <EntidadeModal open={open} setOpen={setOpen} form={form} setForm={setForm} perfis={perfis} saving={saving} onSave={handleSave} />
     </div>

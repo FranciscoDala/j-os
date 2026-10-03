@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, field_validator
 from uuid import UUID
 from typing import Optional
 from datetime import date
@@ -11,18 +11,13 @@ class EntidadeCreate(BaseModel):
     email: Optional[str] = None
     documento: Optional[str] = None
     endereco: Optional[str] = None
-
-    # funcionario
     cargo: Optional[str] = None
     departamento: Optional[str] = None
     salario: Optional[float] = None
     carga_horaria: Optional[int] = None
     data_admissao: Optional[date] = None
-
-    # fornecedor
     empresa_fornecedora: Optional[str] = None
     categoria_fornecedor: Optional[str] = None
-
     tem_acesso_app: bool = False
     perfil_id: Optional[UUID] = None
     senha: Optional[str] = None
@@ -33,6 +28,13 @@ class EntidadeCreate(BaseModel):
         if v is not None and v < 0:
             raise ValueError('Salário não pode ser negativo')
         return v
+
+    @field_validator('nome')
+    @classmethod
+    def validar_nome(cls, v):
+        if not v or len(v.strip()) < 2:
+            raise ValueError('Nome muito curto')
+        return v.strip()
 
 class EntidadeOut(BaseModel):
     id: UUID
@@ -54,6 +56,5 @@ class EntidadeOut(BaseModel):
     perfil_id: Optional[UUID] = None
     user_id: Optional[UUID] = None
     ativo: bool
-
     class Config:
         from_attributes = True
