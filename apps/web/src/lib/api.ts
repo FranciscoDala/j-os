@@ -13,7 +13,6 @@ async function apiFetch(path: string, options: RequestInit = {}) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
         if (res.status === 401 && typeof window !== 'undefined') {
-            // evita loop se já estiver no login
             if (!window.location.pathname.includes("/login")) {
                 localStorage.removeItem("access_token");
                 window.location.href = "/login";
@@ -44,10 +43,29 @@ export const getAtividades = (params?: any) => {
     return apiFetch(`/atividade/${qs}`);
 }
 
-// AUTH / EMPRESA / VENDA (pra não ficar faltando no seu api.ts)
+// AUTH / EMPRESA / VENDA
 export const login = (payload: any) => apiFetch("/auth/login", { method: "POST", body: JSON.stringify(payload) });
 export const selectEmpresa = (payload: any) => apiFetch("/auth/select-empresa", { method: "POST", body: JSON.stringify(payload) });
 export const getMe = () => apiFetch("/auth/me");
 export const getMesas = () => apiFetch("/mesas/");
 export const getVendas = () => apiFetch("/vendas/");
 export const criarVenda = (payload: any) => apiFetch("/vendas/", { method: "POST", body: JSON.stringify(payload) });
+
+// >>> FIX DO SEU ERRO - ADICIONA ISSO <<<
+export const loginApi = async (email: string, senha: string) => {
+    const data = await login({ email, senha });
+    // salva tudo aqui pra não dar null nas entidades
+    if (typeof window !== 'undefined') {
+        if (data.access_token) {
+            localStorage.setItem("access_token", data.access_token);
+            localStorage.setItem("token", data.access_token);
+        }
+        if (data.temp_token) localStorage.setItem("temp_token", data.temp_token);
+        if (data.user) localStorage.setItem("user", JSON.stringify(data.user));
+        if (data.empresas) localStorage.setItem("empresas", JSON.stringify(data.empresas));
+
+        const empresaId = data.empresa_id || data.user?.empresa_id || data.empresas?.[0]?.id;
+        if (empresaId) localStorage.setItem("empresa_id", String(empresaId));
+    }
+    return data;
+};
