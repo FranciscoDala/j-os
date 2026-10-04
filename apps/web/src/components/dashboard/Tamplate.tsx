@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Search, Bell, Mail, Menu } from "lucide-react";
 import { Sidebar } from "./Sidebar";
@@ -8,9 +8,34 @@ import { VendasTab } from "@/app/dashboard/restaurante/components/tabs/venda/ven
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
 
-type Ctx = { activeTab: string; setActiveTab: (t: string) => void; user: any; moduleId: ModuleId; };
+type Ctx = {
+  activeTab: string;
+  setActiveTab: (t: string) => void;
+  user: any;
+  moduleId: ModuleId;
+  role: string;
+  can: (perm: string) => boolean;
+};
+
 const DashboardCtx = createContext<Ctx>(null as any);
 export const useDashboard = () => useContext(DashboardCtx);
+
+// MAP PROFISSIONAL - Sincronizado com backend roleenum
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  dono: ["*"],
+  gerente_restaurante: ["*"],
+  operador_caixa: ["home", "caixa", "vendas", "produtos", "funcionarios", "pedidos", "mesas"],
+  caixa: ["home", "caixa", "vendas"],
+  garcom: ["home", "vendas", "pedidos", "mesas"],
+  vigilante: ["home"],
+  rh: ["home", "funcionarios"],
+  funcionario: ["home", "produtos", "vendas"],
+};
+
+function normalizeRole(raw: any): string {
+  if (!raw) return "funcionario";
+  return String(raw).toLowerCase();
+}
 
 export function DashboardLayoutProvider({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -19,40 +44,71 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     const [activeTab, setActiveTab] = useState("home");
     const [user, setUser] = useState<any>(null);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
+    const [role, setRole] = useState("funcionario");
 
     useEffect(() => {
         const token = localStorage.getItem("access_token");
         if (!token) { router.push("/login"); return; }
-        setUser(JSON.parse(localStorage.getItem("user") || "{}"));
-        setActiveTab(localStorage.getItem(`${moduleId}_tab`) || "home");
-    }, [moduleId]);
+        try {
+          const u = JSON.parse(localStorage.getItem("user") || "{}");
+          setUser(u);
+          // Pega role do user - pode vir como role, role_equivalente, perfil.slug
+          const r = normalizeRole(u?.role || u?.role_equivalente || u?.perfil_slug || "funcionario");
+          setRole(r);
+          const savedTab = localStorage.getItem(`${moduleId}_tab`) || "home";
+          // Se o role não pode ver a tab salva, reseta pra home
+          const allowed = ROLE_PERMISSIONS[r] || ROLE_PERMISSIONS["funcionario"];
+          if (allowed.includes("*") || allowed.includes(savedTab)) {
+            setActiveTab(savedTab);
+          } else {
+            setActiveTab("home");
+          }
+        } catch {
+          setUser({});
+        }
+    }, [moduleId, router]);
 
     useEffect(() => {
         localStorage.setItem(`${moduleId}_tab`, activeTab);
         if (activeTab === "vendas") {
             const token = localStorage.getItem("access_token");
             fetch(`${API_BASE}/caixa/status`, { headers: { Authorization: `Bearer ${token}` } })
-             .then(r => r.json())
-             .then(d => { if(!d.aberto) setActiveTab("caixa"); })
-             .catch(() => setActiveTab("caixa"));
+            .then(r => r.json())
+            .then(d => { if(!d.aberto) setActiveTab("caixa"); })
+            .catch(() => setActiveTab("caixa"));
         }
     }, [activeTab, moduleId]);
+
+    const can = useMemo(() => {
+      return (tab: string) => {
+        const allowed = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS["funcionario"];
+        if (allowed.includes("*")) return true;
+        return allowed.includes(tab);
+      };
+    }, [role]);
+
+    // Se o operador_caixa tentar acessar tab proibida, joga pra home
+    useEffect(() => {
+      if (role &&!can(activeTab)) {
+        setActiveTab("home");
+      }
+    }, [role, activeTab, can]);
 
     const logout = () => { localStorage.clear(); router.push("/login"); };
     const isVendasOpen = activeTab === "vendas";
 
     return (
-        <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId }}>
+        <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId, role, can }}>
             <div className="h-[100dvh] w-screen overflow-hidden bg-[#5A8AD4] p-0 md:p-3 flex">
                 <div className="relative flex-1 bg-[#EEF4FF]/60 md:bg-white/30 backdrop-blur-2xl md:rounded-[28px] rounded-none flex gap-0 md:gap-3 md:p-3 p-2 border-0 md:border border-white/40 h-full overflow-hidden">
                     <div className="hidden md:flex">
-                        <Sidebar activeTab={activeTab} setActiveTab={(t) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} />
+                        <Sidebar activeTab={activeTab} setActiveTab={(t) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} />
                     </div>
                     {isMobileOpen &&!isVendasOpen && (
                         <>
                             <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsMobileOpen(false)} />
                             <div className="fixed left-2 top-2 bottom-2 z-50 md:hidden">
-                                <Sidebar activeTab={activeTab} setActiveTab={(t) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} />
+                                <Sidebar activeTab={activeTab} setActiveTab={(t) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} />
                             </div>
                         </>
                     )}
@@ -70,7 +126,10 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                                 <button className="hidden md:flex w-10 h-10 bg-white/60 rounded-full items-center justify-center border border-white/50"><Mail size={16} /></button>
                                 <div className="bg-white/80 backdrop-blur-xl rounded-full pl-1 pr-2 md:pr-3 py-1 flex items-center gap-2 border border-white/50 shadow-sm">
                                     <img src="https://i.pravatar.cc/100?img=33" className="w-8 h-8 rounded-full object-cover shrink-0" style={{ border: '2px solid #ffffff' }} alt="user" />
-                                    <div className="hidden md:block"><p className="text-[13px] font-bold leading-none">{user?.nome || "Admin Jenath"}</p><p className="text-[11px] text-gray-500 capitalize">{moduleId}</p></div>
+                                    <div className="hidden md:block">
+                                      <p className="text-[13px] font-bold leading-none">{user?.nome || "Admin Jenath"}</p>
+                                      <p className="text-[11px] text-gray-500 capitalize">{role.replace('_',' ')}</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -88,8 +147,8 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
             <style jsx global>{`
         html, body { height: 100%; overflow: hidden; scrollbar-width: none; -ms-overflow-style: none; }
         html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; height: 0; }
-     .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
-     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
         </DashboardCtx.Provider>
     );

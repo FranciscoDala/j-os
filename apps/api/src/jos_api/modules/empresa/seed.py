@@ -1,44 +1,41 @@
 from uuid import UUID
 from sqlalchemy.orm import Session
-from .models import TipoEmpresaEnum
-from .perfis_models import Perfil
+from.models import TipoEmpresaEnum
+from.perfis_models import Perfil
+from jos_api.modules.auth.models import RoleEnum
 from jos_api.core.events import emit
 
+# TEMPLATE CORRETO - cada perfil já sabe qual RoleEnum ele é e quais acoes tem
 TEMPLATE_PERFIS = {
     TipoEmpresaEnum.RESTAURANTE: [
-        {"nome": "DONO", "slug": "dono", "permissoes": {"all": True}},
-        {"nome": "GERENTE", "slug": "gerente", "permissoes": {"modulos": ["caixa", "mesas", "relatorios", "funcionarios"]}},
-        {"nome": "OPERADOR_CAIXA", "slug": "caixa", "permissoes": {"modulos": ["caixa", "mesas"]}},
-        {"nome": "GARÇOM", "slug": "garcom", "permissoes": {"modulos": ["mesas", "pedidos"]}},
-        {"nome": "COZINHA", "slug": "cozinha", "permissoes": {"modulos": ["pedidos"]}},
-        {"nome": "FINANCEIRO", "slug": "financeiro", "permissoes": {"modulos": ["caixa", "relatorios"]}},
-        {"nome": "RH", "slug": "rh", "permissoes": {"modulos": ["funcionarios", "escalas", "folha"]}},
-    ],
-    TipoEmpresaEnum.SEGURANCA: [
-        {"nome": "DONO", "slug": "dono", "permissoes": {"all": True}},
-        {"nome": "GERENTE_OPERACIONAL", "slug": "gerente_operacional", "permissoes": {"all": True}},
-        {"nome": "SUPERVISOR", "slug": "supervisor", "permissoes": {"modulos": ["escalas", "ocorrencias"]}},
-        {"nome": "AGENTE_SEGURANCA", "slug": "agente", "permissoes": {"modulos": ["ocorrencias"]}},
-        {"nome": "FINANCEIRO", "slug": "financeiro", "permissoes": {"modulos": ["financeiro", "relatorios"]}},
-        {"nome": "RH", "slug": "rh", "permissoes": {"modulos": ["funcionarios", "escalas", "folha", "recrutamento"]}},
-    ],
-    TipoEmpresaEnum.SERVICOS: [
-        {"nome": "DONO", "slug": "dono", "permissoes": {"all": True}},
-        {"nome": "GERENTE", "slug": "gerente", "permissoes": {"all": True}},
-        {"nome": "ATENDIMENTO", "slug": "atendimento", "permissoes": {"modulos": ["clientes", "agendamentos"]}},
-        {"nome": "TECNICO", "slug": "tecnico", "permissoes": {"modulos": ["servicos"]}},
-        {"nome": "OPERADOR_CAIXA", "slug": "caixa", "permissoes": {"modulos": ["caixa"]}},
-        {"nome": "FINANCEIRO", "slug": "financeiro", "permissoes": {"modulos": ["financeiro"]}},
-        {"nome": "RH", "slug": "rh", "permissoes": {"modulos": ["funcionarios", "escalas", "folha"]}},
+        {"nome": "DONO", "slug": "dono", "role": RoleEnum.DONO, "permissoes": {"all": True, "modulos": ["*"], "acoes": ["*"]}},
+        {"nome": "GERENTE", "slug": "gerente", "role": RoleEnum.GERENTE_RESTAURANTE, "permissoes": {"modulos": ["restaurante", "caixa", "financeiro", "rh", "seguranca"], "acoes": ["restaurante:*", "financeiro:*", "rh:*", "seguranca:read"]}},
+        {"nome": "OPERADOR_CAIXA", "slug": "caixa", "role": RoleEnum.OPERADOR_CAIXA, "permissoes": {"modulos": ["restaurante", "caixa", "financeiro"], "acoes": ["restaurante:caixa:*", "restaurante:venda:*", "restaurante:pedido:read", "restaurante:produto:read", "restaurante:cliente:read", "restaurante:cliente:create", "restaurante:entidade:read", "financeiro:read_own"]}},
+        {"nome": "GARÇOM", "slug": "garcom", "role": RoleEnum.GARCOM, "permissoes": {"modulos": ["restaurante"], "acoes": ["restaurante:pedido:create", "restaurante:pedido:read", "restaurante:produto:read", "restaurante:mesa:read", "restaurante:cliente:read", "restaurante:entidade:read"]}},
+        {"nome": "COZINHA", "slug": "cozinha", "role": RoleEnum.FUNCIONARIO, "permissoes": {"modulos": ["restaurante"], "acoes": ["restaurante:pedido:read", "restaurante:produto:read"]}},
+        {"nome": "FINANCEIRO", "slug": "financeiro", "role": RoleEnum.RH, "permissoes": {"modulos": ["financeiro", "rh"], "acoes": ["financeiro:*", "rh:read", "restaurante:entidade:read"]}},
+        {"nome": "RH", "slug": "rh", "role": RoleEnum.RH, "permissoes": {"modulos": ["rh", "restaurante"], "acoes": ["rh:*", "restaurante:entidade:*", "financeiro:read_own"]}},
     ],
     TipoEmpresaEnum.VAREJO: [
-        {"nome": "DONO", "slug": "dono", "permissoes": {"all": True}},
-        {"nome": "GERENTE", "slug": "gerente", "permissoes": {"all": True}},
-        {"nome": "OPERADOR_CAIXA", "slug": "caixa", "permissoes": {"modulos": ["caixa", "vendas"]}},
-        {"nome": "VENDEDOR", "slug": "vendedor", "permissoes": {"modulos": ["vendas"]}},
-        {"nome": "ESTOQUE", "slug": "estoque", "permissoes": {"modulos": ["estoque"]}},
-        {"nome": "RH", "slug": "rh", "permissoes": {"modulos": ["funcionarios", "escalas", "folha"]}},
-        {"nome": "FINANCEIRO", "slug": "financeiro", "permissoes": {"modulos": ["caixa", "relatorios"]}},
+        {"nome": "DONO", "slug": "dono", "role": RoleEnum.DONO, "permissoes": {"all": True, "modulos": ["*"], "acoes": ["*"]}},
+        {"nome": "GERENTE", "slug": "gerente", "role": RoleEnum.GERENTE_RESTAURANTE, "permissoes": {"all": True, "modulos": ["*"], "acoes": ["*"]}},
+        {"nome": "OPERADOR_CAIXA", "slug": "caixa", "role": RoleEnum.OPERADOR_CAIXA, "permissoes": {"modulos": ["caixa", "vendas"], "acoes": ["restaurante:caixa:*", "restaurante:venda:*", "restaurante:entidade:read"]}},
+        {"nome": "VENDEDOR", "slug": "vendedor", "role": RoleEnum.FUNCIONARIO, "permissoes": {"modulos": ["vendas"], "acoes": ["restaurante:venda:create", "restaurante:venda:read"]}},
+        {"nome": "ESTOQUE", "slug": "estoque", "role": RoleEnum.FUNCIONARIO, "permissoes": {"modulos": ["estoque"], "acoes": ["restaurante:produto:*"]}},
+        {"nome": "RH", "slug": "rh", "role": RoleEnum.RH, "permissoes": {"modulos": ["funcionarios"], "acoes": ["rh:*", "restaurante:entidade:*"]}},
+        {"nome": "FINANCEIRO", "slug": "financeiro", "role": RoleEnum.RH, "permissoes": {"modulos": ["caixa", "financeiro"], "acoes": ["financeiro:*"]}},
+    ],
+    TipoEmpresaEnum.SEGURANCA: [
+        {"nome": "DONO", "slug": "dono", "role": RoleEnum.DONO, "permissoes": {"all": True, "modulos": ["*"], "acoes": ["*"]}},
+        {"nome": "GERENTE_OPERACIONAL", "slug": "gerente_operacional", "role": RoleEnum.GERENTE_RESTAURANTE, "permissoes": {"all": True, "modulos": ["*"], "acoes": ["*"]}},
+        {"nome": "SUPERVISOR", "slug": "supervisor", "role": RoleEnum.GERENTE_RESTAURANTE, "permissoes": {"modulos": ["escalas", "ocorrencias"], "acoes": ["seguranca:*"]}},
+        {"nome": "AGENTE_SEGURANCA", "slug": "agente", "role": RoleEnum.VIGILANTE, "permissoes": {"modulos": ["ocorrencias"], "acoes": ["seguranca:ronda:create", "seguranca:ronda:read_own", "seguranca:ocorrencia:create", "seguranca:ocorrencia:read"]}},
+        {"nome": "RH", "slug": "rh", "role": RoleEnum.RH, "permissoes": {"modulos": ["funcionarios"], "acoes": ["rh:*"]}},
+    ],
+    TipoEmpresaEnum.SERVICOS: [
+        {"nome": "DONO", "slug": "dono", "role": RoleEnum.DONO, "permissoes": {"all": True, "modulos": ["*"], "acoes": ["*"]}},
+        {"nome": "GERENTE", "slug": "gerente", "role": RoleEnum.GERENTE_RESTAURANTE, "permissoes": {"all": True, "modulos": ["*"], "acoes": ["*"]}},
+        {"nome": "OPERADOR_CAIXA", "slug": "caixa", "role": RoleEnum.OPERADOR_CAIXA, "permissoes": {"modulos": ["caixa"], "acoes": ["restaurante:caixa:*", "restaurante:venda:*", "restaurante:entidade:read"]}},
     ]
 }
 
@@ -46,8 +43,20 @@ def seed_perfis_por_tipo(db: Session, empresa_id: UUID, tipo: TipoEmpresaEnum):
     templates = TEMPLATE_PERFIS.get(tipo, TEMPLATE_PERFIS[TipoEmpresaEnum.VAREJO])
     criados = []
     for t in templates:
-        p = Perfil(empresa_id=empresa_id, nome=t["nome"], slug=t["slug"], permissoes=t["permissoes"], is_system=True)
+        # evita duplicar se já existe
+        existe = db.query(Perfil).filter(Perfil.empresa_id==empresa_id, Perfil.slug==t["slug"]).first()
+        if existe:
+            continue
+        p = Perfil(
+            empresa_id=empresa_id,
+            nome=t["nome"],
+            slug=t["slug"],
+            role_equivalente=t["role"],
+            permissoes=t["permissoes"],
+            is_system=True
+        )
         db.add(p)
         criados.append(p)
     db.flush()
-    emit(str(empresa_id), "perfis:created", data=[{"id": str(c.id), "nome": c.nome, "slug": c.slug} for c in criados])
+    if criados:
+        emit(str(empresa_id), "perfis:created", data=[{"id": str(c.id), "nome": c.nome, "slug": c.slug, "role": c.role_equivalente.value} for c in criados])

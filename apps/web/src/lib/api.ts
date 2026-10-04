@@ -21,6 +21,7 @@ async function apiFetch(path: string, options: RequestInit = {}) {
     return data;
 }
 
+// CAIXA
 export const getCaixaStatus = () => apiFetch("/caixa/status");
 export const abrirCaixa = (payload: { saldo_inicial: number }) => apiFetch("/caixa/abrir", { method: "POST", body: JSON.stringify(payload) });
 export const forcarAberturaCaixa = (payload: { saldo_inicial: number, motivo: string }) => apiFetch("/caixa/forcar-abertura", { method: "POST", body: JSON.stringify(payload) });
@@ -28,13 +29,23 @@ export const fecharCaixaApi = (saldo_informado: number) => apiFetch("/caixa/fech
 export const getCaixaExtrato = () => apiFetch("/caixa/extrato");
 export const criarSangria = (payload: { valor: number; motivo: string }) => apiFetch("/caixa/sangria", { method: "POST", body: JSON.stringify(payload) });
 export const criarSuprimento = (payload: { valor: number; motivo: string }) => apiFetch("/caixa/suprimento", { method: "POST", body: JSON.stringify(payload) });
+
+// PRODUTOS
 export const getProdutos = (q?: string) => apiFetch(`/produtos/${q? `?search=${encodeURIComponent(q)}` : ''}`);
 export const getProduto = (id: string) => apiFetch(`/produtos/${id}`);
 export const getProdutosCategorias = () => apiFetch(`/produtos/categorias/lista`);
+
+// ATIVIDADE
 export const getAtividades = (params?: any) => apiFetch(`/atividade/${params? `?${new URLSearchParams(params).toString()}` : ''}`);
+
+// AUTH
 export const login = (payload: any) => apiFetch("/auth/login", { method: "POST", body: JSON.stringify(payload) });
 export const selectEmpresa = (payload: any) => apiFetch("/auth/select-empresa", { method: "POST", body: JSON.stringify(payload) });
 export const getMe = () => apiFetch("/auth/me");
+
+// ENTIDADES - NOVO PROFISSIONAL
+export const getEntidades = (empresa_id: string, tipo?: string) => apiFetch(`/entidades/${empresa_id}${tipo? `?tipo=${tipo}` : ''}`);
+export const getPerfis = (empresa_id: string) => apiFetch(`/entidades/${empresa_id}/perfis`);
 
 export const loginApi = async (email: string, senha: string) => {
     const data = await login({ email: email.toLowerCase().trim(), senha });

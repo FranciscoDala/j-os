@@ -41,18 +41,38 @@ export function EntidadesTab() {
 
     const load = useCallback(async () => {
         if (!empresaId) return;
-        const res = await fetch(`${API_BASE}/entidades/${empresaId}?tipo=${tipoFiltro}`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any });
-        if (res.ok) setLista(await res.json());
-        else {
-            const err = await res.json().catch(()=>({}));
-            if (res.status===403) toast.error(err.detail || "Empresa não autorizada");
+        try {
+            const res = await fetch(`${API_BASE}/entidades/${empresaId}?tipo=${tipoFiltro}`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, cache: "no-store" });
+            if (res.ok) {
+                setLista(await res.json());
+            } else {
+                const err = await res.json().catch(()=>({detail:"Erro"}));
+                if (res.status===403) {
+                    // FIX: operador_caixa agora tem permissão, mas se ainda der 403 mostra mensagem amigável
+                    console.warn("403 entidades:", err);
+                    toast.error(err.detail || "Sem permissão - faça login novamente como operador_caixa");
+                    setLista([]);
+                }
+            }
+        } catch (e) {
+            console.error("load entidades fail", e);
         }
     }, [tipoFiltro, empresaId]);
 
     const loadPerfis = useCallback(async () => {
         if (!empresaId) return;
-        const res = await fetch(`${API_BASE}/entidades/${empresaId}/perfis`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any });
-        if (res.ok) { const data = await res.json(); const uniq = Object.values(data.reduce((acc:any, cur:any) => { acc[cur.slug] = cur; return acc; }, {})); setPerfis(uniq as any[]); }
+        try {
+            const res = await fetch(`${API_BASE}/entidades/${empresaId}/perfis`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, cache: "no-store" });
+            if (res.ok) {
+                const data = await res.json();
+                // Remove duplicados por slug e garante role_equivalente
+                const uniqMap: any = {};
+                data.forEach((p:any) => { uniqMap[p.slug] = p; });
+                setPerfis(Object.values(uniqMap) as any[]);
+            }
+        } catch (e) {
+            console.error("load perfis fail", e);
+        }
     }, [empresaId]);
 
     useEffect(() => { if (empresaId) { load(); loadPerfis(); } }, [load, loadPerfis]);
@@ -90,11 +110,11 @@ export function EntidadesTab() {
             const json = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(json.detail || "Erro ao salvar");
 
-            if (isEdit) { setLista(prev => prev.map(p => p.id === json.id? json : p)); toast.success("Atualizado com sucesso", { id: "entidade-save" }); }
-            else { setLista(prev => [json,...prev]); toast.success("Criado com sucesso", { id: "entidade-save" }); }
+            if (isEdit) { setLista(prev => prev.map(p => p.id === json.id? json : p)); toast.success("Atualizado com sucesso"); }
+            else { setLista(prev => [json,...prev]); toast.success("Criado com sucesso"); }
             setOpen(false);
             setForm({ id: null, tipo: tipoFiltro, nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" });
-        } catch (e: any) { toast.error(e.message, { id: "entidade-error" }); } finally { setSaving(false); }
+        } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
     };
 
     const confirmDelete = async () => {
@@ -105,9 +125,9 @@ export function EntidadesTab() {
         try {
             const res = await fetch(`${API_BASE}/entidades/${empresaId}/${selected.id}`, { method: "DELETE", headers: { "Content-Type": "application/json",...getAuthHeaders() } as any });
             if (!res.ok) throw new Error("Erro ao apagar");
-            toast.success(`${selected.nome} apagado`, { id: "delete" });
+            toast.success(`${selected.nome} apagado`);
             setOpenDelete(false);
-        } catch { setLista(backup); toast.error("Erro ao apagar", { id: "delete-error" }); } finally { setDeleting(false); }
+        } catch { setLista(backup); toast.error("Erro ao apagar"); } finally { setDeleting(false); }
     };
 
     const filtered = lista.filter(l => l.nome.toLowerCase().includes(search.toLowerCase()));

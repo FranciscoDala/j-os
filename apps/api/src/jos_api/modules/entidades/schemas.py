@@ -39,21 +39,6 @@ class EntidadeCreate(BaseModel):
             return s if s!= "" else None
         return v
 
-    @field_validator('perfil_id', 'data_admissao', 'salario', 'carga_horaria', mode='before')
-    @classmethod
-    def empty_to_none_all(cls, v):
-        if v == "" or v == "null" or v == "undefined":
-            return None
-        return v
-
-    @field_validator('email')
-    @classmethod
-    def validar_email_acesso(cls, v):
-        if v:
-            return v.lower().strip()
-        return v
-
-        
 class EntidadeOut(BaseModel):
     id: UUID
     empresa_id: UUID
@@ -61,19 +46,13 @@ class EntidadeOut(BaseModel):
     nome: str
     telefone: Optional[str] = None
     email: Optional[str] = None
-    documento: Optional[str] = None
-    endereco: Optional[str] = None
     cargo: Optional[str] = None
     departamento: Optional[str] = None
     salario: Optional[float] = None
-    carga_horaria: Optional[int] = None
-    empresa_fornecedora: Optional[str] = None
-    categoria_fornecedor: Optional[str] = None
     tem_acesso_app: bool
     perfil_id: Optional[UUID] = None
     user_id: Optional[UUID] = None
     ativo: bool
-
     class Config:
         from_attributes = True
         extra = "ignore"
@@ -82,13 +61,7 @@ class PerfilOut(BaseModel):
     id: UUID
     nome: str
     slug: str
-    descricao: Optional[str] = None
-
-    @field_validator('descricao', mode='before')
-    @classmethod
-    def desc_default(cls, v):
-        return v or None
-
+    role_equivalente: Optional[str] = None
     class Config:
         from_attributes = True
-        extra = "ignore" # <--- ESSENCIAL: ignora se o model não tem descricao
+        extra = "ignore"
