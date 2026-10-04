@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, Form, File, UploadFile, Request
+# pyright: reportGeneralTypeIssues=false
+# pyright: reportAttributeAccessIssue=false
+from fastapi import APIRouter, Depends, Query, HTTPException, Form, File, UploadFile, Request, Header
 from sqlalchemy.orm import Session
 import uuid
 from typing import List, Optional
@@ -8,7 +10,7 @@ from jos_api.db.session import get_db
 from jos_api.modules.produto.schemas import ProdutoCreateRequest, ProdutoResponse, ProdutoUpdateRequest, BaixaStockRequest
 from jos_api.modules.produto.models import ProductType, ProductUnit
 from jos_api.modules.produto import service as produto_service
-from jos_api.core.deps import get_current_user, precisa_modulo
+from jos_api.core.deps import get_current_user
 from jos_api.modules.auth.models import User
 from jos_api.core.uploadImagem import upload_image
 
@@ -33,43 +35,50 @@ def _parse_bool(v) -> bool:
 
 async def _try_upload(imagem: UploadFile | None, empresa_id: uuid.UUID | None) -> str | None:
     if not imagem or not empresa_id or not imagem.filename: return None
-    # teu uploader já valida 2MB, imghdr e salva em j-os/{empresa_id}/produtos
     return await upload_image(imagem, str(empresa_id), folder="produtos")
 
-def _get_empresa_id_from_perfil(perfil_data) -> uuid.UUID:
-    eid = perfil_data.get("empresa_id")
-    if not eid: raise HTTPException(403, "Usuário sem empresa vinculada")
-    return uuid.UUID(eid) if isinstance(eid, str) else eid
+def _get_empresa_id_from_user(current_user: User, x_empresa_id: str = Header(None, alias="X-Empresa-ID")) -> uuid.UUID: # type: ignore
+    eid = x_empresa_id
+    if not eid:
+        eid = getattr(current_user, 'empresa_id', None)
+    if not eid:
+        try:
+            eid = current_user.__dict__.get("empresa_id")
+        except:
+            eid = None
+    if not eid:
+        raise HTTPException(status_code=403, detail="Sem X-Empresa-ID")
+    return uuid.UUID(str(eid))
 
 def _get_ip(request: Request): return request.client.host if request.client else None
-def _get_nome(user: User, perfil_data): return getattr(user, 'nome', None) or perfil_data.get("perfil_nome", "Sistema")
+def _get_nome(user: User): return getattr(user, 'nome', None) or getattr(user, 'full_name', None) or getattr(user, 'email', None) or "Sistema"
 
 @router.get("/categorias/lista", response_model=List[str])
-def listar_categorias(db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
-    empresa_id = _get_empresa_id_from_perfil(perfil_data)
+def listar_categorias(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
     return produto_service.get_categorias(db, empresa_id)
 
 @router.get("/alerta/stock-baixo", response_model=List[ProdutoResponse])
-def produtos_stock_baixo(db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
-    empresa_id = _get_empresa_id_from_perfil(perfil_data)
+def produtos_stock_baixo(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
     return produto_service.get_produtos_stock_baixo(db, empresa_id)
 
 @router.get("/")
-def listar_produtos(skip: int = Query(0, ge=0), limit: int = Query(10, ge=1, le=100), search: str = Query(""), categoria: Optional[str] = Query(None), tipo: Optional[str] = Query(None), ativo: Optional[bool] = Query(None), db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
-    empresa_id = _get_empresa_id_from_perfil(perfil_data)
+def listar_produtos(skip: int = Query(0, ge=0), limit: int = Query(10, ge=1, le=100), search: str = Query(""), categoria: Optional[str] = Query(None), tipo: Optional[str] = Query(None), ativo: Optional[bool] = Query(None), db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
     items, total = produto_service.get_produtos(db, empresa_id, search, categoria or "", tipo or "", ativo, skip, limit)
     return {"items": items, "total": total}
 
 @router.get("/codigo/{codigo}", response_model=ProdutoResponse)
-def buscar_por_codigo(codigo: str, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
-    empresa_id = _get_empresa_id_from_perfil(perfil_data)
+def buscar_por_codigo(codigo: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
     produto = produto_service.get_produto_by_codigo(db, codigo, empresa_id)
     if not produto: raise HTTPException(404, "Produto não encontrado")
     return produto
 
 @router.get("/{produto_id}", response_model=ProdutoResponse)
-def buscar_por_id(produto_id: uuid.UUID, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
-    empresa_id = _get_empresa_id_from_perfil(perfil_data)
+def buscar_por_id(produto_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
     return produto_service.get_produto_by_id(db, produto_id, empresa_id)
 
 @router.post("/", response_model=ProdutoResponse, status_code=201)
@@ -98,11 +107,11 @@ async def criar_produto(
     service_duration: Optional[int] = Form(None),
     imagem: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
-    perfil_data = Depends(precisa_modulo("caixa")),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    x_empresa_id: str = Header(None, alias="X-Empresa-ID")
 ):
     try:
-        empresa_id = _get_empresa_id_from_perfil(perfil_data)
+        empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
         imagem_url = await _try_upload(imagem, empresa_id)
         produto_data = ProdutoCreateRequest(
             nome=nome.strip(), codigo=codigo.strip(),
@@ -118,7 +127,7 @@ async def criar_produto(
             prep_time=prep_time, kitchen_station=kitchen_station,
             is_modifiable=_parse_bool(is_modifiable), service_duration=service_duration,
         )
-        return produto_service.create_produto(db, produto_data, empresa_id, current_user.id, criado_por_nome=_get_nome(current_user, perfil_data), ip=_get_ip(request))
+        return produto_service.create_produto(db, produto_data, empresa_id, current_user.id, criado_por_nome=_get_nome(current_user), ip=_get_ip(request))
     except HTTPException:
         raise
     except Exception as e:
@@ -138,10 +147,11 @@ async def atualizar_produto(
     peso: Optional[float] = Form(None), prep_time: Optional[int] = Form(None),
     kitchen_station: Optional[str] = Form(None), is_modifiable: Optional[str] = Form(None),
     imagem: Optional[UploadFile] = File(None),
-    db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    x_empresa_id: str = Header(None, alias="X-Empresa-ID")
 ):
-    empresa_id = _get_empresa_id_from_perfil(perfil_data)
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
     update_data = {}
     if nome is not None: update_data["nome"] = nome
     if codigo is not None: update_data["codigo"] = codigo
@@ -164,16 +174,16 @@ async def atualizar_produto(
     if imagem and imagem.filename:
         url = await _try_upload(imagem, empresa_id)
         if url: update_data["imagem_url"] = url
-    return produto_service.update_produto(db, produto_id, ProdutoUpdateRequest(**update_data), empresa_id, user_id=current_user.id, user_nome=_get_nome(current_user, perfil_data), ip=_get_ip(request))
+    return produto_service.update_produto(db, produto_id, ProdutoUpdateRequest(**update_data), empresa_id, user_id=current_user.id, user_nome=_get_nome(current_user), ip=_get_ip(request))
 
 @router.delete("/{produto_id}")
-def delete_produto(request: Request, produto_id: uuid.UUID, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user)):
-    empresa_id = _get_empresa_id_from_perfil(perfil_data)
-    return produto_service.delete_produto(db, produto_id, empresa_id, user_id=current_user.id, user_nome=_get_nome(current_user, perfil_data), ip=_get_ip(request))
+def delete_produto(request: Request, produto_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
+    return produto_service.delete_produto(db, produto_id, empresa_id, user_id=current_user.id, user_nome=_get_nome(current_user), ip=_get_ip(request))
 
 @router.post("/{produto_id}/baixa-stock")
-def dar_baixa_stock(produto_id: uuid.UUID, dados: BaixaStockRequest, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
-    empresa_id = _get_empresa_id_from_perfil(perfil_data)
+def dar_baixa_stock(produto_id: uuid.UUID, dados: BaixaStockRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
     try:
         produto_service.baixar_stock(db, produto_id, dados.quantidade, empresa_id)
         return {"detail": "Stock atualizado"}
