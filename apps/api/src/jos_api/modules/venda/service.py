@@ -75,6 +75,7 @@ def criar_mesa(db: Session, empresa_id: uuid.UUID, numero: str, capacidade: int)
     emit(str(empresa_id), "mesa:created", data={"id": str(m.id), "numero": m.numero})
     return m
 
+    
 def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID, caixa: Caixa, criado_por_nome: str = "Sistema", ip: str | None = None):
     if not data.itens: raise HTTPException(400, "Sem itens")
     _limpar_expiradas(db, empresa_id)
@@ -119,15 +120,15 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
     nomes = ", ".join([i.nome_produto for i in venda.itens])
     mov = None
     if venda_status == VendaStatus.CONCLUIDA:
-        mov = CaixaMovimento(empresa_id=empresa_id, caixa_id=caixa.id, tipo=TipoMovimento.VENDA, origem=OrigemMovimento.VENDA, valor=venda.total, descricao=f"Venda #{venda.numero} - {venda.forma_pagamento}", venda_id=venda.id, forma_pagamento=venda.forma_pagamento, criado_por=created_by, criado_por_nome=criado_por_nome)
+        # AQUI: descricao agora com Resp:
+        mov = CaixaMovimento(empresa_id=empresa_id, caixa_id=caixa.id, tipo=TipoMovimento.VENDA, origem=OrigemMovimento.VENDA, valor=venda.total, descricao=f"Venda #{venda.numero} - {venda.forma_pagamento} - Resp: {criado_por_nome}", venda_id=venda.id, forma_pagamento=venda.forma_pagamento, criado_por=created_by, criado_por_nome=criado_por_nome)
         db.add(mov)
         db.flush()
-    registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="CRIAR", descricao=f"Venda #{venda.numero} - {nomes} - R$ {venda.total}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero} - {nomes}", user_id=created_by, user_nome=criado_por_nome, detalhes={"produtos": nomes, "total": str(venda.total)}, ip=ip, commit=False)
+    registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="CRIAR", descricao=f"Venda #{venda.numero} - {nomes} - R$ {venda.total} - por {criado_por_nome}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero} - {nomes}", user_id=created_by, user_nome=criado_por_nome, detalhes={"produtos": nomes, "total": str(venda.total)}, ip=ip, commit=False)
     db.commit(); db.refresh(venda)
     if mov:
         db.refresh(mov)
 
-    # ===== EMITS CORRIGIDOS COM ID =====
     for p in produtos_afectados:
         emit(str(empresa_id), "produto:update", data=p)
         emit(str(empresa_id), "produto:atualizado", data=p)
@@ -139,6 +140,7 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
         "total_venda": str(venda.total),
         "valor": str(venda.total),
         "mesa_id": str(venda.mesa_id) if venda.mesa_id else None,
+        "criado_por_nome": criado_por_nome,
         "itens": [{"produto_id": str(i.produto_id), "quantidade": str(i.quantidade)} for i in venda.itens]
     }
     emit(str(empresa_id), "venda:nova", data=venda_payload)
@@ -152,8 +154,10 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
             "descricao": mov.descricao,
             "criado_em": mov.criado_em.isoformat() if mov.criado_em else datetime.utcnow().isoformat(),
             "criado_por_nome": mov.criado_por_nome or criado_por_nome,
+            "aberto_por_nome": criado_por_nome,
             "forma_pagamento": str(mov.forma_pagamento) if mov.forma_pagamento else str(venda.forma_pagamento),
-            "venda_id": str(venda.id)
+            "venda_id": str(venda.id),
+            "caixa_id": str(caixa.id)
         }
         emit(str(empresa_id), "caixa:extrato", data=mov_payload)
         emit(str(empresa_id), "caixa:atualizado", data=mov_payload)
@@ -163,10 +167,12 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
             "id": str(venda.id),
             "tipo": "VENDA",
             "valor": str(venda.total),
-            "descricao": f"Venda #{venda.numero}",
+            "descricao": f"Venda #{venda.numero} - Resp: {criado_por_nome}",
             "criado_em": datetime.utcnow().isoformat(),
             "criado_por_nome": criado_por_nome,
-            "venda_id": str(venda.id)
+            "aberto_por_nome": criado_por_nome,
+            "venda_id": str(venda.id),
+            "caixa_id": str(caixa.id)
         }
         emit(str(empresa_id), "caixa:extrato", data=fallback)
         emit(str(empresa_id), "caixa:atualizado", data=fallback)
@@ -174,7 +180,7 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
 
     return venda, produtos_afectados
 
-    
+
 def add_item_comanda(db: Session, venda_id: uuid.UUID, data, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
     venda = db.query(Venda).filter(Venda.id == venda_id, Venda.empresa_id == empresa_id).with_for_update().first()
     if not venda or venda.status!= VendaStatus.ABERTA: raise HTTPException(400, "Comanda não está aberta")

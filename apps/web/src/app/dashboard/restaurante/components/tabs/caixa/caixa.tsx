@@ -23,7 +23,7 @@ function getAuthHeaders() {
 async function apiFetch(path: string, options: RequestInit = {}) {
     const headers: any = { "Content-Type": "application/json",...getAuthHeaders(),...(options.headers || {}) };
     if (options.body instanceof FormData) delete headers["Content-Type"];
-    const res = await fetch(`${BASE}${path}`, { ...options, headers });
+    const res = await fetch(`${BASE}${path}`, {...options, headers });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) throw d;
     return d;
@@ -32,6 +32,12 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const todayISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' });
 const STORAGE_KEY = "j-os:mostrar_extrato";
+
+const formatDateTimeFull = (iso: string) => {
+    try {
+        return new Date(iso).toLocaleString('pt-PT', { timeZone: 'Africa/Luanda', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch { return iso; }
+};
 
 export function CaixaTab() {
     const [status, setStatus] = useState<any>(null);
@@ -78,19 +84,17 @@ export function CaixaTab() {
         document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
     }, []);
 
-    // REALTIME CIRÚRGICO - sem load(), sem refresh
     useEffect(() => {
         const onExtratoPush = (e: any) => {
             const m = e.detail;
             if (!m?.id &&!m?.valor &&!m?.total_venda &&!m?.total) return;
             const hoje = todayISO();
             if (inicio!== hoje || fim!== hoje) return;
-
             setExtrato((prev: any) => {
                 if (!prev) return prev;
                 if (m.id && prev.movimentos?.some((x: any) => x.id === m.id)) return prev;
                 return {
-                   ...prev,
+                  ...prev,
                     movimentos: [m,...(prev.movimentos || [])],
                     saldo_atual: Number(prev.saldo_atual || 0) + Number(m.valor || m.total_venda || m.total || 0),
                     total_entradas: Number(m.valor || m.total || 0) > 0? Number(prev.total_entradas || 0) + Number(m.valor || m.total || 0) : prev.total_entradas,
@@ -141,12 +145,13 @@ export function CaixaTab() {
 
     const handleBaixar = () => {
         setMenuOpen(false);
-        const linhas = [["Data", "Tipo", "Valor", "Descricao", "Usuario"]];
+        const linhas = [["Data", "Tipo", "Valor", "Descricao", "Responsavel"]];
         movs.forEach((m: any) => {
-            const data = new Date(m.criado_em).toLocaleString('pt-PT', { timeZone: 'Africa/Luanda' });
-            linhas.push([data, m.tipo, String(m.valor), (m.descricao || "").replace(/;/g, ","), m.criado_por_nome || ""]);
+            const data = formatDateTimeFull(m.criado_em || m.data);
+            linhas.push([data, m.tipo, String(m.valor), (m.descricao || "").replace(/;/g, ","), m.criado_por_nome || m.aberto_por_nome || ""]);
         });
         linhas.push([]); linhas.push(["Periodo", `${inicio} ate ${fim}`]);
+        linhas.push(["Caixa", status?.aberto? `Aberto por ${status?.caixa_atual?.aberto_por_nome} em ${formatDateTimeFull(status?.caixa_atual?.aberto_em)}` : "Fechado"]);
         const csv = linhas.map(r => r.join(";")).join("\n");
         const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
@@ -156,15 +161,29 @@ export function CaixaTab() {
     const handleImprimir = () => {
         setMenuOpen(false);
         const win = window.open("", "_blank"); if (!win) return;
-        const html = `<html><head><title>Relatorio ${inicio} - ${fim}</title><style>body{font-family:monospace;padding:20px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:6px;font-size:12px} th{background:#000;color:#fff}</style></head><body><h2>J-OS - ${inicio} ate ${fim}</h2><table><thead><tr><th>Data</th><th>Tipo</th><th>Valor</th><th>Descricao</th></tr></thead><tbody>${movs.map((m: any) => `<tr><td>${new Date(m.criado_em).toLocaleString('pt-PT')}</td><td>${m.tipo}</td><td>${fmt(Number(m.valor))}</td><td>${m.descricao || ''}</td></tr>`).join("")}</tbody></table><script>window.print()</script></body></html>`;
+        const responsavelCaixa = status?.caixa_atual?.aberto_por_nome? ` - Aberto por: ${status.caixa_atual.aberto_por_nome} em ${formatDateTimeFull(status.caixa_atual.aberto_em)}` : "";
+        const html = `<html><head><title>Relatorio ${inicio} - ${fim}</title><style>body{font-family:monospace;padding:20px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:6px;font-size:11px} th{background:#000;color:#fff}.info{margin-bottom:10px;font-size:12px}</style></head><body><h2>J-OS - ${inicio} ate ${fim}</h2><div class="info">Caixa: ${status?.aberto? 'Aberto' : 'Fechado'}${responsavelCaixa}</div><table><thead><tr><th>Data/Hora</th><th>Tipo</th><th>Valor</th><th>Descricao</th><th>Responsavel</th></tr></thead><tbody>${movs.map((m: any) => `<tr><td>${formatDateTimeFull(m.criado_em)}</td><td>${m.tipo}</td><td>${fmt(Number(m.valor))}</td><td>${m.descricao || ''}</td><td>${m.criado_por_nome || m.aberto_por_nome || ''}</td></tr>`).join("")}</tbody></table><script>window.print()</script></body></html>`;
         win.document.write(html); win.document.close();
     };
 
     if (loading &&!extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
 
+    // Info do responsavel do caixa atual
+    const caixaAtual = status?.caixa_atual;
+    const responsavelAbertura = caixaAtual?.aberto_por_nome || status?.mensagem || "";
+    const dataAberturaFull = caixaAtual?.aberto_em? formatDateTimeFull(caixaAtual.aberto_em) : "";
+
     return (
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
+
+            {/* INFO RESPONSAVEL - novo */}
+            {status?.aberto && caixaAtual && (
+                <div className="bg-zinc-900 text-white rounded-[14px] px-4 py-2.5 flex items-center justify-between text-[11px]">
+                    <span className="font-bold tracking-wide">Caixa {status.aberto? 'aberto' : 'fechado'} por: <span className="text-white font-black">{caixaAtual.aberto_por_nome}</span></span>
+                    <span className="text-zinc-400 font-medium">{dataAberturaFull}</span>
+                </div>
+            )}
 
             <div className="hidden md:flex items-center justify-between">
                 <div className="flex gap-2 w-[calc((100%-32px)/3)]">
@@ -219,7 +238,13 @@ export function CaixaTab() {
 
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div onClick={() => handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
-                    <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={inicio.slice(5).replace("-", "/")} horaAbertura={movs[0]? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : "--:--"} />
+                    <MasterCard
+                        aberto={!!status?.aberto}
+                        atual={atual}
+                        nomeRestaurante={responsavelAbertura? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE"}
+                        dataAbertura={dataAberturaFull? dataAberturaFull.split(',')[0] || dataAberturaFull.split(' ')[0] : inicio.slice(5).replace("-", "/")}
+                        horaAbertura={dataAberturaFull? dataAberturaFull.split(',').pop()?.trim() || dataAberturaFull : (movs[0]? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : "--:--")}
+                    />
                 </div>
                 <div onClick={() => handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={inicio.slice(5).replace("-", "/")} qtdVendas={movs.filter((m: any) => (m.tipo || "").toUpperCase().includes("VENDA")).length} />
@@ -237,7 +262,7 @@ export function CaixaTab() {
                 </button>
             </div>
 
-            {showExtrato && <ExtratoList movimentos={movs} selectedDate={extrato?.periodo_inicio || inicio} />}
+            {showExtrato && <ExtratoList movimentos={movs} selectedDate={extrato?.periodo_inicio || inicio} statusCaixa={status} />}
 
             <JConfirm open={confirm.open} title={confirm.title} desc={confirm.desc} type={confirm.type} onClose={() => setConfirm(s => ({...s, open: false }))} onConfirm={confirm.action} />
             <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={status?.caixa_atual || extrato} onClose={() => setModalOpen(false)} onSuccess={async () => { await load(); toast.success("Ok sucesso, o caixa aberto para operações consolte a tabela de movimentos!"); }} />
