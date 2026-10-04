@@ -1,3 +1,5 @@
+# pyright: reportGeneralTypeIssues=false
+# pyright: reportAttributeAccessIssue=false
 from fastapi import APIRouter, Depends, HTTPException, Body, Request, Query, Header
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
@@ -7,7 +9,7 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from jos_api.db.session import get_db
-from jos_api.core.deps import get_current_user, precisa_caixa_aberto
+from jos_api.core.deps import get_current_user
 from jos_api.modules.caixa import schemas, service
 from jos_api.modules.caixa.models import Caixa, CaixaMovimento, TipoMovimento, CaixaStatus
 from jos_api.modules.auth.models import User
@@ -28,12 +30,18 @@ def _get_empresa_id_from_user(current_user: User, x_empresa_id: str = Header(Non
         raise HTTPException(status_code=403, detail="Sem X-Empresa-ID")
     return uuid.UUID(str(eid))
 
-
 def _get_nome(user: User) -> str:
     return getattr(user, 'nome', None) or getattr(user, 'full_name', None) or getattr(user, 'email', None) or "Caixa"
 
 def _get_ip(request: Request):
     return request.client.host if request.client else None
+
+def _get_caixa_aberto_dep(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
+    caixa = service.get_caixa_aberto(db, empresa_id)
+    if not caixa:
+        raise HTTPException(status_code=400, detail="Nenhum caixa aberto")
+    return caixa
 
 def _range_luanda_para_utc(data_str: str):
     tz = ZoneInfo("Africa/Luanda")
@@ -127,14 +135,14 @@ def extrato_por_data(data_str: str, db: Session = Depends(get_db), current_user:
         raise HTTPException(status_code=400, detail="Data invalida YYYY-MM-DD")
     caixas = db.query(Caixa).filter(Caixa.empresa_id == empresa_id, Caixa.aberto_em >= inicio_utc, Caixa.aberto_em <= fim_utc).order_by(Caixa.aberto_em.asc()).all()
     if not caixas:
-        return {"caixa_id": uuid.uuid4(), "saldo_inicial": Decimal("0"), "saldo_atual": Decimal("0"), "total_entradas": Decimal("0"), "total_saidas": Decimal("0"), "movimentos": [], "qtd_caixas": 0, "periodo_inicio": data_str, "periodo_fim": data_str}
+        return {"caixa_id": uuid.uuid4(), "saldo_inicial": Decimal("0"), "saldo_atual": Decimal("0"), "total_entradas": Decimal("0"), "total_saidas": Decimal("0"), "movimentos": [], "qtd_caixas": 0, "periodo_inicio": data_str, "periodo_fim": data_str} # type: ignore
     movs, ent, sai, ini, atu = _calc_extrato(caixas, db)
     saldo_ini_ret = caixas[0].saldo_inicial if len(caixas) == 1 else ini
     if len(caixas) == 1 and caixas[0].status!= CaixaStatus.ABERTO:
         saldo_atu_ret = caixas[0].saldo_final_esperado or ini
     else:
         saldo_atu_ret = atu
-    return {"caixa_id": caixas[0].id, "saldo_inicial": saldo_ini_ret, "saldo_atual": saldo_atu_ret, "total_entradas": ent, "total_saidas": sai, "movimentos": movs, "qtd_caixas": len(caixas), "periodo_inicio": data_str, "periodo_fim": data_str}
+    return {"caixa_id": caixas[0].id, "saldo_inicial": saldo_ini_ret, "saldo_atual": saldo_atu_ret, "total_entradas": ent, "total_saidas": sai, "movimentos": movs, "qtd_caixas": len(caixas), "periodo_inicio": data_str, "periodo_fim": data_str} # type: ignore
 
 @router.get("/extrato-por-periodo", response_model=schemas.ExtratoResponse)
 def extrato_por_periodo(inicio: str = Query(..., description="YYYY-MM-DD"), fim: str = Query(..., description="YYYY-MM-DD"), db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
@@ -146,9 +154,9 @@ def extrato_por_periodo(inicio: str = Query(..., description="YYYY-MM-DD"), fim:
         raise HTTPException(status_code=400, detail="Datas invalidas YYYY-MM-DD")
     caixas = db.query(Caixa).filter(Caixa.empresa_id == empresa_id, Caixa.aberto_em >= inicio_utc, Caixa.aberto_em <= fim_utc).order_by(Caixa.aberto_em.asc()).all()
     if not caixas:
-        return {"caixa_id": uuid.uuid4(), "saldo_inicial": Decimal("0"), "saldo_atual": Decimal("0"), "total_entradas": Decimal("0"), "total_saidas": Decimal("0"), "movimentos": [], "qtd_caixas": 0, "periodo_inicio": inicio, "periodo_fim": fim}
+        return {"caixa_id": uuid.uuid4(), "saldo_inicial": Decimal("0"), "saldo_atual": Decimal("0"), "total_entradas": Decimal("0"), "total_saidas": Decimal("0"), "movimentos": [], "qtd_caixas": 0, "periodo_inicio": inicio, "periodo_fim": fim} # type: ignore
     movs, ent, sai, ini, atu = _calc_extrato(caixas, db)
-    return {"caixa_id": caixas[0].id, "saldo_inicial": ini, "saldo_atual": atu, "total_entradas": ent, "total_saidas": sai, "movimentos": movs, "qtd_caixas": len(caixas), "periodo_inicio": inicio, "periodo_fim": fim}
+    return {"caixa_id": caixas[0].id, "saldo_inicial": ini, "saldo_atual": atu, "total_entradas": ent, "total_saidas": sai, "movimentos": movs, "qtd_caixas": len(caixas), "periodo_inicio": inicio, "periodo_fim": fim} # type: ignore
 
 @router.get("/extrato", response_model=schemas.ExtratoResponse)
 def extrato_caixa(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
@@ -157,13 +165,13 @@ def extrato_caixa(db: Session = Depends(get_db), current_user: User = Depends(ge
     if not caixa_atual:
         ultimo = db.query(Caixa).filter(Caixa.empresa_id == empresa_id).order_by(Caixa.aberto_em.desc()).first()
         if not ultimo:
-            return {"caixa_id": uuid.uuid4(), "saldo_inicial": Decimal("0"), "saldo_atual": Decimal("0"), "total_entradas": Decimal("0"), "total_saidas": Decimal("0"), "movimentos": [], "qtd_caixas": 0}
+            return {"caixa_id": uuid.uuid4(), "saldo_inicial": Decimal("0"), "saldo_atual": Decimal("0"), "total_entradas": Decimal("0"), "total_saidas": Decimal("0"), "movimentos": [], "qtd_caixas": 0} # type: ignore
         caixa_atual = ultimo
     movs = db.query(CaixaMovimento).filter(CaixaMovimento.caixa_id == caixa_atual.id).order_by(CaixaMovimento.criado_em.asc()).all()
     ent = sum((m.valor for m in movs if m.valor and m.valor > 0 and str(m.tipo)!= "ABERTURA"), Decimal("0"))
     sai = sum((m.valor for m in movs if m.valor and m.valor < 0), Decimal("0"))
     saldo = service.calcular_saldo_atual(db, caixa_atual) if caixa_atual.status == CaixaStatus.ABERTO else (caixa_atual.saldo_final_esperado or caixa_atual.saldo_inicial or Decimal("0"))
-    return {"caixa_id": caixa_atual.id, "saldo_inicial": caixa_atual.saldo_inicial, "saldo_atual": saldo, "total_entradas": ent, "total_saidas": sai, "movimentos": movs, "qtd_caixas": 1}
+    return {"caixa_id": caixa_atual.id, "saldo_inicial": caixa_atual.saldo_inicial, "saldo_atual": saldo, "total_entradas": ent, "total_saidas": sai, "movimentos": movs, "qtd_caixas": 1} # type: ignore
 
 @router.get("/{caixa_id}/extrato", response_model=schemas.ExtratoResponse)
 def extrato_por_id(caixa_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
@@ -175,14 +183,14 @@ def extrato_por_id(caixa_id: uuid.UUID, db: Session = Depends(get_db), current_u
     ent = sum((m.valor for m in movs if m.valor and m.valor > 0 and str(m.tipo)!= "ABERTURA"), Decimal("0"))
     sai = sum((m.valor for m in movs if m.valor and m.valor < 0), Decimal("0"))
     saldo = service.calcular_saldo_atual(db, caixa) if caixa.status == CaixaStatus.ABERTO else (caixa.saldo_final_esperado or caixa.saldo_inicial)
-    return {"caixa_id": caixa.id, "saldo_inicial": caixa.saldo_inicial, "saldo_atual": saldo, "total_entradas": ent, "total_saidas": sai, "movimentos": movs, "qtd_caixas": 1}
+    return {"caixa_id": caixa.id, "saldo_inicial": caixa.saldo_inicial, "saldo_atual": saldo, "total_entradas": ent, "total_saidas": sai, "movimentos": movs, "qtd_caixas": 1} # type: ignore
 
 class SangriaRequest(BaseModel):
     valor: Decimal
     motivo: str
 
 @router.post("/sangria", response_model=schemas.CaixaMovimentoResponse)
-def sangria(dados: SangriaRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), caixa_atual: Caixa = Depends(precisa_caixa_aberto)):
+def sangria(dados: SangriaRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), caixa_atual: Caixa = Depends(_get_caixa_aberto_dep)):
     nome = _get_nome(current_user)
     if dados.valor <= 0:
         raise HTTPException(status_code=400, detail="Valor deve ser positivo")
@@ -191,7 +199,7 @@ def sangria(dados: SangriaRequest, request: Request, db: Session = Depends(get_d
     return mov
 
 @router.post("/suprimento", response_model=schemas.CaixaMovimentoResponse)
-def suprimento(dados: SangriaRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), caixa_atual: Caixa = Depends(precisa_caixa_aberto)):
+def suprimento(dados: SangriaRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), caixa_atual: Caixa = Depends(_get_caixa_aberto_dep)):
     nome = _get_nome(current_user)
     if dados.valor <= 0:
         raise HTTPException(status_code=400, detail="Valor deve ser positivo")
