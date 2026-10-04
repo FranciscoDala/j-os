@@ -19,9 +19,19 @@ def _get_empresa_id(perfil_data) -> uuid.UUID:
     eid = perfil_data.get("empresa_id")
     if not eid: raise HTTPException(status_code=403, detail="Sem empresa vinculada")
     return uuid.UUID(eid) if isinstance(eid, str) else eid
+
 def _get_nome(user: User, perfil_data) -> str:
     return getattr(user, 'nome', None) or getattr(user, 'full_name', None) or getattr(user, 'email', None) or perfil_data.get("perfil_nome", "Usuário")
+
 def _get_ip(request: Request): return request.client.host if request.client else None
+
+def _get_role(perfil_data) -> str:
+    return str(perfil_data.get("role") or perfil_data.get("perfil_slug") or "funcionario").lower()
+
+def _is_caixa_role(perfil_data) -> bool:
+    role = _get_role(perfil_data)
+    # LIBERA TUDO QUE É CAIXA
+    return role in ["dono", "gerente", "gerente_restaurante", "operador_caixa", "caixa", "rh", "admin"]
 
 def _range_luanda_para_utc(data_str: str):
     tz = ZoneInfo("Africa/Luanda")
@@ -51,8 +61,11 @@ def _calc_extrato(caixas, db: Session):
         else: total_sai+=m.valor
     return movs, total_ent, total_sai, saldo_ini, saldo_atu
 
+# FIX - status agora libera operador_caixa direto
 @router.get("/status")
 def status_caixa(db: Session = Depends(get_db), perfil_data = Depends(get_perfil_atual)):
+    if not _is_caixa_role(perfil_data):
+        raise HTTPException(403, f"Sem permissão caixa para { _get_role(perfil_data) }")
     empresa_id = _get_empresa_id(perfil_data)
     caixa = service.get_caixa_aberto(db, empresa_id)
     if not caixa: return {"aberto": False, "caixa_atual": None, "mensagem": "Caixa fechado"}
@@ -60,12 +73,16 @@ def status_caixa(db: Session = Depends(get_db), perfil_data = Depends(get_perfil
     return {"aberto": True, "caixa_atual": {"id": str(caixa.id), "aberto_por": str(caixa.aberto_por), "aberto_por_nome": caixa.aberto_por_nome, "aberto_em": caixa.aberto_em.isoformat() if caixa.aberto_em else None, "saldo_inicial": float(caixa.saldo_inicial), "saldo_atual": float(saldo_atual)}, "mensagem": f"Caixa aberto por {caixa.aberto_por_nome}"}
 
 @router.post("/abrir", response_model=schemas.CaixaResponse)
-def abrir_caixa(dados: schemas.CaixaAbrirRequest, request: Request, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user)):
+def abrir_caixa(dados: schemas.CaixaAbrirRequest, request: Request, db: Session = Depends(get_db), perfil_data = Depends(get_perfil_atual), current_user: User = Depends(get_current_user)):
+    if not _is_caixa_role(perfil_data):
+        raise HTTPException(403, f"Sem permissão para abrir caixa: { _get_role(perfil_data) }")
     empresa_id = _get_empresa_id(perfil_data); nome = _get_nome(current_user, perfil_data)
     return service.abrir_caixa(db, empresa_id, current_user.id, nome, dados.saldo_inicial, ip=_get_ip(request))
 
 @router.post("/forcar-abertura")
-def forcar_abertura(dados: schemas.CaixaForcarAberturaRequest, request: Request, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user)):
+def forcar_abertura(dados: schemas.CaixaForcarAberturaRequest, request: Request, db: Session = Depends(get_db), perfil_data = Depends(get_perfil_atual), current_user: User = Depends(get_current_user)):
+    if not _is_caixa_role(perfil_data):
+        raise HTTPException(403, "Sem permissão")
     empresa_id = _get_empresa_id(perfil_data); nome = _get_nome(current_user, perfil_data)
     if not dados.motivo or len(dados.motivo.strip()) < 3: raise HTTPException(status_code=400, detail="Informe o motivo")
     novo, antigo = service.forcar_abertura(db, empresa_id, current_user.id, nome, dados.saldo_inicial, dados.motivo, ip=_get_ip(request))
@@ -73,17 +90,23 @@ def forcar_abertura(dados: schemas.CaixaForcarAberturaRequest, request: Request,
     return {"detail": f"Fechado {antigo.aberto_por_nome}", "caixa_novo": jsonable_encoder(schemas.CaixaResponse.model_validate(novo))}
 
 @router.post("/fechar", response_model=schemas.CaixaResponse)
-def fechar_caixa(request: Request, saldo_informado: Decimal = Body(..., embed=True), db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user)):
+def fechar_caixa(request: Request, saldo_informado: Decimal = Body(..., embed=True), db: Session = Depends(get_db), perfil_data = Depends(get_perfil_atual), current_user: User = Depends(get_current_user)):
+    if not _is_caixa_role(perfil_data):
+        raise HTTPException(403, "Sem permissão para fechar")
     empresa_id = _get_empresa_id(perfil_data); nome = _get_nome(current_user, perfil_data)
     return service.fechar_caixa(db, empresa_id, current_user.id, saldo_informado, nome, ip=_get_ip(request))
 
 @router.get("/historico")
-def historico_caixas(db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
+def historico_caixas(db: Session = Depends(get_db), perfil_data = Depends(get_perfil_atual)):
+    if not _is_caixa_role(perfil_data):
+        raise HTTPException(403, "Sem permissão")
     empresa_id = _get_empresa_id(perfil_data)
     return db.query(Caixa).filter(Caixa.empresa_id == empresa_id).order_by(Caixa.aberto_em.desc()).limit(100).all()
 
 @router.get("/extrato-por-data/{data_str}", response_model=schemas.ExtratoResponse)
-def extrato_por_data(data_str: str, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
+def extrato_por_data(data_str: str, db: Session = Depends(get_db), perfil_data = Depends(get_perfil_atual)):
+    if not _is_caixa_role(perfil_data):
+        raise HTTPException(403, "Sem permissão extrato")
     empresa_id = _get_empresa_id(perfil_data)
     try:
         inicio_utc, fim_utc = _range_luanda_para_utc(data_str)
@@ -101,7 +124,9 @@ def extrato_por_data(data_str: str, db: Session = Depends(get_db), perfil_data =
     return {"caixa_id": caixas[0].id, "saldo_inicial": saldo_ini_ret, "saldo_atual": saldo_atu_ret, "total_entradas": ent, "total_saidas": sai, "movimentos": movs, "qtd_caixas": len(caixas), "periodo_inicio":data_str, "periodo_fim":data_str}
 
 @router.get("/extrato-por-periodo", response_model=schemas.ExtratoResponse)
-def extrato_por_periodo(inicio: str = Query(..., description="YYYY-MM-DD"), fim: str = Query(..., description="YYYY-MM-DD"), db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
+def extrato_por_periodo(inicio: str = Query(..., description="YYYY-MM-DD"), fim: str = Query(..., description="YYYY-MM-DD"), db: Session = Depends(get_db), perfil_data = Depends(get_perfil_atual)):
+    if not _is_caixa_role(perfil_data):
+        raise HTTPException(403, "Sem permissão extrato")
     empresa_id = _get_empresa_id(perfil_data)
     try:
         inicio_utc, _ = _range_luanda_para_utc(inicio)
@@ -114,13 +139,13 @@ def extrato_por_periodo(inicio: str = Query(..., description="YYYY-MM-DD"), fim:
     movs, ent, sai, ini, atu = _calc_extrato(caixas, db)
     return {"caixa_id": caixas[0].id, "saldo_inicial": ini, "saldo_atual": atu, "total_entradas": ent, "total_saidas": sai, "movimentos": movs, "qtd_caixas": len(caixas), "periodo_inicio":inicio, "periodo_fim":fim}
 
-# CORRIGIDO - NÃO DA MAIS 400 SE NÃO TIVER CAIXA ABERTO
 @router.get("/extrato", response_model=schemas.ExtratoResponse)
-def extrato_caixa(db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
+def extrato_caixa(db: Session = Depends(get_db), perfil_data = Depends(get_perfil_atual)):
+    if not _is_caixa_role(perfil_data):
+        raise HTTPException(403, f"Sem permissão extrato para { _get_role(perfil_data) }")
     empresa_id = _get_empresa_id(perfil_data)
     caixa_atual = service.get_caixa_aberto(db, empresa_id)
     if not caixa_atual:
-        # pega ultimo fechado pra não quebrar frontend
         ultimo = db.query(Caixa).filter(Caixa.empresa_id==empresa_id).order_by(Caixa.aberto_em.desc()).first()
         if not ultimo:
             return {"caixa_id": uuid.uuid4(), "saldo_inicial": Decimal("0"), "saldo_atual": Decimal("0"), "total_entradas": Decimal("0"), "total_saidas": Decimal("0"), "movimentos": [], "qtd_caixas":0}
@@ -133,7 +158,9 @@ def extrato_caixa(db: Session = Depends(get_db), perfil_data = Depends(precisa_m
     return {"caixa_id": caixa_atual.id, "saldo_inicial": caixa_atual.saldo_inicial, "saldo_atual": saldo, "total_entradas": ent, "total_saidas": sai, "movimentos": movs, "qtd_caixas":1}
 
 @router.get("/{caixa_id}/extrato", response_model=schemas.ExtratoResponse)
-def extrato_por_id(caixa_id: uuid.UUID, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
+def extrato_por_id(caixa_id: uuid.UUID, db: Session = Depends(get_db), perfil_data = Depends(get_perfil_atual)):
+    if not _is_caixa_role(perfil_data):
+        raise HTTPException(403, "Sem permissão")
     empresa_id = _get_empresa_id(perfil_data)
     caixa = db.query(Caixa).filter(Caixa.id==caixa_id, Caixa.empresa_id==empresa_id).first()
     if not caixa: raise HTTPException(404, "Caixa não encontrado")
@@ -147,7 +174,9 @@ class SangriaRequest(BaseModel):
     valor: Decimal; motivo: str
 
 @router.post("/sangria", response_model=schemas.CaixaMovimentoResponse)
-def sangria(dados: SangriaRequest, request: Request, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user), caixa_atual: Caixa = Depends(precisa_caixa_aberto)):
+def sangria(dados: SangriaRequest, request: Request, db: Session = Depends(get_db), perfil_data = Depends(get_perfil_atual), current_user: User = Depends(get_current_user), caixa_atual: Caixa = Depends(precisa_caixa_aberto)):
+    if not _is_caixa_role(perfil_data):
+        raise HTTPException(403, "Sem permissão sangria")
     nome = _get_nome(current_user, perfil_data)
     if dados.valor <= 0: raise HTTPException(400, "Valor deve ser positivo")
     mov = service.registrar_movimento(db, caixa_atual, TipoMovimento.SANGRIA, -abs(dados.valor), f"Sangria: {dados.motivo}", current_user.id, nome)
@@ -155,7 +184,9 @@ def sangria(dados: SangriaRequest, request: Request, db: Session = Depends(get_d
     return mov
 
 @router.post("/suprimento", response_model=schemas.CaixaMovimentoResponse)
-def suprimento(dados: SangriaRequest, request: Request, db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa")), current_user: User = Depends(get_current_user), caixa_atual: Caixa = Depends(precisa_caixa_aberto)):
+def suprimento(dados: SangriaRequest, request: Request, db: Session = Depends(get_db), perfil_data = Depends(get_perfil_atual), current_user: User = Depends(get_current_user), caixa_atual: Caixa = Depends(precisa_caixa_aberto)):
+    if not _is_caixa_role(perfil_data):
+        raise HTTPException(403, "Sem permissão suprimento")
     nome = _get_nome(current_user, perfil_data)
     if dados.valor <= 0: raise HTTPException(400, "Valor deve ser positivo")
     mov = service.registrar_movimento(db, caixa_atual, TipoMovimento.SUPRIMENTO, abs(dados.valor), f"Suprimento: {dados.motivo}", current_user.id, nome)
@@ -163,6 +194,8 @@ def suprimento(dados: SangriaRequest, request: Request, db: Session = Depends(ge
     return mov
 
 @router.get("/", response_model=list[schemas.CaixaResponse])
-def listar_caixas(db: Session = Depends(get_db), perfil_data = Depends(precisa_modulo("caixa"))):
+def listar_caixas(db: Session = Depends(get_db), perfil_data = Depends(get_perfil_atual)):
+    if not _is_caixa_role(perfil_data):
+        raise HTTPException(403, "Sem permissão")
     empresa_id = _get_empresa_id(perfil_data)
     return db.query(Caixa).filter(Caixa.empresa_id==empresa_id).order_by(Caixa.aberto_em.desc()).limit(50).all()
