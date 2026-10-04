@@ -21,8 +21,8 @@ class UserLogin(BaseModel):
     senha: str
 
 class SelectEmpresaRequest(BaseModel):
-    temp_token: str
     empresa_id: UUID
+    temp_token: Optional[str] = None
 
 class UserOut(BaseModel):
     id: UUID
@@ -41,4 +41,4 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     empresas: Optional[List[EmpresaResumo]] = None
     user: UserOut
-    empresa_id: Optional[str] = None # novo pra facilitar frontend
+    empresa_id: Optional[str] = None
