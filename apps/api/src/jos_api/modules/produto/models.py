@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 import enum
 import sqlalchemy as sa
-from sqlalchemy import String, Boolean, DateTime, Text, Float, UniqueConstraint, Index, Enum as SAEnum, Numeric, Integer
+from sqlalchemy import String, Boolean, DateTime, Text, Float, UniqueConstraint, Index, Numeric, Integer
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from jos_api.db.base import Base
@@ -17,7 +17,14 @@ class ProductType(str, enum.Enum):
     KIT = "KIT"
 
 class ProductUnit(str, enum.Enum):
-    UNIT = "UNIT"; KG = "KG"; LITER = "LITER"; HOUR = "HOUR"; DAY = "DAY"; TASK = "TASK"; PORTION = "PORTION"; UN = "UN"
+    UNIT = "UNIT"
+    KG = "KG"
+    LITER = "LITER"
+    HOUR = "HOUR"
+    DAY = "DAY"
+    TASK = "TASK"
+    PORTION = "PORTION"
+    UN = "UN"
 
 class Product(Base):
     __tablename__ = "products"
@@ -37,8 +44,9 @@ class Product(Base):
     descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
     categoria: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     imagem_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    tipo: Mapped[ProductType] = mapped_column(SAEnum(ProductType, name="producttype", create_type=False), default=ProductType.GENERAL, nullable=False, server_default="GENERAL")
-    unidade: Mapped[ProductUnit] = mapped_column(SAEnum(ProductUnit, name="productunit", create_type=False), default=ProductUnit.UNIT, nullable=False, server_default="UNIT")
+    # FIX DEFINITIVO: TEXT ao invés de ENUM
+    tipo: Mapped[str] = mapped_column(String(50), default=ProductType.GENERAL.value, nullable=False, server_default="GENERAL")
+    unidade: Mapped[str] = mapped_column(String(20), default=ProductUnit.UNIT.value, nullable=False, server_default="UNIT")
     preco_venda: Mapped[Decimal] = mapped_column(Numeric(12,2), nullable=False)
     preco_custo: Mapped[Decimal] = mapped_column(Numeric(12,2), default=Decimal("0"), nullable=False, server_default="0")
     peso: Mapped[float | None] = mapped_column(Float, nullable=True)

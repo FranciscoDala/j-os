@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
 from. import models, schemas
 import uuid
+import enum
 from decimal import Decimal
 from datetime import datetime
 from jos_api.modules.atividade.service import registrar_atividade
@@ -23,9 +24,11 @@ def get_produtos(db: Session, empresa_id: uuid.UUID | None, search="", categoria
     if not empresa_id: raise HTTPException(403, "Sem empresa")
     q = db.query(models.Product).filter(models.Product.empresa_id == empresa_id, models.Product.deleted_at == None)
     if ativo is not None: q = q.filter(models.Product.ativo == ativo)
-    if search: q = q.filter(or_(models.Product.nome.ilike(f"%{search}%"), models.Product.codigo.ilike(f"%{search}%")))
-    if categoria: q = q.filter(models.Product.categoria == categoria)
-    if tipo: q = q.filter(models.Product.tipo == tipo)
+    if search and search.strip():
+        s = f"%{search.strip()}%"
+        q = q.filter(or_(models.Product.nome.ilike(s), models.Product.codigo.ilike(s)))
+    if categoria and categoria.strip(): q = q.filter(models.Product.categoria == categoria.strip())
+    if tipo and tipo.strip(): q = q.filter(models.Product.tipo == tipo.strip())
     total = q.count()
     items = q.order_by(models.Product.nome.asc()).offset(skip).limit(limit).all()
     return items, total
@@ -36,10 +39,13 @@ def create_produto(db: Session, produto: schemas.ProdutoCreateRequest, empresa_i
     if exists:
         raise HTTPException(400, f"Código '{produto.codigo}' já existe. Use outro código.")
     data = produto.model_dump()
+    # converte enum para string para salvar em TEXT
+    if isinstance(data.get("tipo"), enum.Enum): data["tipo"] = data["tipo"].value
+    if isinstance(data.get("unidade"), enum.Enum): data["unidade"] = data["unidade"].value
     if data.get("tem_iva") is False: data["iva"] = Decimal("0")
     else:
         if data.get("iva") is None or data.get("iva") == Decimal("0"): data["iva"] = Decimal("14.0")
-    if data.get("tipo") in [models.ProductType.SERVICE, models.ProductType.KIT]:
+    if data.get("tipo") in [models.ProductType.SERVICE.value, models.ProductType.KIT.value, "SERVICE", "KIT"]:
         data["controlar_stock"] = False; data["stock_atual"] = Decimal("0")
     db_prod = models.Product(**data, empresa_id=empresa_id, created_by=created_by)
     try:
@@ -58,12 +64,14 @@ def update_produto(db: Session, produto_id: uuid.UUID, update: schemas.ProdutoUp
     prod = get_produto_by_id(db, produto_id, empresa_id)
     antes = prod.nome
     d = update.model_dump(exclude_unset=True)
+    # enum -> string
+    if isinstance(d.get("tipo"), enum.Enum): d["tipo"] = d["tipo"].value
     if "tem_iva" in d:
         if d["tem_iva"] is False: d["iva"] = Decimal("0")
         else:
             if "iva" not in d or d["iva"] is None or d["iva"] == Decimal("0"):
                 if prod.iva == Decimal("0"): d["iva"] = Decimal("14.0")
-    if "tipo" in d and d["tipo"] in [models.ProductType.SERVICE, models.ProductType.KIT]:
+    if "tipo" in d and d["tipo"] in [models.ProductType.SERVICE.value, models.ProductType.KIT.value, "SERVICE", "KIT"]:
         d["controlar_stock"] = False; d["stock_atual"] = Decimal("0")
     for k, v in d.items(): setattr(prod, k, v)
     db.flush()
