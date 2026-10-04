@@ -11,6 +11,15 @@ const VENDAS_API = `${API_URL}/api/v1/vendas`;
 
 type Toast = { id: string; msg: string; type: "success" | "error" | "info" | "warning" };
 
+function getAuthHeaders() {
+    const token = typeof window!== "undefined"? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null;
+    const empresa_id = typeof window!== "undefined"? localStorage.getItem("empresa_id") : null;
+    const h: Record<string, string> = {};
+    if (token) h["Authorization"] = `Bearer ${token}`;
+    if (empresa_id) h["X-Empresa-ID"] = empresa_id;
+    return h;
+}
+
 export function VendasTab({ onClose }: { onClose: () => void }) {
     const [activeCat, setActiveCat] = useState("All");
     const [searchV, setSearchV] = useState("");
@@ -31,12 +40,12 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const pushToast = (msg: string, type: Toast["type"] = "info") => {
         const id = Date.now().toString() + Math.random().toString().slice(2);
         setToasts(t => [...t, { id, msg, type }]);
-        setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000);
+        setTimeout(() => setToasts(t => t.filter(x => x.id!== id)), 4000);
     };
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if ((e.key === "/" && !(e.target instanceof HTMLInputElement)) || (e.ctrlKey && e.key.toLowerCase() === "k")) {
+            if ((e.key === "/" &&!(e.target instanceof HTMLInputElement)) || (e.ctrlKey && e.key.toLowerCase() === "k")) {
                 e.preventDefault(); setShowSearch(true); setTimeout(() => searchRef.current?.focus(), 50);
             }
             if (e.key === "Escape" && showSearch) { setShowSearch(false); setSearchV(""); }
@@ -51,12 +60,12 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         const fetchReal = async () => {
             setLoadingProd(true);
             try {
-                const token = localStorage.getItem("access_token");
                 const qs = new URLSearchParams({ skip: "0", limit: "100", search: searchV });
-                const r = await fetch(`${API_BASE}/?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+                const r = await fetch(`${API_BASE}/?${qs}`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
                 const data = await r.json();
-                if (r.ok) setDbProducts((data.items || []).filter((p: any) => p.ativo !== false));
-            } catch { }
+                if (r.ok) setDbProducts((data.items || []).filter((p: any) => p.ativo!== false));
+                else if (r.status === 403) pushToast("Empresa não autorizada", "error");
+            } catch {}
             setLoadingProd(false);
         };
         fetchReal();
@@ -65,26 +74,25 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     useEffect(() => {
         const fetchCats = async () => {
             try {
-                const token = localStorage.getItem("access_token");
-                const r = await fetch(`${API_BASE}/categorias/lista`, { headers: { Authorization: `Bearer ${token}` } });
+                const r = await fetch(`${API_BASE}/categorias/lista`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
                 if (r.ok) setCatsDb(await r.json());
-            } catch { }
+            } catch {}
         };
         fetchCats();
     }, []);
 
-    // REALTIME CIRÚRGICO - sem fetch, só atualiza o que mudou
+    // REALTIME CIRÚRGICO
     useEffect(() => {
         const onProdutoUpdate = (e: any) => {
             const p = e.detail;
             if (!p?.id) return;
-            setDbProducts(prev => prev.map(x => x.id === p.id ? { ...x, ...p, stock_atual: p.stock_atual ?? p.quantidade ?? x.stock_atual } : x));
+            setDbProducts(prev => prev.map(x => x.id === p.id? {...x,...p, stock_atual: p.stock_atual?? p.quantidade?? x.stock_atual } : x));
             setCart(prev => prev.map(c => {
                 if (c.id === p.id) {
-                    const atual = Number(p.stock_atual ?? p.quantidade ?? 0);
-                    if (p.controlar_stock !== false && c.qtd > atual && atual > 0) {
+                    const atual = Number(p.stock_atual?? p.quantidade?? 0);
+                    if (p.controlar_stock!== false && c.qtd > atual && atual > 0) {
                         pushToast(`Stock de "${p.nome || c.name}" atualizado para ${atual}. Ajustado no carrinho.`, "warning");
-                        return { ...c, qtd: atual };
+                        return {...c, qtd: atual };
                     }
                 }
                 return c;
@@ -97,23 +105,20 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             if (!searchV || p.nome?.toLowerCase().includes(searchV.toLowerCase())) {
                 setDbProducts(prev => {
                     if (prev.some(x => x.id === p.id)) return prev;
-                    return [p, ...prev];
+                    return [p,...prev];
                 });
             }
         };
         const onVendaNova = (e: any) => {
             const venda = e.detail;
             const itens = venda?.itens || venda?.data?.itens || [];
-            if (!itens.length) {
-                // se venda:nova veio sem itens, não faz nada aqui (produto:update já cuida)
-                return;
-            }
+            if (!itens.length) return;
             itens.forEach((it: any) => {
                 const pid = it.produto_id || it.produto?.id;
                 const qtd = Number(it.quantidade || 0);
                 setDbProducts(prev => prev.map(p =>
                     p.id === pid && p.controlar_stock
-                        ? { ...p, stock_atual: Number(p.stock_atual || 0) - qtd }
+                      ? {...p, stock_atual: Number(p.stock_atual || 0) - qtd }
                         : p
                 ));
             });
@@ -132,11 +137,11 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         };
     }, [searchV]);
 
-    const cats = ["All", ...catsDb];
+    const cats = ["All",...catsDb];
     const getStockState = (p: any) => {
         if (!p.controlar_stock) return "ok";
-        const atual = Number(p.stock_atual ?? 0);
-        const minimo = Number(p.stock_minimo ?? 0);
+        const atual = Number(p.stock_atual?? 0);
+        const minimo = Number(p.stock_minimo?? 0);
         if (atual <= 0) return "zero";
         if (atual <= minimo || atual <= 5) return "low";
         return "ok";
@@ -144,25 +149,25 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
     const add = (p: any) => {
         const state = getStockState(p);
-        const atual = Number(p.stock_atual ?? 0);
+        const atual = Number(p.stock_atual?? 0);
         const qtyInCart = cart.find(c => c.id === p.id)?.qtd || 0;
         if (state === "zero") { pushToast(`Sem stock: "${p.nome}" está esgotado. Repor stock para continuar a vender.`, "error"); return; }
         if (p.controlar_stock && qtyInCart >= atual) { pushToast(`Stock insuficiente: só temos ${atual} un. de "${p.nome}" disponível.`, "warning"); return; }
         const ex = cart.find((c) => c.id === p.id);
-        if (ex) setCart(cart.map((c) => (c.id === p.id ? { ...c, qtd: c.qtd + 1 } : c)));
-        else setCart([...cart, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: p.imagem_url ? `${API_URL}${p.imagem_url}` : "", qtd: 1 }]);
+        if (ex) setCart(cart.map((c) => (c.id === p.id? {...c, qtd: c.qtd + 1 } : c)));
+        else setCart([...cart, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: p.imagem_url? `${API_URL}${p.imagem_url}` : "", qtd: 1 }]);
     };
 
     const getQty = (id: string) => cart.find((c) => c.id === id)?.qtd || 0;
     const total = cart.reduce((s, i) => s + i.price * i.qtd, 0);
-    const recebidoNum = recebido ? parseFloat(recebido) : 0;
+    const recebidoNum = recebido? parseFloat(recebido) : 0;
     const troco = recebidoNum - total;
 
     const handleCalc = (val: string) => {
         if (val === "C") setRecebido("");
         else if (val === "DEL") setRecebido((s) => s.slice(0, -1));
-        else if (val === "00") { if (recebido !== "") setRecebido((s) => s + "00"); }
-        else if (val === ".") { if (!recebido.includes(".")) setRecebido((s) => (s === "" ? "0." : s + ".")); }
+        else if (val === "00") { if (recebido!== "") setRecebido((s) => s + "00"); }
+        else if (val === ".") { if (!recebido.includes(".")) setRecebido((s) => (s === ""? "0." : s + ".")); }
         else { setRecebido((s) => (s + val).slice(0, 10)); }
     };
 
@@ -174,16 +179,15 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         }
         setFinalizando(true);
         try {
-            const token = localStorage.getItem("access_token");
             const payload = {
                 itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })),
                 mesa_id: null,
-                dinheiro_recebido: forma === "dinheiro" ? recebidoNum : total,
+                dinheiro_recebido: forma === "dinheiro"? recebidoNum : total,
                 forma_pagamento: forma.toUpperCase()
             };
             const r = await fetch(`${VENDAS_API}/`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                headers: { "Content-Type": "application/json",...getAuthHeaders() as any },
                 body: JSON.stringify(payload)
             });
             const data = await r.json();
@@ -192,11 +196,10 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             setShowPay(false);
             setShowConfirm(true);
             pushToast(`Venda #${data.numero} finalizada - Kz ${Number(data.total).toLocaleString("de-DE")}`, "success");
-            // baixa local também, sem precisar esperar WS
             setDbProducts(prev => prev.map(p => {
                 const inCart = cart.find(c => c.id === p.id);
                 if (inCart && p.controlar_stock) {
-                    return { ...p, stock_atual: Number(p.stock_atual || 0) - inCart.qtd };
+                    return {...p, stock_atual: Number(p.stock_atual || 0) - inCart.qtd };
                 }
                 return p;
             }));
@@ -210,8 +213,8 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const imprimirFatura = () => {
         const win = window.open("", "_blank", "width=320,height=600");
         if (!win) return;
-        const vendaNum = ultimaVenda?.numero ? ` #${ultimaVenda.numero}` : "";
-        const html = `<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px;color:#000}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}td{padding:2px 0}</style></head><body><div class="center bold">RESTAURANTE JENATH${vendaNum}<br/>NIF: 123456789<br/>Talatona, Luanda<br/>${forma.toUpperCase()}</div><div class="line"></div><div>Data: ${new Date().toLocaleString()}<br/>Mesa: Balcão<br/>Operador: Admin</div><div class="line"></div><table>${cart.map(i => `<tr><td>${i.name} x${i.qtd}</td><td style="text-align:right">Kz ${(i.price * i.qtd).toLocaleString("de-DE")}</td></tr>`).join("")}</table><div class="line"></div><table><tr><td class="bold">TOTAL</td><td style="text-align:right" class="bold">Kz ${total.toLocaleString("de-DE")}</td></tr>${forma === "dinheiro" ? `<tr><td>Recebido</td><td style="text-align:right">Kz ${recebidoNum.toLocaleString("de-DE")}</td></tr><tr><td class="bold">TROCO</td><td style="text-align:right" class="bold">Kz ${troco.toLocaleString("de-DE")}</td></tr>` : ``}<tr><td>Pagamento</td><td style="text-align:right">${forma}</td></tr></table><div class="line"></div><div class="center">Obrigado pela preferência!<br/>Volte sempre</div><script>window.print(); window.close();</script></body></html>`;
+        const vendaNum = ultimaVenda?.numero? ` #${ultimaVenda.numero}` : "";
+        const html = `<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px;color:#000}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}td{padding:2px 0}</style></head><body><div class="center bold">RESTAURANTE JENATH${vendaNum}<br/>NIF: 123456789<br/>Talatona, Luanda<br/>${forma.toUpperCase()}</div><div class="line"></div><div>Data: ${new Date().toLocaleString()}<br/>Mesa: Balcão<br/>Operador: Admin</div><div class="line"></div><table>${cart.map(i => `<tr><td>${i.name} x${i.qtd}</td><td style="text-align:right">Kz ${(i.price * i.qtd).toLocaleString("de-DE")}</td></tr>`).join("")}</table><div class="line"></div><table><tr><td class="bold">TOTAL</td><td style="text-align:right" class="bold">Kz ${total.toLocaleString("de-DE")}</td></tr>${forma === "dinheiro"? `<tr><td>Recebido</td><td style="text-align:right">Kz ${recebidoNum.toLocaleString("de-DE")}</td></tr><tr><td class="bold">TROCO</td><td style="text-align:right" class="bold">Kz ${troco.toLocaleString("de-DE")}</td></tr>` : ``}<tr><td>Pagamento</td><td style="text-align:right">${forma}</td></tr></table><div class="line"></div><div class="center">Obrigado pela preferência!<br/>Volte sempre</div><script>window.print(); window.close();</script></body></html>`;
         win.document.write(html); win.document.close();
     };
 
@@ -221,7 +224,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     };
 
     useEffect(() => {
-        if (!showPay || forma !== "dinheiro") return;
+        if (!showPay || forma!== "dinheiro") return;
         const onKey = (e: KeyboardEvent) => {
             if (e.key === "Escape") setShowPay(false);
             else if (e.key === "Enter") { if (recebidoNum >= total) finalizarVenda(); }
@@ -233,7 +236,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         return () => window.removeEventListener("keydown", onKey);
     }, [showPay, forma, recebidoNum, total, recebido]);
 
-    const filteredByCat = activeCat === "All" ? dbProducts : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
+    const filteredByCat = activeCat === "All"? dbProducts : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
 
     return (
         <div className="h-full w-full flex flex-col bg-[#F5F7FB] overflow-hidden relative">

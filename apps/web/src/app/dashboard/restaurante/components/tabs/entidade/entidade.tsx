@@ -10,6 +10,15 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com"
 const TIPOS = ["FUNCIONARIO", "CLIENTE", "FORNECEDOR"] as const;
 const TIPO_LABELS: Record<string, string> = { FUNCIONARIO: "Funcionário", CLIENTE: "Cliente", FORNECEDOR: "Fornecedor" };
 
+function getAuthHeaders() {
+    const token = typeof window!== "undefined"? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null;
+    const empresa_id = typeof window!== "undefined"? (localStorage.getItem("empresa_id") || localStorage.getItem("empresaId")) : null;
+    const h: Record<string, string> = {};
+    if (token) h["Authorization"] = `Bearer ${token}`;
+    if (empresa_id) h["X-Empresa-ID"] = empresa_id;
+    return h;
+}
+
 function getEmpresaId() {
     if (typeof window === "undefined") return null;
     return localStorage.getItem("empresa_id") || localStorage.getItem("empresaId") || null;
@@ -29,18 +38,23 @@ export function EntidadesTab() {
     const [form, setForm] = useState<any>({ id: null, tipo: "FUNCIONARIO", nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" });
 
     useEffect(() => { setEmpresaId(getEmpresaId()); }, []);
+
     const load = useCallback(async () => {
         if (!empresaId) return;
-        const token = localStorage.getItem("access_token") || localStorage.getItem("token");
-        const res = await fetch(`${API_BASE}/entidades/${empresaId}?tipo=${tipoFiltro}`, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch(`${API_BASE}/entidades/${empresaId}?tipo=${tipoFiltro}`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any });
         if (res.ok) setLista(await res.json());
+        else {
+            const err = await res.json().catch(()=>({}));
+            if (res.status===403) toast.error(err.detail || "Empresa não autorizada");
+        }
     }, [tipoFiltro, empresaId]);
+
     const loadPerfis = useCallback(async () => {
         if (!empresaId) return;
-        const token = localStorage.getItem("access_token") || localStorage.getItem("token");
-        const res = await fetch(`${API_BASE}/entidades/${empresaId}/perfis`, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch(`${API_BASE}/entidades/${empresaId}/perfis`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any });
         if (res.ok) { const data = await res.json(); const uniq = Object.values(data.reduce((acc:any, cur:any) => { acc[cur.slug] = cur; return acc; }, {})); setPerfis(uniq as any[]); }
     }, [empresaId]);
+
     useEffect(() => { if (empresaId) { load(); loadPerfis(); } }, [load, loadPerfis]);
 
     const handleEdit = (ent: any) => {
@@ -52,7 +66,6 @@ export function EntidadesTab() {
     const handleSave = async () => {
         if (!empresaId) return toast.error("Empresa não encontrada");
 
-        // VALIDAÇÃO FORTE - NÃO DEIXA SALVAR SEM SENHA QUANDO TEM ACESSO
         const isEdit =!!form.id;
         if (form.tem_acesso_app) {
             if (!form.perfil_id) return toast.error("Selecione o perfil de acesso");
@@ -63,21 +76,17 @@ export function EntidadesTab() {
 
         setSaving(true);
         try {
-            const token = localStorage.getItem("access_token") || localStorage.getItem("token");
             const clean = (v: any) => (v === "" || v === undefined? null : typeof v === 'string'? (v.trim() || null) : v);
             const payload: any = {
                 tipo: form.tipo, nome: form.nome.trim(), telefone: clean(form.telefone), email: clean(form.email)?.toLowerCase() || null, documento: clean(form.documento), endereco: clean(form.endereco), cargo: clean(form.cargo), departamento: clean(form.departamento), empresa_fornecedora: clean(form.empresa_fornecedora), categoria_fornecedor: clean(form.categoria_fornecedor), tem_acesso_app:!!form.tem_acesso_app, perfil_id: clean(form.perfil_id), data_admissao: clean(form.data_admissao), salario: form.salario? Number(form.salario) : null, carga_horaria: form.carga_horaria? Number(form.carga_horaria) : null,
             };
             if (form.senha && form.senha.trim().length >= 6) payload.senha = form.senha.trim();
-            else if (!isEdit && payload.tem_acesso_app) {
-                // segurança extra - se for criação e não tem senha, bloqueia
-                throw new Error("Senha obrigatória para acesso ao app");
-            }
+            else if (!isEdit && payload.tem_acesso_app) throw new Error("Senha obrigatória para acesso ao app");
             if (!payload.tem_acesso_app) payload.perfil_id = null;
 
             const url = isEdit? `${API_BASE}/entidades/${empresaId}/${form.id}` : `${API_BASE}/entidades/${empresaId}`;
             const method = isEdit? "PUT" : "POST";
-            const res = await fetch(url, { method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
+            const res = await fetch(url, { method, headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, body: JSON.stringify(payload) });
             const json = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(json.detail || "Erro ao salvar");
 
@@ -94,8 +103,7 @@ export function EntidadesTab() {
         const backup = lista;
         setLista(prev => prev.filter(p => p.id!== selected.id));
         try {
-            const token = localStorage.getItem("access_token") || localStorage.getItem("token");
-            const res = await fetch(`${API_BASE}/entidades/${empresaId}/${selected.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+            const res = await fetch(`${API_BASE}/entidades/${empresaId}/${selected.id}`, { method: "DELETE", headers: { "Content-Type": "application/json",...getAuthHeaders() } as any });
             if (!res.ok) throw new Error("Erro ao apagar");
             toast.success(`${selected.nome} apagado`, { id: "delete" });
             setOpenDelete(false);

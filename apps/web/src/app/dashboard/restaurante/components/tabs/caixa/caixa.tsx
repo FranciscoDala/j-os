@@ -10,11 +10,25 @@ import { toast } from "sonner";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com";
 const BASE = `${API_URL.replace(/\/$/, "")}/api/v1`;
-async function apiFetch(path: string, options: RequestInit = {}) {
-    const token = localStorage.getItem("access_token");
-    const res = await fetch(`${BASE}${path}`, { ...options, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options.headers || {}) } });
-    const d = await res.json().catch(() => ({})); if (!res.ok) throw d; return d;
+
+function getAuthHeaders() {
+    const token = typeof window!== "undefined"? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null;
+    const empresa_id = typeof window!== "undefined"? localStorage.getItem("empresa_id") : null;
+    const h: Record<string, string> = {};
+    if (token) h["Authorization"] = `Bearer ${token}`;
+    if (empresa_id) h["X-Empresa-ID"] = empresa_id;
+    return h;
 }
+
+async function apiFetch(path: string, options: RequestInit = {}) {
+    const headers: any = { "Content-Type": "application/json",...getAuthHeaders(),...(options.headers || {}) };
+    if (options.body instanceof FormData) delete headers["Content-Type"];
+    const res = await fetch(`${BASE}${path}`, { ...options, headers });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw d;
+    return d;
+}
+
 const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const todayISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' });
 const STORAGE_KEY = "j-os:mostrar_extrato";
@@ -52,14 +66,14 @@ export function CaixaTab() {
 
     useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved !== null) setShowExtrato(saved === "true");
+        if (saved!== null) setShowExtrato(saved === "true");
         else setShowExtrato(false);
     }, []);
     useEffect(() => { load(); }, [inicio, fim]);
     useEffect(() => {
         const h = (e: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-            if (menuRefMobile.current && !menuRefMobile.current.contains(e.target as Node)) setMenuOpen(false);
+            if (menuRef.current &&!menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+            if (menuRefMobile.current &&!menuRefMobile.current.contains(e.target as Node)) setMenuOpen(false);
         };
         document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
     }, []);
@@ -68,25 +82,25 @@ export function CaixaTab() {
     useEffect(() => {
         const onExtratoPush = (e: any) => {
             const m = e.detail;
-            if (!m?.id && !m?.valor && !m?.total_venda && !m?.total) return;
+            if (!m?.id &&!m?.valor &&!m?.total_venda &&!m?.total) return;
             const hoje = todayISO();
-            if (inicio !== hoje || fim !== hoje) return;
+            if (inicio!== hoje || fim!== hoje) return;
 
             setExtrato((prev: any) => {
                 if (!prev) return prev;
                 if (m.id && prev.movimentos?.some((x: any) => x.id === m.id)) return prev;
                 return {
-                    ...prev,
-                    movimentos: [m, ...(prev.movimentos || [])],
+                   ...prev,
+                    movimentos: [m,...(prev.movimentos || [])],
                     saldo_atual: Number(prev.saldo_atual || 0) + Number(m.valor || m.total_venda || m.total || 0),
-                    total_entradas: Number(m.valor || m.total || 0) > 0 ? Number(prev.total_entradas || 0) + Number(m.valor || m.total || 0) : prev.total_entradas,
-                    total_saidas: Number(m.valor || 0) < 0 ? Number(prev.total_saidas || 0) + Number(m.valor) : prev.total_saidas,
+                    total_entradas: Number(m.valor || m.total || 0) > 0? Number(prev.total_entradas || 0) + Number(m.valor || m.total || 0) : prev.total_entradas,
+                    total_saidas: Number(m.valor || 0) < 0? Number(prev.total_saidas || 0) + Number(m.valor) : prev.total_saidas,
                 };
             });
         };
         const onCaixaStatus = (e: any) => {
             const s = e.detail;
-            if (s) setStatus((prev: any) => ({ ...prev, ...s }));
+            if (s) setStatus((prev: any) => ({...prev,...s }));
         };
         window.addEventListener("caixa:extrato" as any, onExtratoPush);
         window.addEventListener("caixa:update" as any, onCaixaStatus);
@@ -108,7 +122,7 @@ export function CaixaTab() {
     const movs = extrato?.movimentos || [];
     const entradas = Number(extrato?.total_entradas || 0);
     const saidas = Math.abs(Number(extrato?.total_saidas || 0));
-    const atual = Number(extrato?.saldo_atual ?? 0);
+    const atual = Number(extrato?.saldo_atual?? 0);
 
     const handleCardClick = (type: "master" | "entradas" | "saidas") => {
         if (type === "master") {
@@ -146,7 +160,7 @@ export function CaixaTab() {
         win.document.write(html); win.document.close();
     };
 
-    if (loading && !extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
+    if (loading &&!extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
 
     return (
         <div className="space-y-4">
@@ -158,7 +172,7 @@ export function CaixaTab() {
                     <div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={fim} onChange={setFim} /></div>
                 </div>
                 <div className="relative" ref={menuRef}>
-                    <button onClick={() => setMenuOpen(o => !o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                    <button onClick={() => setMenuOpen(o =>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
                     </button>
                     {menuOpen && (
@@ -176,7 +190,7 @@ export function CaixaTab() {
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
                 </button>
                 <div className="relative" ref={menuRefMobile}>
-                    <button onClick={() => setMenuOpen(o => !o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                    <button onClick={() => setMenuOpen(o =>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
                     </button>
                     {menuOpen && (
@@ -205,27 +219,27 @@ export function CaixaTab() {
 
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div onClick={() => handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
-                    <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={inicio.slice(5).replace("-", "/")} horaAbertura={movs[0] ? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : "--:--"} />
+                    <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante="J-OS RESTAURANTE" dataAbertura={inicio.slice(5).replace("-", "/")} horaAbertura={movs[0]? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : "--:--"} />
                 </div>
                 <div onClick={() => handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={inicio.slice(5).replace("-", "/")} qtdVendas={movs.filter((m: any) => (m.tipo || "").toUpperCase().includes("VENDA")).length} />
                 </div>
                 <div onClick={() => handleCardClick("saidas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
-                    <SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })} retirado={saidas > 0 ? '1' : '0'} />
+                    <SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })} retirado={saidas > 0? '1' : '0'} />
                 </div>
             </div>
 
             <div className="flex justify-end pt-2">
-                <button onClick={() => { const v = !showExtrato; setShowExtrato(v); localStorage.setItem(STORAGE_KEY, String(v)); }} className="flex items-center gap-2">
-                    <div className={`w-[44px] h-[26px] rounded-full p-[3px] transition-colors ${showExtrato ? 'bg-green-500' : 'bg-zinc-300'}`}>
-                        <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-all ${showExtrato ? 'translate-x-[18px]' : 'translate-x-0'}`} />
+                <button onClick={() => { const v =!showExtrato; setShowExtrato(v); localStorage.setItem(STORAGE_KEY, String(v)); }} className="flex items-center gap-2">
+                    <div className={`w-[44px] h-[26px] rounded-full p-[3px] transition-colors ${showExtrato? 'bg-green-500' : 'bg-zinc-300'}`}>
+                        <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-all ${showExtrato? 'translate-x-[18px]' : 'translate-x-0'}`} />
                     </div>
                 </button>
             </div>
 
             {showExtrato && <ExtratoList movimentos={movs} selectedDate={extrato?.periodo_inicio || inicio} />}
 
-            <JConfirm open={confirm.open} title={confirm.title} desc={confirm.desc} type={confirm.type} onClose={() => setConfirm(s => ({ ...s, open: false }))} onConfirm={confirm.action} />
+            <JConfirm open={confirm.open} title={confirm.title} desc={confirm.desc} type={confirm.type} onClose={() => setConfirm(s => ({...s, open: false }))} onConfirm={confirm.action} />
             <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={status?.caixa_atual || extrato} onClose={() => setModalOpen(false)} onSuccess={async () => { await load(); toast.success("Ok sucesso, o caixa aberto para operações consolte a tabela de movimentos!"); }} />
             <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={() => setSangriaOpen(false)} onSuccess={async () => { await load(); toast.success("Ok sucesso, saída feita no caixa consulte a tabela de movimentos!"); }} />
         </div>
