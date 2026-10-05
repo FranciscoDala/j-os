@@ -1,5 +1,5 @@
 "use client";
-import { Users, Clock, Receipt, Sparkles, MapPin } from "lucide-react";
+import { Users, Clock, Receipt, Sparkles, MapPin, Lock, Ban } from "lucide-react";
 
 const statusStyles: any = {
     LIVRE: {
@@ -35,7 +35,8 @@ const statusStyles: any = {
 export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalhe }: any) {
     const s = statusStyles[m.status] || statusStyles.LIVRE;
     const min = m.aberta_em? Math.floor((Date.now() - new Date(m.aberta_em).getTime()) / 60000) : 0;
-    const total = Number(m.venda_total || 0);
+    const total = Number(m.venda_total || m.total_consumo || 0);
+    const hasConsumo = total > 0;
 
     return (
         <div className={`group relative rounded-[24px] p-4 flex flex-col shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.10)] hover:-translate-y-[1px] transition-all duration-300 ${s.wrap}`}>
@@ -65,7 +66,7 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
             {/* Body */}
             <div className="mt-4 flex-1">
                 {m.status === "OCUPADA"? (
-                    <div className={`rounded-[18px] border p-3.5 ${s.consumoBg}`}>
+                    <div className={`rounded-[18px] border p-3.5 ${s.consumoBg} ${hasConsumo? "border-amber-200" : ""}`}>
                         <div className="flex items-center justify-between">
                             <span className="flex items-center gap-1.5 text-[10px] font-black tracking-widest opacity-50">
                                 <Clock size={11} /> {min} MIN
@@ -104,7 +105,7 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
                 )}
             </div>
 
-            {/* Actions */}
+            {/* Actions - TRAVADO */}
             <div className="mt-4 grid grid-cols-2 gap-2">
                 {m.status === "LIVRE" && (
                     <>
@@ -118,12 +119,26 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
                 )}
                 {m.status === "OCUPADA" && (
                     <>
-                        <button onClick={() => onComanda(m)} className="h-10 rounded-full bg-black text-white text-[11px] font-black tracking-widest flex items-center justify-center gap-1.5 hover:bg-zinc-800 active:scale-[0.98] transition-all">
-                            <Receipt size={13} /> COMANDA
-                        </button>
-                        <button onClick={() => onLiberar(m)} className="h-10 rounded-full bg-white border border-black/10 text-[11px] font-bold hover:bg-zinc-50 active:scale-[0.98] transition-all">
-                            Liberar
-                        </button>
+                        {hasConsumo? (
+                            <>
+                                <button onClick={() => onComanda(m)} className="col-span-2 h-11 rounded-full bg-[#16A34A] text-white text-[11px] font-black tracking-widest flex items-center justify-center gap-1.5 hover:bg-[#15803D] active:scale-[0.97] transition-all shadow-[0_6px_16px_rgba(22,163,74,0.3)]">
+                                    <Receipt size={14} /> FECHAR CONTA • Kz {total.toLocaleString("de-DE")}
+                                </button>
+                                <div className="col-span-2 flex items-center justify-center gap-1.5 py-1">
+                                    <Lock size={10} className="text-red-400" />
+                                    <span className="text-[8px] font-black tracking-widest text-red-500/70">LIBERAR BLOQUEADO - TEM CONSUMO</span>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <button onClick={() => onComanda(m)} className="h-10 rounded-full bg-black text-white text-[11px] font-black tracking-widest flex items-center justify-center gap-1.5 hover:bg-zinc-800 active:scale-[0.98] transition-all">
+                                    <Receipt size={13} /> COMANDA
+                                </button>
+                                <button onClick={() => onLiberar(m)} className="h-10 rounded-full bg-white border border-black/10 text-[11px] font-bold hover:bg-zinc-50 active:scale-[0.98] transition-all flex items-center justify-center gap-1">
+                                    <Ban size={12} /> Liberar
+                                </button>
+                            </>
+                        )}
                     </>
                 )}
                 {m.status === "SUJA" && (
