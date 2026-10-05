@@ -34,7 +34,7 @@ function CustomSelect({ value, onChange, options, labelMap }: { value: string, o
             {open && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[18px] border border-[#E8DCCF] shadow-[0_12px_32px_rgba(0,0,0,0.18)] z-[100] overflow-hidden p-1.5">
                     <div className="max-h-[200px] overflow-y-auto no-scrollbar space-y-0.5">
-                        {options.map(opt => (<button key={opt} type="button" onClick={() => { onChange(opt); setOpen(false); }} className={`w-full text-left px-4 py-2 rounded-full text-[11px] font-bold transition-all ${value === opt? "bg-[#A67C52] text-white" : "bg-white text-black hover:bg-[#F5E6D3]"}`}>{labelMap[opt]}</button>))}
+                        {options.map(opt => (<button key={opt} type="button" onClick={() => { onChange(opt); setOpen(false); }} className={`w-full text-left px-4 py-2 rounded-full text-[11px] font-bold transition-all ${value === opt? "bg-[#A67C52] text-white shadow-sm" : "bg-white text-black hover:bg-[#F5E6D3] hover:text-[#5A3A22]"}`}>{labelMap[opt]}</button>))}
                     </div>
                 </div>
             )}
@@ -73,24 +73,36 @@ export function EntidadesTab() {
 
     return (
         <>
-            <div className="space-y-4">
-                {/* BARRA FILTROS - MESMO GRID DOS CARDS */}
-                <div className="flex items-center gap-3 w-full">
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 flex-1">
-                        <div className="col-span-1"><CustomSelect value={tipoFiltro} onChange={(v) => setTipoFiltro(v as any)} options={[...TIPOS]} labelMap={TIPO_LABELS} /></div>
-                        <div className="col-span-1">
-                            <div className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 py-2.5 flex items-center gap-2 shadow-sm focus-within:border-[#A67C52] focus-within:ring-2 focus-within:ring-[#A67C52]/20 transition-all">
-                                <Search size={14} className="opacity-40 shrink-0" />
-                                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar..." className="bg-transparent outline-none text-[11px] font-bold w-full" />
-                            </div>
+            <div className="space-y-4 w-full">
+                {/* FILTROS - MESMO GRID DOS CARDS + BTN NA MESMA LINHA */}
+                <div className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 items-center">
+                    <div className="col-span-1">
+                        <CustomSelect value={tipoFiltro} onChange={(v) => setTipoFiltro(v as any)} options={[...TIPOS]} labelMap={TIPO_LABELS} />
+                    </div>
+                    <div className="col-span-1">
+                        <div className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 py-2.5 flex items-center gap-2 shadow-sm focus-within:border-[#A67C52] focus-within:ring-2 focus-within:ring-[#A67C52]/20 transition-all">
+                            <Search size={14} className="opacity-40 shrink-0" />
+                            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar..." className="bg-transparent outline-none text-[11px] font-bold w-full" />
                         </div>
                     </div>
-                    {canManage && (
-                        <button onClick={() => { setForm({ id: null, tipo: tipoFiltro, nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" }); setOpen(true); }} className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-md hover:bg-zinc-800 shrink-0"><Plus size={18} /></button>
-                    )}
+                    <div className="hidden lg:block lg:col-span-1" />
+                    <div className="hidden md:flex lg:col-span-1 justify-end">
+                        {canManage && (
+                            <button onClick={() => { setForm({ id: null, tipo: tipoFiltro, nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" }); setOpen(true); }} className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-md hover:bg-zinc-800 shrink-0"><Plus size={18} /></button>
+                        )}
+                    </div>
+                    {/* MOBILE - btn add continua na mesma linha dos inputs via flex row dentro do grid */}
+                    <div className="flex md:hidden col-span-2 items-center gap-3 -mt-1">
+                        <div className="flex-1 grid grid-cols-2 gap-3">
+                            <div className="col-span-1"><CustomSelect value={tipoFiltro} onChange={(v) => setTipoFiltro(v as any)} options={[...TIPOS]} labelMap={TIPO_LABELS} /></div>
+                            <div className="col-span-1"><div className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 py-2.5 flex items-center gap-2 shadow-sm"><Search size={14} className="opacity-40" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar..." className="bg-transparent outline-none text-[11px] font-bold w-full" /></div></div>
+                        </div>
+                        {canManage && <button onClick={() => { setForm({ id: null, tipo: tipoFiltro, nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" }); setOpen(true); }} className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-md shrink-0"><Plus size={18} /></button>}
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {/* GRID DOS CARDS - EXATAMENTE MESMO gap e colunas */}
+                <div className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {filtered.length === 0? <div className="col-span-full text-center py-10 text-[12px] opacity-50 font-bold">Nenhum {TIPO_LABELS[tipoFiltro]}</div> : filtered.map(ent => <EntidadeCard key={ent.id} ent={ent} onEdit={handleEdit} onDelete={handleDeleteClick} canManage={canManage} />)}
                 </div>
             </div>
