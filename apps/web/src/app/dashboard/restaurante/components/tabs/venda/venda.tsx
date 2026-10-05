@@ -13,15 +13,15 @@ const MESAS_API = `${API_URL}/api/v1/mesas`;
 type Toast = { id: string; msg: string; type: "success" | "error" | "info" | "warning" };
 
 function getAuthHeaders() {
-    const token = typeof window !== "undefined" ? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null;
-    const empresa_id = typeof window !== "undefined" ? localStorage.getItem("empresa_id") : null;
+    const token = typeof window!== "undefined"? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null;
+    const empresa_id = typeof window!== "undefined"? localStorage.getItem("empresa_id") : null;
     const h: Record<string, string> = {};
     if (token) h["Authorization"] = `Bearer ${token}`;
     if (empresa_id) h["X-Empresa-ID"] = empresa_id;
     return h;
 }
 function getEmpresaId() {
-    return typeof window !== "undefined" ? localStorage.getItem("empresa_id") : null;
+    return typeof window!== "undefined"? localStorage.getItem("empresa_id") : null;
 }
 
 export function VendasTab({ onClose }: { onClose: () => void }) {
@@ -41,36 +41,36 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const [finalizando, setFinalizando] = useState(false);
     const [ultimaVenda, setUltimaVenda] = useState<any>(null);
 
-    // --- MODO MESAS (OPCIONAL) ---
     const [modoMesa, setModoMesa] = useState(false);
     const [mesasOcupadas, setMesasOcupadas] = useState<any[]>([]);
     const [loadingMesas, setLoadingMesas] = useState(false);
     const [mesaSelecionada, setMesaSelecionada] = useState<any>(null);
     const [vendaMesa, setVendaMesa] = useState<any>(null);
+    const [mesaParaFechar, setMesaParaFechar] = useState<any>(null);
 
     const pushToast = (msg: string, type: Toast["type"] = "info") => {
         const id = Date.now().toString() + Math.random().toString().slice(2);
         setToasts(t => [...t, { id, msg, type }]);
-        setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000);
+        setTimeout(() => setToasts(t => t.filter(x => x.id!== id)), 4000);
     };
 
-    // persistir modo mesa
     useEffect(() => {
         const saved = localStorage.getItem("venda_modo_mesa");
         if (saved === "1") setModoMesa(true);
     }, []);
     useEffect(() => {
-        localStorage.setItem("venda_modo_mesa", modoMesa ? "1" : "0");
+        localStorage.setItem("venda_modo_mesa", modoMesa? "1" : "0");
         if (!modoMesa) {
             setMesaSelecionada(null);
             setVendaMesa(null);
+            setMesaParaFechar(null);
             setActiveCat("All");
         }
     }, [modoMesa]);
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if ((e.key === "/" && !(e.target instanceof HTMLInputElement)) || (e.ctrlKey && e.key.toLowerCase() === "k")) {
+            if ((e.key === "/" &&!(e.target instanceof HTMLInputElement)) || (e.ctrlKey && e.key.toLowerCase() === "k")) {
                 e.preventDefault(); setShowSearch(true); setTimeout(() => searchRef.current?.focus(), 50);
             }
             if (e.key === "Escape" && showSearch) { setShowSearch(false); setSearchV(""); }
@@ -81,7 +81,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
     useEffect(() => { if (showSearch) searchRef.current?.focus(); }, [showSearch]);
 
-    // produtos
     useEffect(() => {
         const fetchReal = async () => {
             setLoadingProd(true);
@@ -89,8 +88,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                 const qs = new URLSearchParams({ skip: "0", limit: "100", search: searchV });
                 const r = await fetch(`${API_BASE}/?${qs}`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
                 const data = await r.json();
-                if (r.ok) setDbProducts((data.items || []).filter((p: any) => p.ativo !== false));
-                else if (r.status === 403) pushToast("Empresa não autorizada", "error");
+                if (r.ok) setDbProducts((data.items || []).filter((p: any) => p.ativo!== false));
             } catch { }
             setLoadingProd(false);
         };
@@ -107,7 +105,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         fetchCats();
     }, []);
 
-    // buscar mesas ocupadas só quando modo ativo e na categoria Mesas
     const fetchMesasOcupadas = useCallback(async () => {
         if (!modoMesa) return;
         const empresaId = getEmpresaId();
@@ -115,10 +112,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         setLoadingMesas(true);
         try {
             const r = await fetch(`${MESAS_API}/${empresaId}?status=OCUPADA`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
-            if (r.ok) {
-                const data = await r.json();
-                setMesasOcupadas(data);
-            }
+            if (r.ok) setMesasOcupadas(await r.json());
         } catch { }
         setLoadingMesas(false);
     }, [modoMesa]);
@@ -127,165 +121,147 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         if (modoMesa && activeCat === "Mesas") fetchMesasOcupadas();
     }, [modoMesa, activeCat, fetchMesasOcupadas]);
 
-    // selecionar mesa -> carregar comanda
     const selecionarMesa = async (mesa: any) => {
+        // seleciona e NÃO carrega itens antigos no carrinho - carrinho fica só para adicionar
         setMesaSelecionada(mesa);
         setCart([]);
-        setVendaMesa(null);
-        if (!mesa.venda_atual_id) {
-            pushToast(`Mesa ${mesa.numero} sem venda ativa`, "info");
-            return;
-        }
+        setMesaParaFechar(null);
         try {
-            const empresaId = getEmpresaId();
-            const r = await fetch(`${VENDAS_API}/${empresaId}/${mesa.venda_atual_id}`, { headers: getAuthHeaders() as any });
-            if (r.ok) {
-                const venda = await r.json();
-                setVendaMesa(venda);
-                const itensCart = (venda.itens || []).map((it: any) => ({
-                    id: it.produto_id,
-                    name: it.produto_nome || it.nome,
-                    price: Number(it.preco_unitario || it.preco || 0),
-                    img: "",
-                    qtd: Number(it.quantidade || 1),
-                }));
-                setCart(itensCart);
-                pushToast(`Comanda da Mesa ${mesa.numero} carregada`, "success");
-            }
-        } catch { pushToast("Erro ao carregar comanda", "error"); }
+            const r = await fetch(`${VENDAS_API}/${mesa.venda_atual_id}`, { headers: getAuthHeaders() as any });
+            if (r.ok) setVendaMesa(await r.json());
+        } catch { }
+        pushToast(`Mesa ${mesa.numero} selecionada - adicione produtos`, "success");
     };
 
-    // REALTIME
     useEffect(() => {
         const onProdutoUpdate = (e: any) => {
             const p = e.detail;
             if (!p?.id) return;
-            setDbProducts(prev => prev.map(x => x.id === p.id ? { ...x, ...p, stock_atual: p.stock_atual ?? p.quantidade ?? x.stock_atual } : x));
+            setDbProducts(prev => prev.map(x => x.id === p.id? {...x,...p } : x));
         };
         window.addEventListener("produto:update" as any, onProdutoUpdate);
         return () => window.removeEventListener("produto:update" as any, onProdutoUpdate);
     }, []);
 
-    const cats = modoMesa ? ["All", "Mesas", ...catsDb] : ["All", ...catsDb];
+    const cats = modoMesa? ["All", "Mesas",...catsDb] : ["All",...catsDb];
     const getStockState = (p: any) => {
         if (!p.controlar_stock) return "ok";
-        const atual = Number(p.stock_atual ?? 0);
-        const minimo = Number(p.stock_minimo ?? 0);
+        const atual = Number(p.stock_atual?? 0);
         if (atual <= 0) return "zero";
-        if (atual <= minimo || atual <= 5) return "low";
+        if (atual <= 5) return "low";
         return "ok";
     };
 
     const add = (p: any) => {
         const state = getStockState(p);
-        const atual = Number(p.stock_atual ?? 0);
-        const qtyInCart = cart.find(c => c.id === p.id)?.qtd || 0;
-        if (state === "zero") { pushToast(`Sem stock: "${p.nome}" esgotado`, "error"); return; }
-        if (p.controlar_stock && qtyInCart >= atual) { pushToast(`Stock insuficiente: só ${atual} un.`, "warning"); return; }
+        if (state === "zero") { pushToast(`Sem stock: "${p.nome}"`, "error"); return; }
         const ex = cart.find((c) => c.id === p.id);
-        if (ex) setCart(cart.map((c) => (c.id === p.id ? { ...c, qtd: c.qtd + 1 } : c)));
-        else setCart([...cart, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: p.imagem_url ? `${API_URL}${p.imagem_url}` : "", qtd: 1 }]);
+        if (ex) setCart(cart.map((c) => (c.id === p.id? {...c, qtd: c.qtd + 1 } : c)));
+        else setCart([...cart, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: p.imagem_url? `${API_URL}${p.imagem_url}` : "", qtd: 1 }]);
     };
 
     const getQty = (id: string) => cart.find((c) => c.id === id)?.qtd || 0;
     const total = cart.reduce((s, i) => s + i.price * i.qtd, 0);
-    const recebidoNum = recebido ? parseFloat(recebido) : 0;
+    const recebidoNum = recebido? parseFloat(recebido) : 0;
     const troco = recebidoNum - total;
 
     const handleCalc = (val: string) => {
         if (val === "C") setRecebido("");
         else if (val === "DEL") setRecebido((s) => s.slice(0, -1));
-        else if (val === "00") { if (recebido !== "") setRecebido((s) => s + "00"); }
-        else if (val === ".") { if (!recebido.includes(".")) setRecebido((s) => (s === "" ? "0." : s + ".")); }
+        else if (val === "00") { if (recebido!== "") setRecebido((s) => s + "00"); }
+        else if (val === ".") { if (!recebido.includes(".")) setRecebido((s) => (s === ""? "0." : s + ".")); }
         else { setRecebido((s) => (s + val).slice(0, 10)); }
     };
 
+    // ADICIONAR NA MESA OU BALCÃO - usa mesma rota que já funciona
     const finalizarVenda = async () => {
         if (cart.length === 0) return;
-        if (forma === "dinheiro" && recebidoNum < total) { pushToast("Valor insuficiente", "error"); return; }
+        if (!mesaParaFechar && forma === "dinheiro" &&!mesaSelecionada && recebidoNum < total) {
+            pushToast("Valor insuficiente", "error"); return;
+        }
         setFinalizando(true);
         try {
-            // MESMA ROTA QUE JÁ FUNCIONAVA PRA VOCÊ
             const payload: any = {
                 itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })),
                 forma_pagamento: forma.toUpperCase(),
-                dinheiro_recebido: forma === "dinheiro" ? recebidoNum : total,
+                dinheiro_recebido: forma === "dinheiro"? recebidoNum : total,
+                mesa_id: mesaSelecionada? mesaSelecionada.id : null,
+                modo: mesaSelecionada? "mesa" : "balcao",
             };
-
-            if (mesaSelecionada) {
-                // QUANDO TEM MESA SELECIONADA, SÓ ENVIA O mesa_id
-                payload.mesa_id = mesaSelecionada.id;
-                // se já tem venda aberta, manda venda_atual_id pra somar
-                if (mesaSelecionada.venda_atual_id) payload.venda_atual_id = mesaSelecionada.venda_atual_id;
-                payload.modo = "mesa";
-            } else {
-                payload.mesa_id = null;
-                payload.modo = "balcao";
-            }
-
-            console.log("ENVIANDO VENDA PAYLOAD:", payload);
+            if (mesaSelecionada?.venda_atual_id) payload.venda_atual_id = mesaSelecionada.venda_atual_id;
 
             const r = await fetch(`${VENDAS_API}/`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json", ...getAuthHeaders() as any },
+                headers: { "Content-Type": "application/json",...getAuthHeaders() as any },
                 body: JSON.stringify(payload)
             });
-
-            const text = await r.text();
-            console.log("VENDA RESPONSE:", r.status, text);
-            let data: any = {};
-            try { data = JSON.parse(text); } catch { data = { detail: text }; }
-
-            if (!r.ok) throw new Error(data.detail || data.message || `Erro ${r.status}`);
+            const txt = await r.text();
+            let data: any = {}; try { data = JSON.parse(txt); } catch { data = { detail: txt }; }
+            if (!r.ok) throw new Error(data.detail || "Erro ao salvar");
 
             if (mesaSelecionada) {
-                pushToast(`Mesa ${mesaSelecionada.numero} atualizada - Kz ${Number(data.total || total).toLocaleString("de-DE")}`, "success");
+                pushToast(`Mesa ${mesaSelecionada.numero} atualizada +Kz ${total.toLocaleString("de-DE")}`, "success");
                 setCart([]);
                 setMesaSelecionada(null);
                 setVendaMesa(null);
+                setShowPay(false);
                 setActiveCat("Mesas");
                 fetchMesasOcupadas();
             } else {
                 setUltimaVenda(data);
                 setShowPay(false);
                 setShowConfirm(true);
-                pushToast(`Venda #${data.numero} finalizada`, "success");
             }
-
-            setDbProducts(prev => prev.map(p => {
-                const inCart = cart.find(c => c.id === p.id);
-                if (inCart && p.controlar_stock) return { ...p, stock_atual: Number(p.stock_atual || 0) - inCart.qtd };
-                return p;
-            }));
         } catch (e: any) { pushToast(e.message, "error"); }
         finally { setFinalizando(false); }
     };
 
     const fecharContaMesa = async () => {
-        if (!mesaSelecionada?.venda_atual_id) return;
+        const mesa = mesaParaFechar || mesaSelecionada;
+        if (!mesa?.venda_atual_id) return;
         setFinalizando(true);
         try {
-            // MESMA BASE QUE JÁ FUNCIONAVA: /vendas/{id}/fechar SEM empresa_id na URL
-            const r = await fetch(`${VENDAS_API}/${mesaSelecionada.venda_atual_id}/fechar`, {
+            const r = await fetch(`${VENDAS_API}/${mesa.venda_atual_id}/fechar`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json", ...getAuthHeaders() as any },
-                body: JSON.stringify({ forma_pagamento: forma.toUpperCase(), dinheiro_recebido: recebidoNum || total })
+                headers: { "Content-Type": "application/json",...getAuthHeaders() as any },
+                body: JSON.stringify({ forma_pagamento: forma.toUpperCase(), dinheiro_recebido: recebidoNum || undefined })
             });
             const txt = await r.text();
-            console.log("FECHAR RESPONSE", r.status, txt);
             let data: any = {}; try { data = JSON.parse(txt); } catch { data = { detail: txt }; }
             if (!r.ok) throw new Error(data.detail || "Erro ao fechar");
-            pushToast(`Conta Mesa ${mesaSelecionada.numero} fechada`, "success");
-            setCart([]); setMesaSelecionada(null); setShowPay(false); fetchMesasOcupadas();
+            // fatura final
+            const win = window.open("", "_blank", "width=320,height=600");
+            if (win) {
+                const itensHtml = (data.itens || vendaMesa?.itens || []).map((i: any) => `<tr><td>${i.produto_nome || i.nome} x${i.quantidade}</td><td style="text-align:right">Kz ${Number(i.subtotal || i.preco * i.quantidade || 0).toLocaleString("de-DE")}</td></tr>`).join("");
+                win.document.write(`<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}</style></head><body><div class="center bold">RESTAURANTE JENATH<br/>FATURA MESA ${mesa.numero}<br/>#${data.numero || mesa.venda_atual_id.slice(0,8)}</div><div class="line"></div><div>Data: ${new Date().toLocaleString()}<br/>Mesa: ${mesa.numero} • ${mesa.pessoas_atual} pessoas<br/>Pagamento: ${forma.toUpperCase()}</div><div class="line"></div><table>${itensHtml}</table><div class="line"></div><table><tr><td class="bold">TOTAL</td><td style="text-align:right" class="bold">Kz ${Number(data.total||0).toLocaleString("de-DE")}</td></tr></table><div class="line"></div><div class="center">Obrigado!<br/>Volte sempre</div><script>window.print();window.close();</script></body></html>`);
+                win.document.close();
+            }
+            pushToast(`Mesa ${mesa.numero} fechada!`, "success");
+            setCart([]); setMesaSelecionada(null); setMesaParaFechar(null); setVendaMesa(null); setShowPay(false); fetchMesasOcupadas();
         } catch (e: any) { pushToast(e.message, "error"); }
         finally { setFinalizando(false); }
+    };
+
+    const imprimirContaParcial = async (mesa: any) => {
+        try {
+            const r = await fetch(`${VENDAS_API}/${mesa.venda_atual_id}`, { headers: getAuthHeaders() as any });
+            let venda = vendaMesa;
+            if (r.ok) venda = await r.json();
+            const consumo = Number(venda?.total || mesa.venda_total || 0);
+            const pendente = mesaSelecionada?.id === mesa.id? total : 0;
+            const win = window.open("", "_blank", "width=320,height=600");
+            if (!win) return;
+            const itensHtml = (venda?.itens || []).map((i: any) => `<tr><td>${i.produto_nome || i.nome} x${i.quantidade}</td><td style="text-align:right">Kz ${Number(i.subtotal || 0).toLocaleString("de-DE")}</td></tr>`).join("");
+            win.document.write(`<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px}.line{border-top:1px dashed #000;margin:8px 0}</style></head><body><div style="text-align:center;font-weight:bold">CONTA PARCIAL<br/>Mesa ${mesa.numero} • ${mesa.pessoas_atual} pessoas<br/>${new Date().toLocaleString()}</div><div class="line"></div><table>${itensHtml}</table><div class="line"></div><div>Consumo: Kz ${consumo.toLocaleString("de-DE")}<br/>${pendente>0?`Pendente a adicionar: Kz ${pendente.toLocaleString("de-DE")}<br/>`:""}Total parcial: Kz ${(consumo+pendente).toLocaleString("de-DE")}</div><div class="line"></div><div style="text-align:center">Não é fatura final</div><script>window.print();window.close();</script></body></html>`);
+            win.document.close();
+        } catch { pushToast("Erro ao imprimir", "error"); }
     };
 
     const imprimirFatura = () => {
         const win = window.open("", "_blank", "width=320,height=600");
         if (!win) return;
-        const vendaNum = ultimaVenda?.numero ? ` #${ultimaVenda.numero}` : "";
-        const html = `<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px;color:#000}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}td{padding:2px 0}</style></head><body><div class="center bold">RESTAURANTE JENATH${vendaNum}</div><div class="line"></div><table>${cart.map(i => `<tr><td>${i.name} x${i.qtd}</td><td style="text-align:right">Kz ${(i.price * i.qtd).toLocaleString("de-DE")}</td></tr>`).join("")}</table><div class="line"></div><div class="center">Obrigado!</div><script>window.print();window.close();</script></body></html>`;
+        const vendaNum = ultimaVenda?.numero? ` #${ultimaVenda.numero}` : "";
+        const html = `<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}</style></head><body><div class="center bold">RESTAURANTE JENATH${vendaNum}</div><div class="line"></div><table>${cart.map(i => `<tr><td>${i.name} x${i.qtd}</td><td style="text-align:right">Kz ${(i.price * i.qtd).toLocaleString("de-DE")}</td></tr>`).join("")}</table><div class="line"></div><div class="center">Obrigado!</div><script>window.print();window.close();</script></body></html>`;
         win.document.write(html); win.document.close();
     };
 
@@ -294,7 +270,8 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         setShowConfirm(false); setShowPay(false); setCart([]); setRecebido(""); setUltimaVenda(null);
     };
 
-    const filteredByCat = activeCat === "All" ? dbProducts : activeCat === "Mesas" ? [] : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
+    const filteredByCat = activeCat === "All"? dbProducts : activeCat === "Mesas"? [] : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
+    const totalFechamento = (mesaParaFechar?.venda_total || mesaParaFechar?.total || 0) + (mesaParaFechar?.id === mesaSelecionada?.id? total : 0);
 
     return (
         <div className="h-full w-full flex flex-col bg-[#F5F7FB] overflow-hidden relative">
@@ -302,11 +279,11 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             <div className="h-[48px] px-4 flex items-center justify-between bg-white/80 backdrop-blur-xl border-b border-black/5 shrink-0">
                 <div className="flex items-center gap-2">
                     <span className="text-[11px] font-black">Modo Mesas</span>
-                    <button onClick={() => setModoMesa(!modoMesa)} className={`w-[44px] h-[26px] rounded-full p-0.5 flex items-center transition-all ${modoMesa ? "bg-black" : "bg-zinc-300"}`}>
-                        <div className={`w-5 h-5 rounded-full bg-white shadow transition-all ${modoMesa ? "translate-x-[18px]" : "translate-x-0"}`} />
+                    <button onClick={() => setModoMesa(!modoMesa)} className={`w-[44px] h-[26px] rounded-full p-0.5 flex items-center transition-all ${modoMesa? "bg-black" : "bg-zinc-300"}`}>
+                        <div className={`w-5 h-5 rounded-full bg-white shadow transition-all ${modoMesa? "translate-x-[18px]" : "translate-x-0"}`} />
                     </button>
                 </div>
-                <button onClick={onClose} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center active:scale-95 hover:bg-zinc-800"><X size={16} /></button>
+                <button onClick={onClose} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center"><X size={16} /></button>
             </div>
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
                 <ProdutosSection
@@ -316,15 +293,28 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                     getQty={getQty} getStockState={getStockState} add={add}
                     modoMesa={modoMesa} mesasOcupadas={mesasOcupadas} loadingMesas={loadingMesas}
                     mesaSelecionada={mesaSelecionada} onSelectMesa={selecionarMesa} fetchMesas={fetchMesasOcupadas}
+                    cart={cart} cartTotal={total}
+                    onFecharMesa={(m: any) => { setMesaParaFechar(m); setRecebido(String(Number(m.venda_total||0)+ (m.id===mesaSelecionada?.id?total:0))); setShowPay(true); }}
+                    onImprimirConta={imprimirContaParcial}
                 />
                 <CarrinhoSection
                     cart={cart} total={total} forma={forma} setForma={setForma} setShowPay={setShowPay} setRecebido={setRecebido}
-                    mesaSelecionada={mesaSelecionada} onFecharConta={fecharContaMesa} onLimparMesa={() => { setMesaSelecionada(null); setCart([]); setVendaMesa(null); }}
+                    mesaSelecionada={mesaSelecionada} onLimparMesa={() => { setMesaSelecionada(null); setCart([]); setVendaMesa(null); }}
                 />
             </div>
-            <PayModal showPay={showPay} setShowPay={setShowPay} total={total} forma={forma} recebido={recebido} recebidoNum={recebidoNum} troco={troco} handleCalc={handleCalc} setShowConfirm={mesaSelecionada ? fecharContaMesa : finalizarVenda} loading={finalizando} isMesa={!!mesaSelecionada} />
+            <PayModal
+                showPay={showPay} setShowPay={setShowPay}
+                total={mesaParaFechar? totalFechamento : total}
+                forma={forma} recebido={recebido} recebidoNum={recebidoNum} troco={recebidoNum - (mesaParaFechar? totalFechamento : total)}
+                handleCalc={handleCalc}
+                setShowConfirm={mesaParaFechar? fecharContaMesa : finalizarVenda}
+                loading={finalizando}
+                isMesa={!!mesaSelecionada}
+                isFechamento={!!mesaParaFechar}
+                mesaNumero={mesaParaFechar?.numero || mesaSelecionada?.numero}
+                onClosePay={() => { setMesaParaFechar(null); setShowPay(false); }}
+            />
             <ConfirmModal showConfirm={showConfirm} setShowConfirm={setShowConfirm} total={total} forma={forma} troco={troco} imprimirFatura={() => aposVenda(true)} onSemRecibo={() => aposVenda(false)} vendaNumero={ultimaVenda?.numero} />
-            <style jsx>{`.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none;}`}</style>
         </div>
     );
 }
