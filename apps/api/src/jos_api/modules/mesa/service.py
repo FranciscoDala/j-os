@@ -31,20 +31,16 @@ def list_mesas(db: Session, empresa_id: uuid.UUID, status: str = "", zona: str =
     if zona: q = q.filter(Mesa.zona == zona)
     if search: q = q.filter(or_(Mesa.numero.ilike(f"%{search}%"), Mesa.zona.ilike(f"%{search}%")))
     mesas = q.order_by(Mesa.numero).all()
-
     out = []
     for m in mesas:
         reserva = None
         if m.status == MesaStatus.RESERVADA:
             reserva = db.query(MesaReserva).filter(MesaReserva.mesa_id == m.id, MesaReserva.status == ReservaStatus.PENDENTE).order_by(MesaReserva.data_reserva.desc()).first()
-
         tempo = None
         if m.aberta_em and m.status == MesaStatus.OCUPADA:
             try: tempo = int((datetime.utcnow() - m.aberta_em).total_seconds() / 60)
             except: pass
-
         venda_total = 0
-        # Busca venda só para exibir total, mas NÃO auto-libera
         try:
             from jos_api.modules.venda.models import Venda, VendaStatus
             if m.venda_atual_id:
@@ -54,12 +50,10 @@ def list_mesas(db: Session, empresa_id: uuid.UUID, status: str = "", zona: str =
                 v = db.query(Venda).filter(Venda.mesa_id == m.id, Venda.empresa_id == empresa_id, Venda.status == VendaStatus.ABERTA).order_by(Venda.created_at.desc()).first()
                 if v:
                     venda_total = float(v.total or 0)
-                    # Se achou venda, vincula
                     if not m.venda_atual_id:
                         m.venda_atual_id = v.id
                         db.commit()
         except: pass
-
         d = _to_dict(m)
         d["reserva_ativa"] = reserva
         d["tempo_ocupada_min"] = tempo
