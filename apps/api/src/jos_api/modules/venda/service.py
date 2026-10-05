@@ -162,6 +162,9 @@ def fechar_comanda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, dinh
             mesa.garcom_id = None
             mesa.aberta_em = None
             mesa.pessoas_atual = 0
+            mesa.qr_token = None
+            mesa.qr_token_criado_em = None
+            
     db.commit(); db.refresh(venda)
     for p in produtos_afectados: emit(str(empresa_id), "produto:update", data=p)
     emit(str(empresa_id), "venda:fechada", data={"id": str(venda.id)})

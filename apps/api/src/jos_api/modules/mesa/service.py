@@ -1,26 +1,20 @@
 import uuid
+import secrets
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from.models import Mesa, MesaReserva, MesaStatus, ReservaStatus
 
+def _gen_token():
+    return secrets.token_urlsafe(6).upper()[:8] # ex: A8F3K9
+
 def _to_dict(m):
     return {
-        "id": m.id,
-        "empresa_id": m.empresa_id,
-        "numero": m.numero,
-        "capacidade": m.capacidade,
-        "zona": m.zona,
-        "status": m.status,
-        "venda_atual_id": m.venda_atual_id,
-        "garcom_id": m.garcom_id,
-        "aberta_em": m.aberta_em,
-        "pessoas_atual": m.pessoas_atual or 0,
-        "pos_x": m.pos_x or 0,
-        "pos_y": m.pos_y or 0,
-        "ativa": m.ativa,
-        "created_at": m.created_at,
-        "updated_at": m.updated_at,
+        "id": m.id, "empresa_id": m.empresa_id, "numero": m.numero, "capacidade": m.capacidade,
+        "zona": m.zona, "status": m.status, "venda_atual_id": m.venda_atual_id,
+        "garcom_id": m.garcom_id, "aberta_em": m.aberta_em, "pessoas_atual": m.pessoas_atual or 0,
+        "pos_x": m.pos_x or 0, "pos_y": m.pos_y or 0, "ativa": m.ativa,
+        "qr_token": getattr(m, 'qr_token', None), "created_at": m.created_at, "updated_at": m.updated_at,
     }
 
 def list_mesas(db: Session, empresa_id: uuid.UUID, status: str = "", zona: str = "", search: str = ""):
@@ -46,13 +40,6 @@ def list_mesas(db: Session, empresa_id: uuid.UUID, status: str = "", zona: str =
             if m.venda_atual_id:
                 v = db.query(Venda).filter(Venda.id == m.venda_atual_id, Venda.status == VendaStatus.ABERTA).first()
                 if v: venda_total = float(v.total or 0)
-            else:
-                v = db.query(Venda).filter(Venda.mesa_id == m.id, Venda.empresa_id == empresa_id, Venda.status == VendaStatus.ABERTA).order_by(Venda.created_at.desc()).first()
-                if v:
-                    venda_total = float(v.total or 0)
-                    if not m.venda_atual_id:
-                        m.venda_atual_id = v.id
-                        db.commit()
         except: pass
         d = _to_dict(m)
         d["reserva_ativa"] = reserva
@@ -88,6 +75,9 @@ def ocupar(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID, venda_id: uui
     mesa.garcom_id = garcom_id
     mesa.aberta_em = datetime.utcnow()
     mesa.pessoas_atual = pessoas or mesa.capacidade
+    # GERA TOKEN NOVO
+    mesa.qr_token = _gen_token()
+    mesa.qr_token_criado_em = datetime.utcnow()
     db.commit(); db.refresh(mesa)
     return mesa
 
@@ -99,6 +89,17 @@ def liberar(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID, limpar: bool
     mesa.garcom_id = None
     mesa.aberta_em = None
     mesa.pessoas_atual = 0
+    # EXPIRA TOKEN
+    mesa.qr_token = None
+    mesa.qr_token_criado_em = None
+    db.commit(); db.refresh(mesa)
+    return mesa
+
+def rotacionar_token(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID):
+    mesa = db.query(Mesa).filter(Mesa.id == mesa_id, Mesa.empresa_id == empresa_id).first()
+    if not mesa: raise ValueError("Mesa não encontrada")
+    mesa.qr_token = _gen_token()
+    mesa.qr_token_criado_em = datetime.utcnow()
     db.commit(); db.refresh(mesa)
     return mesa
 

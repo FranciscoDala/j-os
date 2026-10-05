@@ -37,6 +37,9 @@ class Mesa(Base):
     pos_x: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     pos_y: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     ativa: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default=sa.text('true'))
+    # NOVO - TOKEN POR SESSÃO
+    qr_token: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    qr_token_criado_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, server_default=sa.func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False, server_default=sa.func.now())
 

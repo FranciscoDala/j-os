@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, Header, HTTPException
+from fastapi import APIRouter, Depends, Request, Header, HTTPException, Query
 from sqlalchemy.orm import Session
 import uuid
 from jos_api.db.session import get_db
@@ -8,19 +8,17 @@ from jos_api.core.deps import get_current_user
 from jos_api.modules.caixa.models import Caixa
 from jos_api.modules.caixa import service as caixa_service
 
-# ROTA PÚBLICA - SEM TOKEN
 public_router = APIRouter(prefix="/public", tags=["Publico QR"])
 
 @public_router.get("/{empresa_id}/cardapio", response_model=schemas.CardapioPublicResponse)
-def cardapio_publico(empresa_id: uuid.UUID, db: Session = Depends(get_db)):
-    return service.get_cardapio_publico(db, empresa_id)
+def cardapio_publico(empresa_id: uuid.UUID, mesa: str | None = Query(None), t: str | None = Query(None), db: Session = Depends(get_db)):
+    return service.get_cardapio_publico(db, empresa_id, mesa_numero=mesa, token=t)
 
 @public_router.post("/{empresa_id}/pedido", response_model=schemas.PedidoQrResponse, status_code=201)
 def criar_pedido_publico(empresa_id: uuid.UUID, dados: schemas.PedidoQrPublicCreate, request: Request, db: Session = Depends(get_db)):
     ip = request.client.host if request.client else None
     return service.criar_pedido_qr(db, empresa_id, dados, ip)
 
-# ROTA PRIVADA - COM TOKEN (seu painel)
 private_router = APIRouter(prefix="/pedidos-qr", tags=["Pedidos QR"])
 
 def _get_empresa_id(current_user: User, x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
@@ -48,3 +46,9 @@ def aprovar(pedido_id: uuid.UUID, db: Session = Depends(get_db), current_user: U
 def recusar(pedido_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
     eid = _get_empresa_id(current_user, x_empresa_id)
     return service.recusar_pedido(db, pedido_id, eid)
+
+@private_router.post("/mesas/{mesa_id}/rotacionar-token")
+def rotacionar(mesa_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    from jos_api.modules.mesa import service as mesa_service
+    eid = _get_empresa_id(current_user, x_empresa_id)
+    return mesa_service.rotacionar_token(db, eid, mesa_id)
