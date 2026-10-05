@@ -47,11 +47,16 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const [vendaMesa, setVendaMesa] = useState<any>(null);
     const [mesaParaFechar, setMesaParaFechar] = useState<any>(null);
 
+
+    const [pedidoQrAtivo, setPedidoQrAtivo] = useState<any>(null);
+    const PEDIDOS_QR_API = `${API_URL}/api/v1/pedidos-qr`;
+
     const pushToast = (msg: string, type: Toast["type"] = "info") => {
         const id = Date.now().toString() + Math.random().toString().slice(2);
         setToasts(t => [...t, { id, msg, type }]);
         setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000);
     };
+
 
     // ATENDER PEDIDO QR VINDO DA TAB PEDIDOS
     useEffect(() => {
@@ -59,13 +64,10 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         if (!raw) return;
         try {
             const dados = JSON.parse(raw);
-            localStorage.removeItem("atender_mesa_qr");
-
-            // ativa modo mesa
+            setPedidoQrAtivo(dados); // guarda pra aprovar depois
             setModoMesa(true);
             localStorage.setItem("venda_modo_mesa", "1");
 
-            // busca mesas pra achar a certa
             (async () => {
                 const empresaId = getEmpresaId();
                 if (!empresaId) return;
@@ -75,21 +77,24 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                     const mesa = mesas.find((m: any) =>
                         m.id === dados.mesa_id ||
                         m.numero === dados.mesa_numero ||
-                        m.id === dados.mesa?.id
+                        m.id === dados.mesa?.id ||
+                        m.numero === dados.mesa?.numero
                     );
                     if (mesa) {
-                        selecionarMesa(mesa);
-                        // se veio itens, já joga no carrinho
+                        await selecionarMesa(mesa);
+                        // joga no carrinho DEPOIS de selecionar (pq selecionar limpa o carrinho)
                         if (dados.itens?.length) {
-                            const cartItens = dados.itens.map((it: any) => ({
-                                id: it.produto_id || it.id,
-                                name: it.produto_nome || it.nome,
-                                price: Number(it.preco_unit || it.preco || 0),
-                                img: "",
-                                qtd: Number(it.quantidade || 1)
-                            }));
-                            setCart(cartItens);
-                            pushToast(`Pedido da MESA ${mesa.numero} - ${dados.cliente_nome} carregado`, "success");
+                            setTimeout(() => {
+                                const cartItens = dados.itens.map((it: any) => ({
+                                    id: it.produto_id || it.produto?.id || it.id,
+                                    name: it.produto_nome || it.nome,
+                                    price: Number(it.preco_unit || it.preco || it.preco_venda || 0),
+                                    img: "",
+                                    qtd: Number(it.quantidade || 1)
+                                }));
+                                setCart(cartItens);
+                                pushToast(`MESA ${mesa.numero} - ${dados.cliente_nome} carregado`, "success");
+                            }, 400);
                         }
                     }
                 }
@@ -232,7 +237,17 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                 });
                 const txt = await rCreate.text();
                 let data: any = {}; try { data = JSON.parse(txt); } catch { data = { detail: txt }; }
-                if (!rCreate.ok) throw new Error(data.detail || JSON.stringify(data) || "Erro ao criar comanda");
+                if (!rCreate.ok) throw new Error(data.detail || "Erro ao criar comanda");
+
+                // SE VEIO DO QR, APROVA AGORA E REMOVE O CARD
+                if (pedidoQrAtivo) {
+                    const idQr = pedidoQrAtivo.id || pedidoQrAtivo.pedido_id;
+                    await fetch(`${PEDIDOS_QR_API}/${idQr}/aprovar`, { method: "POST", headers: getAuthHeaders() as any });
+                    window.dispatchEvent(new CustomEvent("pedido-qr:aprovado", { detail: { id: idQr } }));
+                    localStorage.removeItem("atender_mesa_qr");
+                    setPedidoQrAtivo(null);
+                }
+
                 pushToast(`Mesa ${mesaSelecionada.numero} aberta +Kz ${total.toLocaleString("de-DE")}`, "success");
                 setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("Mesas"); fetchMesasOcupadas();
                 return;
@@ -245,6 +260,15 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             const txt = await r.text();
             let data: any = {}; try { data = JSON.parse(txt); } catch { data = { detail: txt }; }
             if (!r.ok) throw new Error(data.detail || "Erro ao adicionar na mesa");
+
+            if (pedidoQrAtivo) {
+                const idQr = pedidoQrAtivo.id || pedidoQrAtivo.pedido_id;
+                await fetch(`${PEDIDOS_QR_API}/${idQr}/aprovar`, { method: "POST", headers: getAuthHeaders() as any });
+                window.dispatchEvent(new CustomEvent("pedido-qr:aprovado", { detail: { id: idQr } }));
+                localStorage.removeItem("atender_mesa_qr");
+                setPedidoQrAtivo(null);
+            }
+
             pushToast(`Mesa ${mesaSelecionada.numero} +Kz ${total.toLocaleString("de-DE")}`, "success");
             setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("Mesas"); fetchMesasOcupadas();
         } catch (e: any) { pushToast(e.message, "error"); }
