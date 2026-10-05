@@ -7,13 +7,14 @@ app = FastAPI(title=settings.PROJECT_NAME, version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # WS no Render precisa de * pra handshake
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(api_router, prefix=settings.API_V1_STR)
+# SEU api_router JÁ TEM prefix="/api/v1" DENTRO, NÃO COLOCA DE NOVO
+app.include_router(api_router)
 
 @app.get("/")
 def root():
