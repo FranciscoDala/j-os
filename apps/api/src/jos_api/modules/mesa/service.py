@@ -36,7 +36,20 @@ def list_mesas(db: Session, empresa_id: uuid.UUID, status: str = "", zona: str =
                     venda_atual_id = venda.id
                     m.venda_atual_id = venda.id
                     db.commit()
-            if venda:
+            # FIX ORFÃ: Se continua OCUPADA mas sem venda ABERTA, auto-libera
+            if not venda:
+                print(f"[MESAS] Auto-liberando mesa órfã {m.numero} {m.id}")
+                m.status = MesaStatus.LIVRE
+                m.venda_atual_id = None
+                m.garcom_id = None
+                m.aberta_em = None
+                m.pessoas_atual = 0
+                db.commit()
+                venda_atual_id = None
+                # Se o filtro era OCUPADA, não retorna essa mesa agora
+                if status == "OCUPADA":
+                    continue
+            else:
                 venda_total = float(venda.total or 0)
 
         d = {**m.__dict__}
@@ -67,6 +80,9 @@ def reservar(db: Session, empresa_id: uuid.UUID, payload):
 def ocupar(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID, venda_id: uuid.UUID | None, garcom_id: uuid.UUID | None, pessoas: int | None = None):
     mesa = db.query(Mesa).filter(Mesa.id == mesa_id, Mesa.empresa_id == empresa_id).first()
     if not mesa: raise ValueError("Mesa não encontrada")
+    # Não deixa ocupar sem venda_id - evita criar órfã
+    if not venda_id:
+        raise ValueError("venda_id obrigatório para ocupar mesa")
     mesa.status = MesaStatus.OCUPADA
     mesa.venda_atual_id = venda_id
     mesa.garcom_id = garcom_id

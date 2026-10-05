@@ -98,11 +98,36 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         setLoadingMesas(true);
         try {
             const r = await fetch(`${MESAS_API}/${empresaId}?status=OCUPADA`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
-            if (r.ok) setMesasOcupadas(await r.json());
+            if (r.ok) {
+                const data = await r.json();
+                // Filtra mesas realmente com venda, se back novo já auto-liberou órfãs não vem
+                setMesasOcupadas(data);
+            }
         } catch { } setLoadingMesas(false);
     }, [modoMesa]);
 
     useEffect(() => { if (modoMesa && activeCat === "Mesas") fetchMesasOcupadas(); }, [modoMesa, activeCat, fetchMesasOcupadas]);
+
+    const liberarMesaOrfa = async (mesa: any) => {
+        const empresaId = getEmpresaId(); if (!empresaId) return;
+        try {
+            const r = await fetch(`${MESAS_API}/${empresaId}/${mesa.id}/liberar`, {
+                method: "POST",
+                headers: getAuthHeaders() as any
+            });
+            if (r.ok) {
+                pushToast(`Mesa ${mesa.numero} liberada (estava órfã)`, "success");
+                fetchMesasOcupadas();
+                setMesaSelecionada(null);
+                setVendaMesa(null);
+            } else {
+                const txt = await r.text();
+                pushToast(`Erro ao liberar: ${txt}`, "error");
+            }
+        } catch (e: any) {
+            pushToast(e.message, "error");
+        }
+    };
 
     const selecionarMesa = async (mesa: any) => {
         setMesaSelecionada(mesa);
@@ -110,15 +135,21 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         setMesaParaFechar(null);
         setVendaMesa(null);
 
+        // 1. Se já tem venda_atual_id, usa direto
         if (mesa.venda_atual_id) {
             try {
                 const r = await fetch(`${VENDAS_API}/${mesa.venda_atual_id}`, { headers: getAuthHeaders() as any });
-                if (r.ok) setVendaMesa(await r.json());
+                if (r.ok) {
+                    const v = await r.json();
+                    setVendaMesa(v);
+                    pushToast(`Mesa ${mesa.numero} selecionada`, "success");
+                    return;
+                }
             } catch { }
-            pushToast(`Mesa ${mesa.numero} selecionada`, "success");
-            return;
+            // Se venda_atual_id inválido, tenta recuperar
         }
 
+        // 2. Tenta recuperar por mesa_id nas vendas abertas
         try {
             const rList = await fetch(`${VENDAS_API}/`, { headers: getAuthHeaders() as any });
             if (rList.ok) {
@@ -132,7 +163,9 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                     return;
                 }
             }
-            pushToast(`Mesa ${mesa.numero} ocupada mas sem comanda. Libere em Mesas > Liberar`, "error");
+            // 3. Nenhuma venda aberta = mesa órfã
+            pushToast(`Mesa ${mesa.numero} órfã, liberando...`, "warning");
+            await liberarMesaOrfa(mesa);
         } catch { }
     };
 
@@ -160,12 +193,12 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         else { setRecebido((s) => (s + val).slice(0, 10)); }
     };
 
-    // 1. ADICIONAR NA MESA - CORRIGIDO PARA NÃO USAR NULL
     const adicionarNaMesa = async () => {
         if (!mesaSelecionada || cart.length === 0) return;
         const vendaId = mesaSelecionada.venda_atual_id || vendaMesa?.id;
         if (!vendaId) {
-            pushToast(`Mesa ${mesaSelecionada.numero} sem venda válida. Libere e ocupe de novo`, "error");
+            pushToast(`Mesa ${mesaSelecionada.numero} sem venda. Será liberada`, "error");
+            await liberarMesaOrfa(mesaSelecionada);
             return;
         }
         setFinalizando(true);
@@ -184,7 +217,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         finally { setFinalizando(false); }
     };
 
-    // 2. FINALIZAR BALCÃO
     const finalizarBalcao = async () => {
         if (cart.length === 0) return;
         if (forma === "dinheiro" && recebidoNum < total) { pushToast("Valor insuficiente", "error"); return; }
@@ -198,10 +230,9 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         finally { setFinalizando(false); }
     };
 
-    // 3. FECHAR MESA - COM FALLBACK
     const fecharContaMesa = async () => {
         const mesa = mesaParaFechar;
-        const vendaId = mesa?.venda_atual_id || vendaMesa?.id;
+        const vendaId = mesa?.venda_atual_id || vendaMesa?.id || mesaSelecionada?.venda_atual_id;
         if (!vendaId) { pushToast("Mesa sem venda para fechar", "error"); return; }
         setFinalizando(true);
         try {
@@ -218,7 +249,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                 win.document.close();
             }
             pushToast(`Mesa ${mesa.numero} fechada!`, "success");
-            setCart([]); setMesaSelecionada(null); setMesaParaFechar(null); setShowPay(false); fetchMesasOcupadas();
+            setCart([]); setMesaSelecionada(null); setMesaParaFechar(null); setVendaMesa(null); setShowPay(false); fetchMesasOcupadas();
         } catch (e: any) { pushToast(e.message, "error"); }
         finally { setFinalizando(false); }
     };
@@ -257,7 +288,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             </div>
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
                 <ProdutosSection dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd} cats={cats} activeCat={activeCat} setActiveCat={setActiveCat} searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef} getQty={getQty} getStockState={getStockState} add={add} modoMesa={modoMesa} mesasOcupadas={mesasOcupadas} loadingMesas={loadingMesas} mesaSelecionada={mesaSelecionada} onSelectMesa={selecionarMesa} fetchMesas={fetchMesasOcupadas} cart={cart} cartTotal={total} onFecharMesa={(m: any) => { setMesaParaFechar(m); setRecebido(String(Number(m.venda_total || m.total || 0) + (m.id === mesaSelecionada?.id? total : 0))); setShowPay(true); }} onImprimirConta={imprimirContaParcial} />
-                <CarrinhoSection cart={cart} total={total} forma={forma} setForma={setForma} setShowPay={setShowPay} setRecebido={setRecebido} mesaSelecionada={mesaSelecionada} onAddMesa={adicionarNaMesa} onLimparMesa={() => { setMesaSelecionada(null); setCart([]); }} finalizando={finalizando} />
+                <CarrinhoSection cart={cart} total={total} forma={forma} setForma={setForma} setShowPay={setShowPay} setRecebido={setRecebido} mesaSelecionada={mesaSelecionada} onAddMesa={adicionarNaMesa} onLimparMesa={() => { setMesaSelecionada(null); setCart([]); setVendaMesa(null); }} finalizando={finalizando} />
             </div>
             <PayModal showPay={showPay} setShowPay={(v: boolean) => { if (!v) setMesaParaFechar(null); setShowPay(v); }} total={mesaParaFechar? totalFechamento : total} forma={forma} recebido={recebido} recebidoNum={recebidoNum} troco={recebidoNum - (mesaParaFechar? totalFechamento : total)} handleCalc={handleCalc} setShowConfirm={mesaParaFechar? fecharContaMesa : finalizarBalcao} loading={finalizando} isMesa={!!mesaParaFechar} mesaNumero={mesaParaFechar?.numero} />
             <ConfirmModal showConfirm={showConfirm} setShowConfirm={setShowConfirm} total={total} forma={forma} troco={recebidoNum - total} imprimirFatura={() => aposVenda(true)} onSemRecibo={() => aposVenda(false)} vendaNumero={ultimaVenda?.numero} />
