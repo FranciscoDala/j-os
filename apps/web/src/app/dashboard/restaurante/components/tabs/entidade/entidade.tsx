@@ -5,6 +5,7 @@ import { DeleteConfirmModal } from "./modals/deletar";
 import { EntidadeCard } from "./cards/entidade";
 import { Search, Plus, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { useDashboard } from "@/components/dashboard/Tamplate";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
 const TIPOS = ["FUNCIONARIO", "CLIENTE", "FORNECEDOR"] as const;
@@ -22,14 +23,6 @@ function getAuthHeaders() {
 function getEmpresaId() {
     if (typeof window === "undefined") return null;
     return localStorage.getItem("empresa_id") || localStorage.getItem("empresaId") || null;
-}
-
-function getCanManage(): boolean {
-    if (typeof window === "undefined") return false;
-    const raw = (localStorage.getItem("perfil_slug") || localStorage.getItem("user_role") || localStorage.getItem("role") || localStorage.getItem("perfil") || localStorage.getItem("user_perfil") || "").toLowerCase();
-    const cargo = (localStorage.getItem("cargo") || localStorage.getItem("user_cargo") || "").toLowerCase();
-    const combined = `${raw} ${cargo}`;
-    return combined.includes("dono") || combined.includes("owner") || combined.includes("gerente") || combined.includes("manager") || combined.includes("admin") || combined.includes("supervisor");
 }
 
 function CustomSelect({ value, onChange, options, labelMap }: { value: string, onChange: (v: string) => void, options: string[], labelMap: Record<string,string> }) {
@@ -62,6 +55,9 @@ function CustomSelect({ value, onChange, options, labelMap }: { value: string, o
 }
 
 export function EntidadesTab() {
+    const { role } = useDashboard();
+    const canManage = ["dono", "gerente", "gerente_restaurante", "rh", "vigilante", "admin", "owner"].includes((role || "").toLowerCase());
+
     const [tipoFiltro, setTipoFiltro] = useState<"FUNCIONARIO" | "CLIENTE" | "FORNECEDOR">("FUNCIONARIO");
     const [lista, setLista] = useState<any[]>([]);
     const [perfis, setPerfis] = useState<any[]>([]);
@@ -72,31 +68,16 @@ export function EntidadesTab() {
     const [deleting, setDeleting] = useState(false);
     const [search, setSearch] = useState("");
     const [empresaId, setEmpresaId] = useState<string | null>(null);
-    const [canManage, setCanManage] = useState(false);
     const [form, setForm] = useState<any>({ id: null, tipo: "FUNCIONARIO", nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" });
 
-    useEffect(() => {
-        setEmpresaId(getEmpresaId());
-        setCanManage(getCanManage());
-    }, []);
+    useEffect(() => { setEmpresaId(getEmpresaId()); }, []);
 
     const load = useCallback(async () => {
         if (!empresaId) return;
         try {
             const res = await fetch(`${API_BASE}/entidades/${empresaId}?tipo=${tipoFiltro}`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, cache: "no-store" });
-            if (res.ok) {
-                setLista(await res.json());
-            } else {
-                const err = await res.json().catch(()=>({detail:"Erro"}));
-                if (res.status===403) {
-                    console.warn("403 entidades:", err);
-                    toast.error(err.detail || "Sem permissão");
-                    setLista([]);
-                }
-            }
-        } catch (e) {
-            console.error("load entidades fail", e);
-        }
+            if (res.ok) setLista(await res.json());
+        } catch (e) { console.error("load entidades fail", e); }
     }, [tipoFiltro, empresaId]);
 
     const loadPerfis = useCallback(async () => {
@@ -109,9 +90,7 @@ export function EntidadesTab() {
                 data.forEach((p:any) => { uniqMap[p.slug] = p; });
                 setPerfis(Object.values(uniqMap) as any[]);
             }
-        } catch (e) {
-            console.error("load perfis fail", e);
-        }
+        } catch {}
     }, [empresaId]);
 
     useEffect(() => { if (empresaId) { load(); loadPerfis(); } }, [load, loadPerfis]);
@@ -129,14 +108,7 @@ export function EntidadesTab() {
     const handleSave = async () => {
         if (!empresaId) return toast.error("Empresa não encontrada");
         const isEdit =!!form.id;
-        if (isEdit &&!canManage) return toast.error("Sem permissão para editar");
-        if (!isEdit &&!canManage) return toast.error("Apenas dono e gerente podem criar");
-        if (form.tem_acesso_app) {
-            if (!form.perfil_id) return toast.error("Selecione o perfil de acesso");
-            if (!form.email?.trim()) return toast.error("Email obrigatório para acesso ao app");
-            if (!isEdit && (!form.senha || form.senha.trim().length < 6)) return toast.error("Senha obrigatória - mínimo 6 caracteres");
-            if (form.senha && form.senha.trim().length > 0 && form.senha.trim().length < 6) return toast.error("Senha mínimo 6 caracteres");
-        }
+        if (!canManage) return toast.error("Apenas dono e gerente");
         setSaving(true);
         try {
             const clean = (v: any) => (v === "" || v === undefined? null : typeof v === 'string'? (v.trim() || null) : v);
@@ -144,15 +116,14 @@ export function EntidadesTab() {
                 tipo: form.tipo, nome: form.nome.trim(), telefone: clean(form.telefone), email: clean(form.email)?.toLowerCase() || null, documento: clean(form.documento), endereco: clean(form.endereco), cargo: clean(form.cargo), departamento: clean(form.departamento), empresa_fornecedora: clean(form.empresa_fornecedora), categoria_fornecedor: clean(form.categoria_fornecedor), tem_acesso_app:!!form.tem_acesso_app, perfil_id: clean(form.perfil_id), data_admissao: clean(form.data_admissao), salario: form.salario? Number(form.salario) : null, carga_horaria: form.carga_horaria? Number(form.carga_horaria) : null,
             };
             if (form.senha && form.senha.trim().length >= 6) payload.senha = form.senha.trim();
-            else if (!isEdit && payload.tem_acesso_app) throw new Error("Senha obrigatória para acesso ao app");
             if (!payload.tem_acesso_app) payload.perfil_id = null;
             const url = isEdit? `${API_BASE}/entidades/${empresaId}/${form.id}` : `${API_BASE}/entidades/${empresaId}`;
             const method = isEdit? "PUT" : "POST";
             const res = await fetch(url, { method, headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, body: JSON.stringify(payload) });
             const json = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(json.detail || "Erro ao salvar");
-            if (isEdit) { setLista(prev => prev.map(p => p.id === json.id? json : p)); toast.success("Atualizado com sucesso"); }
-            else { setLista(prev => [json,...prev]); toast.success("Criado com sucesso"); }
+            if (isEdit) { setLista(prev => prev.map(p => p.id === json.id? json : p)); toast.success("Atualizado"); }
+            else { setLista(prev => [json,...prev]); toast.success("Criado"); }
             setOpen(false);
             setForm({ id: null, tipo: tipoFiltro, nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" });
         } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
@@ -160,7 +131,7 @@ export function EntidadesTab() {
 
     const confirmDelete = async () => {
         if (!selected ||!empresaId) return;
-        if (!canManage) return toast.error("Apenas dono e gerente podem apagar");
+        if (!canManage) return toast.error("Apenas dono e gerente");
         setDeleting(true);
         const backup = lista;
         setLista(prev => prev.filter(p => p.id!== selected.id));
@@ -186,7 +157,7 @@ export function EntidadesTab() {
                         <div className="w-1/2 md:w-[calc(33.333%-8px)] lg:w-[calc(25%-9px)] relative">
                             <div className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 py-2.5 flex items-center gap-2 shadow-sm focus-within:border-[#A67C52] focus-within:ring-2 focus-within:ring-[#A67C52]/20 transition-all">
                                 <Search size={14} className="opacity-40 shrink-0" />
-                                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar..." className="bg-transparent outline-none text-[11px] font-bold w-full placeholder:font-bold placeholder:opacity-40" />
+                                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar..." className="bg-transparent outline-none text-[11px] font-bold w-full" />
                             </div>
                         </div>
                     </div>
@@ -194,7 +165,6 @@ export function EntidadesTab() {
                         <button onClick={() => { setForm({ id: null, tipo: tipoFiltro, nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" }); setOpen(true); }} className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-md hover:bg-zinc-800 shrink-0"><Plus size={18} /></button>
                     )}
                 </div>
-
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {filtered.length === 0? <div className="col-span-full text-center py-10 text-[12px] opacity-50 font-bold">Nenhum {TIPO_LABELS[tipoFiltro]}</div> : filtered.map(ent => <EntidadeCard key={ent.id} ent={ent} onEdit={handleEdit} onDelete={handleDeleteClick} canManage={canManage} />)}
                 </div>
