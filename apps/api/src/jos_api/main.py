@@ -13,12 +13,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# SEU api_router JÁ TEM prefix="/api/v1" DENTRO, NÃO COLOCA DE NOVO
-app.include_router(api_router)
+app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():
-    return {"status": "online", "docs": "/docs", "ws": f"{settings.API_V1_STR}/realtime/ws"}
+    return {"status": "online", "docs": "/docs"}
 
 @app.get("/health")
 def health():
