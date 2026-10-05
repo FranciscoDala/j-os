@@ -122,11 +122,12 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
                         {hasConsumo? (
                             <>
                                 <button onClick={() => onComanda(m)} className="col-span-2 h-11 rounded-full bg-[#16A34A] text-white text-[11px] font-black tracking-widest flex items-center justify-center gap-1.5 hover:bg-[#15803D] active:scale-[0.97] transition-all shadow-[0_6px_16px_rgba(22,163,74,0.3)]">
-                                    <Receipt size={14} /> FECHAR CONTA • Kz {total.toLocaleString("de-DE")}
+                                    <Receipt size={14} /> Fechar Conta • Kz {total.toLocaleString("de-DE")}
                                 </button>
                                 <div className="col-span-2 flex items-center justify-center gap-1.5 py-1">
+                                    {/*
                                     <Lock size={10} className="text-red-400" />
-                                    <span className="text-[8px] font-black tracking-widest text-red-500/70">LIBERAR BLOQUEADO - TEM CONSUMO</span>
+                                    <span className="text-[8px] font-black tracking-widest text-red-500/70">LIBERAR BLOQUEADO - TEM CONSUMO</span>*/}
                                 </div>
                             </>
                         ) : (

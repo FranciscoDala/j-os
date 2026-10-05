@@ -17,14 +17,17 @@ export function Toasts({ toasts, setToasts }: { toasts: Toast[]; setToasts: any 
     );
 }
 
-export function PayModal({ showPay, setShowPay, total, forma, recebido, recebidoNum, troco, handleCalc, setShowConfirm, loading }: any) {
+export function PayModal({ showPay, setShowPay, total, forma, recebido, recebidoNum, troco, handleCalc, setShowConfirm, loading, isMesa, mesaNumero }: any) {
     if (!showPay) return null;
     return (
         <div className="absolute inset-0 z-[200] bg-black/30 backdrop-blur-md flex items-center justify-center p-3">
             <div className="w-full max-w-[400px] bg-white/95 backdrop-blur-2xl rounded-[22px] border border-white/60 shadow-2xl overflow-hidden">
                 <div className="p-3.5 space-y-3">
                     <div className="bg-[#F5F7FB] rounded-[14px] p-3 border border-black/5 space-y-2.5">
-                        <div className="flex justify-between items-center"><span className="text-[11px] font-black tracking-wide uppercase text-gray-600">{forma}</span><span className="font-black text-[14px]">Kz {total.toLocaleString("de-DE")}</span></div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-[11px] font-black tracking-wide uppercase text-gray-600">{isMesa? `MESA ${mesaNumero} • ${forma}` : forma}</span>
+                            <span className="font-black text-[14px]">Kz {total.toLocaleString("de-DE")}</span>
+                        </div>
                         <div className="bg-white rounded-[12px] px-3 py-2.5 border flex justify-between items-center shadow-sm"><div><p className="text-[8px] text-gray-400 tracking-widest font-bold">VALOR RECEBIDO</p><p className="text-[18px] font-black leading-none mt-1">Kz {recebido || "0"}</p></div><div className="w-8 h-8 bg-[#EEF4FF] rounded-full flex items-center justify-center"><Banknote size={14} className="text-[#2F4A8A]" /></div></div>
                         {forma === "dinheiro" && (<div className={`rounded-[12px] px-3 py-2 flex justify-between items-center border ${troco >= 0? "bg-[#E8F5E9] border-green-200" : "bg-[#FFEBEE] border-red-200"}`}><span className="text-[10px] font-black">{troco >= 0? "TROCO" : "FALTA"}</span><span className={`text-[13px] font-black ${troco >= 0? "text-green-700" : "text-red-600"}`}>Kz {Math.abs(troco).toLocaleString("de-DE")}</span></div>)}
                     </div>
@@ -32,7 +35,7 @@ export function PayModal({ showPay, setShowPay, total, forma, recebido, recebido
                     <div className="grid grid-cols-2 gap-2.5">
                       <button onClick={() => setShowPay(false)} className="h-[40px] bg-[#EF4444] text-white rounded-full flex items-center justify-center"><X size={18} /></button>
                       <button disabled={(forma === "dinheiro" && recebidoNum < total) || loading} onClick={() => setShowConfirm()} className="h-[40px] bg-[#16A34A] disabled:bg-gray-300 text-white rounded-full flex items-center justify-center font-bold text-[13px]">
-                        {loading? "..." : <Check size={18} />}
+                        {loading? "..." : <><Check size={18} /> {isMesa? "FECHAR" : "FINALIZAR"}</>}
                       </button>
                     </div>
                 </div>
@@ -41,18 +44,27 @@ export function PayModal({ showPay, setShowPay, total, forma, recebido, recebido
     );
 }
 
-export function ConfirmModal({ showConfirm, setShowConfirm, total, forma, troco, imprimirFatura, onSemRecibo, vendaNumero }: any) {
+export function ConfirmModal({ showConfirm, setShowConfirm, total, forma, troco, imprimirFatura, onSemRecibo, vendaNumero, isMesa, mesaNumero }: any) {
     if (!showConfirm) return null;
     return (
         <div className="absolute inset-0 z-[300] bg-black/40 backdrop-blur-md flex items-center justify-center p-4">
-            <div className="w-full max-w-[340px] bg-white/95 backdrop-blur-2xl rounded-[24px] p-6 border border-white/60 shadow-2xl text-center">
-                <div className="w-14 h-14 bg-[#E8F5E9] rounded-full flex items-center justify-center mx-auto mb-4 border border-white"><Check size={22} className="text-green-600" /></div>
-                <h3 className="font-black text-[16px]">Venda #{vendaNumero} concluída!</h3>
-                <p className="text-[12px] text-gray-500 mt-2">Total Kz {total.toLocaleString("de-DE")} via {forma} {forma === "dinheiro"? `• Troco Kz ${Math.max(0, troco).toLocaleString("de-DE")}` : ""}</p>
-                <p className="text-[11px] text-gray-400 mt-1">Deseja imprimir o recibo?</p>
-                <div className="flex gap-2 mt-5">
-                  <button onClick={onSemRecibo} className="flex-1 bg-white border border-black/10 rounded-full py-3 text-[13px]">Não, obrigado</button>
-                  <button onClick={imprimirFatura} className="flex-1 bg-black text-white rounded-full py-3 text-[13px] font-bold flex items-center justify-center gap-2"><Printer size={14} /> Imprimir</button>
+            <div className="w-full max-w-[360px] bg-white rounded-[24px] p-6 border shadow-2xl text-center animate-in zoom-in-95">
+                <div className="w-14 h-14 bg-[#E8F5E9] rounded-full flex items-center justify-center mx-auto mb-4 border border-green-200"><Check size={26} className="text-green-600" /></div>
+                <h3 className="font-black text-[16px] leading-tight">
+                    {isMesa? `Mesa ${mesaNumero} fechada!` : `Venda #${vendaNumero || ""} concluída!`}
+                </h3>
+                <p className="text-[12px] text-gray-600 mt-2 font-medium">
+                    Total Kz {Number(total).toLocaleString("de-DE")} via {forma}
+                </p>
+                {forma === "dinheiro" && troco > 0 && (
+                    <p className="text-[11px] text-green-700 bg-green-50 border border-green-100 rounded-full px-3 py-1 mt-2 inline-block font-black">
+                        Troco Kz {Number(troco).toLocaleString("de-DE")}
+                    </p>
+                )}
+                <p className="text-[12px] text-gray-900 mt-4 font-bold">Deseja imprimir o recibo?</p>
+                <div className="flex gap-2.5 mt-5">
+                  <button onClick={onSemRecibo} className="flex-1 bg-white border border-black/10 rounded-full py-3.5 text-[13px] font-bold hover:bg-zinc-50">Não, obrigado</button>
+                  <button onClick={imprimirFatura} className="flex-1 bg-black text-white rounded-full py-3.5 text-[13px] font-black flex items-center justify-center gap-2 hover:bg-zinc-800"><Printer size={14} /> Imprimir</button>
                 </div>
             </div>
         </div>
