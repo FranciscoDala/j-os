@@ -54,7 +54,7 @@ function PedirMesaInner() {
         if (!empresaId ||!mesaNumero) return;
         const url = `${API_URL}/api/v1/public/${empresaId}/cardapio?mesa=${mesaNumero}&t=${token}`;
         fetch(url)
-       .then(async r => {
+      .then(async r => {
             const text = await r.text();
             let data: any = {};
             try { data = JSON.parse(text); } catch {}
@@ -62,13 +62,13 @@ function PedirMesaInner() {
             if (!r.ok) throw new Error(data.detail || "Cardápio não encontrado");
             return data;
         })
-       .then(d => {
+      .then(d => {
             if (d.mesa && d.mesa.token_valido === false) throw new Error("EXPIRADO");
             setProdutos(d.produtos || []);
             setCats(["All",...(d.categorias || [])]);
             setLoading(false);
         })
-       .catch(e => {
+      .catch(e => {
             if (e.message === "EXPIRADO" || e.message.toLowerCase().includes("expirou") || e.message.toLowerCase().includes("fechada")) {
                 setExpirado(true);
             } else {
@@ -78,10 +78,9 @@ function PedirMesaInner() {
         });
     }, [empresaId, mesaNumero, token]);
 
-    // REGRA IGUAL SEU ProdutoCard
     const getStockState = (p: any) => {
         if (p.controlar_stock === false) return "ok";
-        if (!p.controlar_stock) return "ok"; // não controla = ok
+        if (!p.controlar_stock) return "ok";
         const atual = Number(p.stock_atual?? 0);
         const minimo = Number(p.stock_minimo?? 0);
         if (atual <= 0) return "zero";
@@ -98,9 +97,11 @@ function PedirMesaInner() {
     };
     const remove = (id: string) => setCart(cart.filter(c => c.id!== id));
 
+    // CORRIGIDO: só 1x por duplo clique/toque
     const handleCardTap = (p: any) => {
         const now = Date.now();
-        if (lastTap.current && lastTap.current.id === p.id && now - lastTap.current.time < 300) {
+        if (lastTap.current && lastTap.current.id === p.id && now - lastTap.current.time < 350) {
+            // segundo toque dentro de 350ms = conta como duplo, add 1x
             add(p);
             lastTap.current = null;
         } else {
@@ -139,10 +140,10 @@ function PedirMesaInner() {
                     <QrCode size={32} className="text-sky-600"/>
                 </div>
                 <h1 className="font-black text-[20px] text-zinc-900 leading-tight">Mesa {mesaLabel} encerrada</h1>
-                <p className="text-[14px] text-zinc-500 mt-3 leading-[1.4] font-medium">Este link expirou porque a conta foi fechada ou a mesa foi liberada para outros clientes.</p>
+                <p className="text-[14px] text-zinc-500 mt-3 leading-[1.4] font-medium">Este link expirou porque a conta foi fechada ou a mesa foi liberada.</p>
                 <div className="mt-5 bg-sky-50 border border-sky-100 rounded-2xl p-3 flex items-center gap-3 text-left">
                     <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-sm"><Clock3 size={18} className="text-sky-600"/></div>
-                    <div><p className="text-[12px] font-black text-zinc-800">O que fazer?</p><p className="text-[11px] text-zinc-500">Escaneie novamente o QR Code que está na mesa</p></div>
+                    <div><p className="text-[12px] font-black text-zinc-800">O que fazer?</p><p className="text-[11px] text-zinc-500">Escaneie novamente o QR Code da mesa</p></div>
                 </div>
                 <p className="text-[11px] text-zinc-400 mt-6 flex items-center justify-center gap-1"><Sparkles size={12}/> Link seguro e de sessão única</p>
             </div>
@@ -159,8 +160,8 @@ function PedirMesaInner() {
     return (
         <div className="h-[100dvh] flex flex-col bg-[#F5F7FB] overflow-hidden">
             <style>{`
-            .hide-scrollbar::-webkit-scrollbar{display:none}
-            .hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+           .hide-scrollbar::-webkit-scrollbar{display:none}
+           .hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
              input,textarea,select{font-size:16px!important}
             `}</style>
 
@@ -170,10 +171,12 @@ function PedirMesaInner() {
                         <h1 className="font-black text-[16px]">MESA {mesaLabel}</h1>
                         <span className="bg-black text-white text-[10px] font-black px-3 py-1 rounded-full">QR • PEDIDO NA MESA</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 mt-3">
-                        <input value={nome} onChange={e=>setNome(e.target.value)} placeholder="Seu nome*" className="bg-[#F5F7FB] rounded-full px-4 py-3 text-[16px] font-bold outline-none focus:ring-2 focus:ring-sky-400" />
-                        <input value={tel} onChange={e=>setTel(e.target.value)} placeholder="WhatsApp" className="bg-[#F5F7FB] rounded-full px-4 py-3 text-[16px] outline-none focus:ring-2 focus:ring-sky-400" />
+                    {/* AJUSTE: scroll-x invisivel, cada input 100% width */}
+                    <div className="mt-3 flex gap-2 overflow-x-auto hide-scrollbar snap-x snap-mandatory">
+                        <input value={nome} onChange={e=>setNome(e.target.value)} placeholder="Seu nome*" className="min-w-[100%] snap-center bg-[#F5F7FB] rounded-full px-4 py-3.5 text-[16px] font-bold outline-none focus:ring-2 focus:ring-sky-400" />
+                        <input value={tel} onChange={e=>setTel(e.target.value)} placeholder="WhatsApp" className="min-w-[100%] snap-center bg-[#F5F7FB] rounded-full px-4 py-3.5 text-[16px] outline-none focus:ring-2 focus:ring-sky-400" />
                     </div>
+                    <p className="text-[10px] text-zinc-400 mt-2 ml-1">← arraste para o lado →</p>
                 </div>
                 <div className="flex gap-2 overflow-auto px-4 py-3 hide-scrollbar">
                     {cats.map(c => <button key={c} onClick={()=>setCatAtiva(c)} className={`px-4 py-2 rounded-full text-[12px] font-black whitespace-nowrap border transition-all ${catAtiva===c?"bg-black text-white border-black":"bg-white"}`}>{c}</button>)}
@@ -206,7 +209,6 @@ function PedirMesaInner() {
                         return (
                             <div
                                 key={p.id}
-                                onDoubleClick={()=>!isZero && add(p)}
                                 onClick={()=>!isZero && handleCardTap(p)}
                                 className={`group relative rounded-[24px] p-2.5 pt-3 pb-3.5 flex flex-col items-center text-center w-full select-none cursor-pointer transition-all duration-300 ${cardWrap} ${isZero?"opacity-60 pointer-events-none":"active:scale-[0.97]"}`}
                             >
