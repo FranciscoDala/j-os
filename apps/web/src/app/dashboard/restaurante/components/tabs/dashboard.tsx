@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, SlidersHorizontal, ArrowUpRight, FileChartColumn, TriangleAlert, File, Eye, ClipboardList, Pill, Calendar } from "lucide-react";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const BASE = `${API_URL}/api/v1`;
@@ -40,9 +39,7 @@ export function HomeTab({ user }: { user: any }) {
                 caixaAtual: Number(extrato?.saldo_atual || 0)
             });
             setUltimasVendas(vendas.slice(0, 3));
-        } catch {
-            // silencia para não quebrar UI
-        } finally {
+        } catch {} finally {
             if (mountedRef.current) setLoading(false);
         }
     }, []);
@@ -53,7 +50,6 @@ export function HomeTab({ user }: { user: any }) {
         return () => { mountedRef.current = false; };
     }, [load]);
 
-    // REALTIME CIRÚRGICO - seguro contra memory leak
     useEffect(() => {
         const onExtrato = (e: any) => {
             const m = e.detail;
@@ -61,26 +57,19 @@ export function HomeTab({ user }: { user: any }) {
             const valorNum = Number(m.valor?? m.total_venda?? m.total?? 0);
             if (isNaN(valorNum)) return;
             const isVenda = (m.tipo || "").toUpperCase().includes("VENDA") || e.type === "venda:nova";
-
             setStats(s => ({
-               ...s,
+              ...s,
                 caixaAtual: m.saldo_atual? Number(m.saldo_atual) : s.caixaAtual + valorNum,
                 faturamento: valorNum > 0? s.faturamento + valorNum : s.faturamento,
                 pending: valorNum < 0? s.pending + Math.abs(valorNum) : s.pending,
                 vendasHoje: isVenda? s.vendasHoje + 1 : s.vendasHoje,
                 watchlist: s.watchlist + 1,
             }));
-            if (isVenda) {
-                setUltimasVendas(prev => [m,...prev].slice(0, 3));
-            }
+            if (isVenda) setUltimasVendas(prev => [m,...prev].slice(0, 3));
         };
-
         const events = ["caixa:extrato", "caixa:update", "caixa:atualizado", "venda:nova", "entidade:created"] as const;
         events.forEach(ev => window.addEventListener(ev as any, onExtrato));
-
-        return () => {
-            events.forEach(ev => window.removeEventListener(ev as any, onExtrato));
-        };
+        return () => { events.forEach(ev => window.removeEventListener(ev as any, onExtrato)); };
     }, []);
 
     const fmt = (v: number) => {
@@ -89,93 +78,168 @@ export function HomeTab({ user }: { user: any }) {
         return n.toLocaleString('pt-PT', { minimumFractionDigits: 2 });
     };
 
-    const cards = [
-        { id: 1, value: loading? "..." : `Kz ${fmt(stats.caixaAtual)}`, label: "Caixa Atual", labelColor: "text-blue-600", bg: "bg-white/90", icon: <FileChartColumn size={16} className="text-blue-700" />, iconBg: "bg-blue-100", bottom: (<div className="flex gap-1.5 mt-4 items-end h-8"><div className="w-full h-2.5 bg-[#A8C7F0] rounded-sm" /><div className="w-full h-4 bg-[#A8C7F0] rounded-sm" /><div className="w-full h-8 bg-[#1E3A8A] rounded-sm" /></div>) },
-        { id: 2, value: loading? "..." : stats.vendasHoje, label: "Vendas Hoje", labelColor: "text-gray-500", bg: "bg-white/90", icon: <TriangleAlert size={16} className="text-orange-500" />, iconBg: "bg-orange-100", bottom: <p className="text-[12px] text-green-600 mt-6 flex items-center gap-1"><ArrowUpRight size={14} />Kz {fmt(stats.faturamento)} faturado</p> },
-        { id: 3, value: loading? "..." : `Kz ${fmt(stats.pending)}`, label: "Saídas Hoje", labelColor: "text-black/70", bg: "bg-[#FFF68F]/95", icon: <File size={16} />, iconBg: "bg-white/70", bottom: (<div className="mt-6"><div className="h-1.5 bg-black/10 rounded-full"><div className="h-1.5 w-1/2 bg-black rounded-full" /></div><p className="text-[11px] mt-2 font-medium">{stats.watchlist} movimentos hoje</p></div>) },
-        { id: 4, value: loading? "..." : stats.active, label: "Caixas no período", labelColor: "text-white/80", bg: "bg-gradient-to-br from-[#5A8AD0] to-[#A9C5F0] text-white", icon: <Eye size={16} className="text-white" />, iconBg: "bg-white/20", bottom: <span className="mt-6 inline-flex bg-white/20 rounded-full px-3 py-1 text-[11px]">◎ ao vivo</span> },
-    ];
-
     return (
-        <div className="flex flex-col gap-3 md:gap-4 w-full min-w-0 pb-6 no-scrollbar">
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 px-1 md:px-0">
-                <h1 className="text-[22px] md:text-[20px] font-bold text-slate-900 leading-tight">Bom dia, {user?.nome || "Admin"}</h1>
-                <div className="flex gap-2 shrink-0">
-                    <button className="flex-1 md:flex-none bg-[#2F4A8A] text-white rounded-full px-4 py-3 md:py-2.5 text-[13px] font-medium flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition">
-                        <Plus size={16} /> Nova Venda
-                    </button>
-                    <button onClick={load} className="bg-white/80 backdrop-blur rounded-full w-11 h-11 md:w-9 md:h-9 flex items-center justify-center border border-white/60 shrink-0">
-                        <SlidersHorizontal size={18} />
-                    </button>
+        <div className="w-full min-w-0 bg-[#EDE9E3] rounded-[24px] p-4 md:p-6 flex flex-col gap-4" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
+            {/* HEADER IGUAL COPIA */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[#F5F3EF]/80 rounded-[20px] p-4">
+                <div className="flex gap-3 items-center">
+                    <div className="w-12 h-12 rounded-full bg-[#DCE8D8] flex items-center justify-center text-[#5A7A6A] text-[22px]">✳</div>
+                    <div>
+                        <h1 className="text-[22px] font-bold leading-none text-[#1A1A1A]">Hello, {user?.nome || "Carlic"}!</h1>
+                        <p className="text-[13px] text-[#6B6B6B] mt-1">Explore information and activity about your property</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="bg-white rounded-full flex items-center px-4 py-2.5 w-[280px] shadow-sm border border-white">
+                        <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center mr-3">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><circle cx="11" cy="11" r="6"/><path d="m21 21-4.3-4.3"/></svg>
+                        </div>
+                        <input placeholder="Search..." className="bg-transparent outline-none text-[13px] w-full placeholder:text-[#9A9A9A]" />
+                    </div>
+                    <div className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-sm">💬</div>
+                    <div className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-sm">🔔</div>
                 </div>
             </div>
 
-            <div className="flex md:hidden gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory px-1 pb-2 overscroll-x-contain">
-                {cards.map((c) => (
-                    <div key={c.id} className={`min-w-[100%] snap-center snap-always ${c.bg} backdrop-blur-xl rounded-[22px] p-4 shadow-sm border border-white/60 flex flex-col justify-between h-[130px] shrink-0`}>
-                        <div className="flex justify-between items-start">
-                            <div><p className="text-[22px] font-black leading-none truncate">{c.value}</p><p className={`text-[13px] mt-1 font-medium ${c.labelColor}`}>{c.label}</p></div>
-                            <div className={`w-8 h-8 ${c.iconBg} rounded-full flex items-center justify-center shrink-0`}>{c.icon}</div>
-                        </div>
-                        {c.bottom}
+            {/* TOP 4 CARDS - IGUAL COPIA 1:1 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Card 1 - Spent this month -> Caixa Atual */}
+                <div className="bg-white rounded-[20px] p-4 shadow-sm border border-white/50 flex justify-between items-center">
+                    <div>
+                        <p className="text-[13px] text-[#6B6B6B]">Spent this month</p>
+                        <p className="text-[22px] font-black mt-1">{loading? "..." : `Kz ${fmt(stats.caixaAtual)}`}</p>
                     </div>
-                ))}
+                    <div className="flex items-end gap-[3px] h-[32px]">
+                        <div className="w-[6px] h-[14px] bg-[#5A7A6A] rounded-full" />
+                        <div className="w-[6px] h-[22px] bg-[#5A7A6A] rounded-full" />
+                        <div className="w-[6px] h-[18px] bg-[#5A7A6A] rounded-full" />
+                        <div className="w-[6px] h-[28px] bg-[#5A7A6A] rounded-full" />
+                        <div className="w-[6px] h-[20px] bg-[#5A7A6A]/60 rounded-full" />
+                        <div className="w-[6px] h-[12px] bg-[#5A7A6A]/40 rounded-full" />
+                    </div>
+                </div>
+                {/* Card 2 - New clients -> Vendas Hoje */}
+                <div className="bg-white rounded-[20px] p-4 shadow-sm border border-white/50 flex justify-between items-center">
+                    <div className="flex gap-3 items-center">
+                        <div className="w-10 h-10 rounded-full bg-[#EAF0E8] flex items-center justify-center">👥</div>
+                        <div>
+                            <p className="text-[13px] text-[#6B6B6B]">New clients</p>
+                            <p className="text-[22px] font-black">{loading? "..." : stats.vendasHoje}</p>
+                        </div>
+                    </div>
+                    <svg width="60" height="24" viewBox="0 0 60 24"><path d="M0 20 Q10 5 20 15 T40 12 T60 5" fill="none" stroke="#7BAE9A" strokeWidth="2"/></svg>
+                </div>
+                {/* Card 3 - Earnings */}
+                <div className="bg-white rounded-[20px] p-4 shadow-sm border border-white/50 flex justify-between items-center">
+                    <div className="flex gap-3 items-center">
+                        <div className="w-10 h-10 rounded-full bg-[#F2E8D5] flex items-center justify-center">💰</div>
+                        <div>
+                            <p className="text-[13px] text-[#6B6B6B]">Earnings</p>
+                            <p className="text-[22px] font-black">Kz {fmt(stats.faturamento)}</p>
+                        </div>
+                    </div>
+                    <svg width="60" height="24" viewBox="0 0 60 24"><path d="M0 18 Q15 22 25 10 T45 14 T60 8" fill="none" stroke="#9A8BC2" strokeWidth="2"/></svg>
+                </div>
+                {/* Card 4 - Activity VERDE */}
+                <div className="bg-[#7AA58E] rounded-[20px] p-4 shadow-sm flex justify-between items-center text-white">
+                    <div>
+                        <p className="text-[13px] text-white/80">Activity</p>
+                        <p className="text-[22px] font-black">Kz {fmt(stats.pending)}</p>
+                    </div>
+                    <svg width="80" height="32" viewBox="0 0 80 32"><path d="M0 20 Q10 28 20 12 Q30 32 40 16 Q50 8 60 18 Q70 5 80 10" fill="none" stroke="white" strokeWidth="2" opacity="0.9"/></svg>
+                </div>
             </div>
 
-            <div className="hidden lg:grid grid-cols-4 gap-3">
-                {cards.map((c) => (
-                    <div key={c.id} className={`${c.bg} backdrop-blur-xl rounded-[18px] p-4 shadow-sm border border-white/60 flex flex-col justify-between min-h-[120px]`}>
-                        <div className="flex justify-between items-start gap-2">
-                            <div className="min-w-0"><p className="text-[18px] font-black leading-none truncate">{c.value}</p><p className={`text-[11px] mt-1 ${c.labelColor}`}>{c.label}</p></div>
-                            <div className={`w-7 h-7 ${c.iconBg} rounded-full flex items-center justify-center shrink-0`}>{c.icon}</div>
-                        </div>
-                        {c.bottom}
+            {/* MID ROW */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                <div className="lg:col-span-5 bg-white rounded-[20px] p-5 shadow-sm border border-white/50">
+                    <div className="flex justify-between items-center">
+                        <p className="font-bold text-[14px] flex items-center gap-2">Balance <span className="text-[11px] bg-[#E8F0E6] px-2 py-1 rounded-full">● On track</span></p>
+                        <span className="text-[11px] text-[#8A8A8A]">Monthly ▾</span>
                     </div>
-                ))}
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                        <div className="bg-[#F9F9F7] rounded-[12px] p-3">
+                            <p className="text-[11px] text-[#8A8A8A]">Saves</p>
+                            <p className="text-[16px] font-black">43.50% <span className="text-[10px] bg-[#E8F0E6] px-1.5 py-0.5 rounded-full font-semibold">+2.45%</span></p>
+                        </div>
+                        <div className="bg-[#F9F9F7] rounded-[12px] p-3">
+                            <p className="text-[11px] text-[#8A8A8A]">Balance</p>
+                            <p className="text-[16px] font-black">${fmt(stats.caixaAtual)} <span className="text-[10px] bg-[#FCE8E8] text-[#D44] px-1.5 py-0.5 rounded-full">-4.75%</span></p>
+                        </div>
+                    </div>
+                    <div className="mt-4 h-[90px] relative">
+                        <svg viewBox="0 0 300 80" className="w-full h-full"><path d="M0 60 Q20 30 40 50 T80 20 T120 55 T160 30 T200 15 T240 40 T300 10" fill="none" stroke="#5A7A6A" strokeWidth="2"/><path d="M0 60 Q20 30 40 50 T80 20 T120 55 T160 30 T200 15 T240 40 T300 10 L300 80 L0 80 Z" fill="#E8F0E6" opacity="0.6"/></svg>
+                    </div>
+                </div>
+
+                <div className="lg:col-span-3 bg-white rounded-[20px] p-5 shadow-sm border border-white/50 flex flex-col items-center">
+                    <p className="font-bold text-[14px] w-full text-left">Earnings</p>
+                    <p className="text-[11px] text-[#8A8A8A] w-full text-left mt-1">Total Expense</p>
+                    <p className="text-[22px] font-black mt-1">$6078.76</p>
+                    <p className="text-[11px] text-[#6B6B6B] mt-1 text-center">Profit is 34% More than last Month</p>
+                    <div className="mt-6 relative w-[140px] h-[70px]">
+                        <svg viewBox="0 0 100 50" className="w-full h-full"><path d="M10 50 A40 40 0 0 1 90 50" fill="none" stroke="#E5E5E5" strokeWidth="10"/><path d="M10 50 A40 40 0 0 1 78 18" fill="none" stroke="#5A7A6A" strokeWidth="10" strokeLinecap="round"/></svg>
+                        <p className="absolute left-1/2 top-[55%] -translate-x-1/2 text-[20px] font-black">80%</p>
+                    </div>
+                    <p className="text-[11px] text-[#8A8A8A] mt-2">Goal: $8000 • {stats.active} caixas</p>
+                </div>
+
+                <div className="lg:col-span-4 bg-white rounded-[20px] p-5 shadow-sm border border-white/50 flex flex-col items-center text-center">
+                    <div className="w-14 h-14 rounded-full bg-[#E9E0D5] flex items-center justify-center text-[24px]">{user?.nome?.[0] || "C"}</div>
+                    <p className="font-bold text-[15px] mt-3">{user?.nome || "Carlic Bolomboy"}</p>
+                    <p className="text-[12px] text-[#8A8A8A]">{user?.email || "carlic@gmai.com"}</p>
+                    <div className="grid grid-cols-3 w-full mt-6 border-t pt-4">
+                        <div><p className="text-[11px] text-[#8A8A8A]">Projects</p><p className="font-black text-[16px]">26</p></div>
+                        <div><p className="text-[11px] text-[#8A8A8A]">Followers</p><p className="font-black text-[16px]">{stats.watchlist}</p></div>
+                        <div><p className="text-[11px] text-[#8A8A8A]">Following</p><p className="font-black text-[16px]">68</p></div>
+                    </div>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-                <div className="lg:col-span-2 bg-white/70 backdrop-blur-xl rounded-[20px] md:rounded-[18px] p-3 md:p-4 flex flex-col border border-white/50 min-w-0">
-                    <div className="flex justify-between items-center mb-3 px-1">
-                        <h2 className="font-bold text-[15px] md:text-[13px]">Últimas Vendas (ao vivo)</h2>
-                        <button onClick={load} className="text-[12px] md:text-[11px] font-semibold bg-white/80 px-4 py-2 md:px-3 md:py-1.5 rounded-full border border-white/60">Atualizar</button>
+            {/* BOTTOM ROW */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                <div className="lg:col-span-5 bg-white rounded-[20px] p-5 shadow-sm border border-white/50">
+                    <p className="font-bold text-[14px]">Available Credit Card in Wallet</p>
+                    <p className="text-[11px] text-[#8A8A8A] mt-1 max-w-[220px]">Lorem ipsum dolor sit amet consectetur. Facilisis tincidunt purus id hendrerit cras massa sollicitudin adipiscing.</p>
+                    <div className="flex gap-3 mt-5 items-center">
+                        <button onClick={load} className="bg-[#5A7A6A] text-white text-[11px] px-4 py-2 rounded-full font-semibold">Add New Card +</button>
+                        <div className="relative w-[160px] h-[90px]">
+                            <div className="absolute top-0 left-4 w-[130px] h-[80px] bg-[#D8E6D3] rounded-[12px] border border-white shadow-md rotate-[-8deg]" />
+                            <div className="absolute top-2 left-6 w-[130px] h-[80px] bg-[#7AA58E] rounded-[12px] border border-white shadow-md rotate-[-4deg] flex items-center justify-center text-white text-[10px]">1234 1234 1234 1234</div>
+                            <div className="absolute top-6 left-8 w-[130px] h-[80px] bg-[#2B2B2B] rounded-[12px] shadow-md rotate-[6deg] flex items-center justify-center text-white text-[10px]">1234 1234 1234 1234</div>
+                        </div>
                     </div>
-                    <div className="flex flex-col gap-2.5 no-scrollbar">
-                        {ultimasVendas.length === 0 && <p className="text-[12px] text-gray-400 p-3">Nenhuma venda hoje ainda.</p>}
+                </div>
+
+                <div className="lg:col-span-3 bg-white rounded-[20px] p-5 shadow-sm border border-white/50">
+                    <p className="font-bold text-[14px]">Your Transfers</p>
+                    <div className="flex flex-col gap-4 mt-4">
+                        {ultimasVendas.length === 0 && <p className="text-[11px] text-[#9A9A9A]">Nenhuma venda ainda</p>}
                         {ultimasVendas.map((v: any, i) => (
-                            <div key={v.id || i} className="bg-white rounded-[16px] p-3.5 flex justify-between items-center border border-white/80 shadow-sm active:scale-[0.99] transition">
-                                <div className="flex gap-3 items-center min-w-0">
-                                    <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center text-[11px] font-black">{v.criado_por_nome?.[0] || 'V'}</div>
-                                    <div className="min-w-0"><p className="font-bold text-[14px] truncate">{v.descricao || 'Venda'}</p><p className="text-[12px] text-gray-500 truncate">{v.criado_em? new Date(v.criado_em).toLocaleTimeString('pt-PT') : ''} • {v.criado_por_nome || 'Sistema'}</p></div>
+                            <div key={i} className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-[13px] font-semibold truncate max-w-[120px]">{v.descricao || "Venda"}</p>
+                                    <p className="text-[11px] text-[#8A8A8A]">{v.criado_em? new Date(v.criado_em).toLocaleTimeString('pt-PT') : "Today, 14:34"}</p>
                                 </div>
-                                <span className="text-[12px] px-3 py-1 rounded-full font-bold bg-green-100 text-green-700 shrink-0 ml-2">+ Kz {fmt(Number(v.valor || 0))}</span>
+                                <span className="text-[11px] bg-[#E8F0E6] text-[#5A7A6A] px-2 py-1 rounded-full font-bold">+2.45%</span>
                             </div>
                         ))}
+                        {ultimasVendas.length === 0 && (
+                            <>
+                                <div className="flex justify-between items-center"><div><p className="text-[13px] font-semibold">From Anna Jones</p><p className="text-[11px] text-[#8A8A8A]">Today, 14:34</p></div><span className="text-[11px] bg-[#E8F0E6] text-[#5A7A6A] px-2 py-1 rounded-full font-bold">+2.45%</span></div>
+                                <div className="flex justify-between items-center"><div><p className="text-[13px] font-semibold">To Carlos Brown III</p><p className="text-[11px] text-[#8A8A8A]">Today, 15:23</p></div><span className="text-[11px] bg-[#FCE8E8] text-[#C44] px-2 py-1 rounded-full font-bold">-4.75%</span></div>
+                            </>
+                        )}
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-3 min-w-0">
-                    <div className="bg-white/70 backdrop-blur-xl rounded-[20px] md:rounded-[18px] p-3 md:p-4 border border-white/50">
-                        <h2 className="font-bold text-[14px] md:text-[13px] mb-3 px-1">Ações Rápidas</h2>
-                        <div className="flex flex-col gap-2.5">
-                            <button className="bg-white rounded-[14px] p-3.5 flex items-center justify-between w-full text-left shadow-sm border border-white/60 active:scale-[0.98] transition">
-                                <div className="flex gap-3 items-center min-w-0"><div className="w-10 h-10 bg-blue-50 rounded-[12px] flex items-center justify-center shrink-0"><ClipboardList size={18} className="text-blue-600" /></div><div className="min-w-0"><p className="text-[13px] font-semibold truncate">Vendas de Hoje</p><p className="text-[11px] text-gray-400">{stats.vendasHoje} vendas</p></div></div><span className="text-gray-400 text-[18px]">›</span>
-                            </button>
-                            <button className="bg-white rounded-[14px] p-3.5 flex items-center justify-between w-full text-left shadow-sm border border-white/60 active:scale-[0.98] transition">
-                                <div className="flex gap-3 items-center min-w-0"><div className="w-10 h-10 bg-blue-50 rounded-[12px] flex items-center justify-center shrink-0"><Pill size={18} className="text-blue-600" /></div><div className="min-w-0"><p className="text-[13px] font-semibold truncate">Faturamento</p><p className="text-[11px] text-gray-400">Kz {fmt(stats.faturamento)}</p></div></div><span className="text-gray-400 text-[18px]">›</span>
-                            </button>
-                            <button className="bg-white rounded-[14px] p-3.5 flex items-center justify-between w-full text-left shadow-sm border border-white/60 active:scale-[0.98] transition">
-                                <div className="flex gap-3 items-center min-w-0"><div className="w-10 h-10 bg-blue-50 rounded-[12px] flex items-center justify-center shrink-0"><Calendar size={18} className="text-blue-600" /></div><div className="min-w-0"><p className="text-[13px] font-semibold truncate">Saldo Atual</p><p className="text-[11px] text-gray-400">Kz {fmt(stats.caixaAtual)}</p></div></div><span className="text-gray-400 text-[18px]">›</span>
-                            </button>
-                        </div>
-                    </div>
+                <div className="lg:col-span-4 bg-[#E8F0E6] rounded-[20px] p-5 shadow-sm border border-white/50 flex flex-col items-center text-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-[#D0E2CA] flex items-center justify-center text-[20px]">🖐</div>
+                    <p className="font-bold text-[15px] mt-3">Keep you safe!</p>
+                    <p className="text-[12px] text-[#6B6B6B] mt-1">Update your security password</p>
+                    <button className="mt-5 bg-[#2F4A3A] text-white text-[12px] px-6 py-2.5 rounded-full font-semibold">Update Your Security</button>
                 </div>
             </div>
-
-            <style jsx>{`
-          .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
-          .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-            `}</style>
         </div>
     );
 }
