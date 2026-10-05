@@ -5,6 +5,7 @@ import { ProdutosTab } from "./components/tabs/produto/produto";
 import { CaixaTab } from "./components/tabs/caixa/caixa";
 import { EntidadesTab } from "./components/tabs/entidade/entidade";
 import { MesasTab } from "./components/tabs/mesa/mesa";
+import { PedidosTab } from "./components/tabs/pedido/pedido";
 
 export default function RestaurantePage() {
     const { activeTab, user } = useDashboard();
@@ -15,8 +16,8 @@ export default function RestaurantePage() {
             {activeTab === "produtos" && <ProdutosTab />}
             {activeTab === "funcionarios" && <EntidadesTab />}
             {activeTab === "mesas" && <MesasTab />}
+            {activeTab === "pedidos" && <PedidosTab />}
             {activeTab === "cardapio" && <div className="bg-white/70 backdrop-blur-xl rounded-[18px] p-4 md:p-8 border border-white/50">Cardápio</div>}
-            {activeTab === "pedidos" && <div className="bg-white/70 backdrop-blur-xl rounded-[18px] p-4 md:p-8 border border-white/50">Pedidos</div>}
             {activeTab === "financas" && <div className="bg-white/70 backdrop-blur-xl rounded-[18px] p-4 md:p-8 border border-white/50">Finanças</div>}
             {activeTab === "relatorios" && <div className="bg-white/70 backdrop-blur-xl rounded-[18px] p-4 md:p-8 border border-white/50">Relatórios</div>}
         </div>
