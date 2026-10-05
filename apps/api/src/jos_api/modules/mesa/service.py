@@ -18,14 +18,11 @@ def list_mesas(db: Session, empresa_id: uuid.UUID, status: str = "", zona: str =
         reserva = None
         if m.status == MesaStatus.RESERVADA:
             reserva = db.query(MesaReserva).filter(MesaReserva.mesa_id == m.id, MesaReserva.status == ReservaStatus.PENDENTE).order_by(MesaReserva.data_reserva.desc()).first()
-
         tempo = None
         if m.aberta_em and m.status == MesaStatus.OCUPADA:
             tempo = int((datetime.utcnow() - m.aberta_em).total_seconds() / 60)
-
         venda_total = 0
         venda_atual_id = m.venda_atual_id
-
         if m.status == MesaStatus.OCUPADA:
             venda = None
             if venda_atual_id:
@@ -36,22 +33,19 @@ def list_mesas(db: Session, empresa_id: uuid.UUID, status: str = "", zona: str =
                     venda_atual_id = venda.id
                     m.venda_atual_id = venda.id
                     db.commit()
-            # FIX ORFÃ: Se continua OCUPADA mas sem venda ABERTA, auto-libera
             if not venda:
-                print(f"[MESAS] Auto-liberando mesa órfã {m.numero} {m.id}")
+                # Auto-libera órfã
                 m.status = MesaStatus.LIVRE
                 m.venda_atual_id = None
                 m.garcom_id = None
                 m.aberta_em = None
                 m.pessoas_atual = 0
                 db.commit()
-                venda_atual_id = None
-                # Se o filtro era OCUPADA, não retorna essa mesa agora
                 if status == "OCUPADA":
                     continue
+                venda_atual_id = None
             else:
                 venda_total = float(venda.total or 0)
-
         d = {**m.__dict__}
         d["reserva_ativa"] = reserva
         d["tempo_ocupada_min"] = tempo
@@ -80,18 +74,18 @@ def reservar(db: Session, empresa_id: uuid.UUID, payload):
 def ocupar(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID, venda_id: uuid.UUID | None, garcom_id: uuid.UUID | None, pessoas: int | None = None):
     mesa = db.query(Mesa).filter(Mesa.id == mesa_id, Mesa.empresa_id == empresa_id).first()
     if not mesa: raise ValueError("Mesa não encontrada")
-    # Não deixa ocupar sem venda_id - evita criar órfã
-    if not venda_id:
-        raise ValueError("venda_id obrigatório para ocupar mesa")
+    if mesa.status == MesaStatus.OCUPADA and mesa.venda_atual_id:
+        raise ValueError("Mesa já ocupada")
     mesa.status = MesaStatus.OCUPADA
-    mesa.venda_atual_id = venda_id
+    if venda_id:
+        mesa.venda_atual_id = venda_id
     mesa.garcom_id = garcom_id
     mesa.aberta_em = mesa.aberta_em or datetime.utcnow()
     if pessoas: mesa.pessoas_atual = pessoas
     res = db.query(MesaReserva).filter(MesaReserva.mesa_id == mesa_id, MesaReserva.status == ReservaStatus.PENDENTE).order_by(MesaReserva.data_reserva.desc()).first()
     if res:
         res.status = ReservaStatus.CHECKIN
-        res.venda_id = venda_id
+        if venda_id: res.venda_id = venda_id
     db.commit(); db.refresh(mesa)
     return mesa
 

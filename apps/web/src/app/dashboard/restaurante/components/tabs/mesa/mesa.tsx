@@ -10,6 +10,7 @@ import { MesaComandaModal } from "./modals/comanda";
 import { CustomSelect } from "./cards/custom";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
+const VENDAS_API = `${API_BASE}/vendas`;
 const STATUS_OPTS = ["", "LIVRE", "OCUPADA", "RESERVADA", "SUJA"] as const;
 const STATUS_LABELS: Record<string, string> = { "": "Todos status", LIVRE: "Livre", OCUPADA: "Ocupada", RESERVADA: "Reservada", SUJA: "Suja" };
 
@@ -34,7 +35,42 @@ export function MesasTab() {
   useEffect(() => { const t = setTimeout(load, 350); return () => clearTimeout(t); }, [search]);
 
   const criarMesa = async () => { if (!numero.trim()) return toast.error("Número obrigatório"); if (!empresaId) return; setSaving(true); try { const res = await fetch(`${API_BASE}/mesas/${empresaId}`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, body: JSON.stringify({ numero: numero.trim().toUpperCase(), capacidade: Number(capacidade), zona: zonaNew }) }); const j = await res.json().catch(() => ({})); if (!res.ok) throw new Error(j.detail || "Erro"); toast.success(`Mesa ${j.numero} criada`); setShowNew(false); setNumero(""); load(); loadZonas(); } catch (e: any) { toast.error(e.message); } finally { setSaving(false); } };
-  const handleOcupar = async (pessoas: number) => { if (!mesaAlvo ||!empresaId) return; setSaving(true); try { const res = await fetch(`${API_BASE}/mesas/${empresaId}/${mesaAlvo.id}/ocupar`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, body: JSON.stringify({ pessoas }) }); const j = await res.json().catch(() => ({})); if (!res.ok) throw new Error(j.detail || "Erro ao ocupar"); toast.success(`Mesa ${j.numero} ocupada`); setShowOcupar(false); setMesaAlvo(null); load(); } catch (e: any) { toast.error(e.message); } finally { setSaving(false); } };
+
+  const handleOcupar = async (pessoas: number) => {
+    if (!mesaAlvo ||!empresaId) return;
+    setSaving(true);
+    try {
+      // 1. Cria venda vazia para a mesa (evita órfã)
+      let vendaId: string | null = null;
+      try {
+        const rVenda = await fetch(`${VENDAS_API}/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json",...getAuthHeaders() } as any,
+          body: JSON.stringify({ mesa_id: mesaAlvo.id, itens: [], modo: "mesa", pessoas })
+        });
+        if (rVenda.ok) {
+          const v = await rVenda.json();
+          vendaId = v.id;
+        }
+      } catch {}
+
+      // 2. Ocupa mesa com ou sem venda_id
+      const url = vendaId
+       ? `${API_BASE}/mesas/${empresaId}/${mesaAlvo.id}/ocupar?venda_id=${vendaId}`
+        : `${API_BASE}/mesas/${empresaId}/${mesaAlvo.id}/ocupar`;
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json",...getAuthHeaders() } as any,
+        body: JSON.stringify({ pessoas })
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.detail || "Erro ao ocupar");
+      toast.success(`Mesa ${j.numero} ocupada`);
+      setShowOcupar(false); setMesaAlvo(null); load();
+    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+  };
+
   const handleLimpar = async (m: any) => { try { const res = await fetch(`${API_BASE}/mesas/${empresaId}/${m.id}/limpar`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() } as any }); if (!res.ok) throw new Error("Erro"); toast.success("Mesa limpa"); load(); } catch (e: any) { toast.error(e.message); } };
   const handleLiberar = async (m: any) => { try { const res = await fetch(`${API_BASE}/mesas/${empresaId}/${m.id}/liberar?limpar=true`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() } as any }); if (!res.ok) throw new Error("Erro"); toast.success("Mesa liberada"); load(); } catch (e: any) { toast.error(e.message); } };
 
