@@ -18,24 +18,20 @@ class VendaCreateRequest(BaseModel):
     dinheiro_recebido: Decimal = Decimal("0")
     forma_pagamento: str = "DINHEIRO"
 
-class MesaCreateRequest(BaseModel):
-    numero: str
-    capacidade: int = 4
-    zona: str = "Salão"
+class AddItemRequest(BaseModel):
+    produto_id: UUID
+    quantidade: Decimal
+    observacao: Optional[str] = None
 
-class MesaResponse(BaseModel):
-    id: UUID
-    empresa_id: UUID
-    numero: str
-    capacidade: int
-    zona: str
+class TransferirMesaRequest(BaseModel):
+    nova_mesa_id: UUID
+
+class UpdateItemStatusRequest(BaseModel):
     status: str
-    venda_atual_id: Optional[UUID] = None
-    garcom_id: Optional[UUID] = None
-    aberta_em: Optional[datetime] = None
-    pessoas_atual: int = 0
-    class Config:
-        from_attributes = True
+
+class ReservaRequest(BaseModel):
+    produto_id: UUID
+    quantidade: Decimal
 
 class VendaItemResponse(BaseModel):
     id: UUID
@@ -50,8 +46,7 @@ class VendaItemResponse(BaseModel):
     total: Decimal
     status: str
     observacao: Optional[str] = None
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
 class VendaResponse(BaseModel):
     id: UUID
@@ -72,28 +67,11 @@ class VendaResponse(BaseModel):
     status: str
     created_at: datetime
     itens: List[VendaItemResponse]
-    class Config:
-        from_attributes = True
-
-class AddItemRequest(BaseModel):
-    produto_id: UUID
-    quantidade: Decimal
-    observacao: Optional[str] = None
-
-class TransferirMesaRequest(BaseModel):
-    nova_mesa_id: UUID
-
-class UpdateItemStatusRequest(BaseModel):
-    status: str
-
-class ReservaRequest(BaseModel):
-    produto_id: UUID
-    quantidade: Decimal
+    class Config: from_attributes = True
 
 class ReservaResponse(BaseModel):
     id: UUID
     produto_id: UUID
     quantidade: Decimal
     expira_em: datetime
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True

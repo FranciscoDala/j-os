@@ -11,7 +11,6 @@ from jos_api.modules.caixa.models import Caixa
 from jos_api.modules.caixa import service as caixa_service
 from jos_api.core.realtime import manager
 from jos_api.core.config import settings
-from jos_api.core.events import emit
 from jose import jwt
 import json
 
@@ -31,14 +30,10 @@ def _get_caixa_aberto_dep(db: Session = Depends(get_db), current_user: User = De
     if not caixa: raise HTTPException(400, "Nenhum caixa aberto")
     return caixa
 
-def _decode_ws_token(token: str):
-    try: return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-    except Exception as e: raise HTTPException(401, f"Token inválido: {e}")
-
 @router.websocket("/ws")
 async def ws_vendas(ws: WebSocket, token: str = Query(...), db: Session = Depends(get_db)):
     try:
-        payload = _decode_ws_token(token)
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         empresa_id = payload.get("empresa_id")
         if not empresa_id: await ws.close(code=1008); return
     except: await ws.close(code=1008); return
@@ -52,9 +47,7 @@ async def ws_vendas(ws: WebSocket, token: str = Query(...), db: Session = Depend
 @router.post("/reservas")
 def reservar(dados: schemas.ReservaRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
     empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
-    r = service.reservar_produto(db, empresa_id, dados.produto_id, current_user.id, dados.quantidade)
-    emit(str(empresa_id), "reserva:update", data={"produto_id": str(r.produto_id), "user_id": str(r.user_id), "quantidade": str(r.quantidade)})
-    return r
+    return service.reservar_produto(db, empresa_id, dados.produto_id, current_user.id, dados.quantidade)
 
 @router.delete("/reservas/{produto_id}")
 def liberar(produto_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
@@ -74,34 +67,6 @@ def criar_venda(dados: schemas.VendaCreateRequest, request: Request, db: Session
     venda, _ = service.create_venda(db, dados, empresa_id, current_user.id, caixa_aberto, _get_nome(current_user), ip=_get_ip(request))
     return venda
 
-@router.post("/{venda_id}/itens", response_model=schemas.VendaResponse)
-def add_item(venda_id: uuid.UUID, dados: schemas.AddItemRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
-    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
-    return service.add_item_comanda(db, venda_id, dados, empresa_id, current_user.id, _get_nome(current_user), ip=_get_ip(request))
-
-@router.put("/{venda_id}/itens/{item_id}/status")
-def update_status_item(venda_id: uuid.UUID, item_id: uuid.UUID, dados: schemas.UpdateItemStatusRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
-    try: novo = VendaItemStatus(dados.status.upper())
-    except: raise HTTPException(400, "Status inválido")
-    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
-    return service.update_item_status(db, venda_id, item_id, novo, empresa_id, current_user.id, _get_nome(current_user), ip=_get_ip(request))
-
-@router.post("/{venda_id}/transferir", response_model=schemas.VendaResponse)
-def transferir(venda_id: uuid.UUID, dados: schemas.TransferirMesaRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
-    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
-    return service.transferir_mesa(db, venda_id, dados.nova_mesa_id, empresa_id, current_user.id, _get_nome(current_user), ip=_get_ip(request))
-
-@router.post("/{venda_id}/fechar", response_model=schemas.VendaResponse)
-def fechar(venda_id: uuid.UUID, dinheiro_recebido: Decimal, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
-    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
-    venda, _ = service.fechar_comanda(db, venda_id, empresa_id, dinheiro_recebido, current_user.id, _get_nome(current_user), ip=_get_ip(request))
-    return venda
-
-@router.post("/{venda_id}/cancelar", response_model=schemas.VendaResponse)
-def cancelar(venda_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
-    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
-    return service.cancelar_venda(db, venda_id, empresa_id, current_user.id, _get_nome(current_user), ip=_get_ip(request))
-
 @router.get("/cozinha/pendentes", response_model=list[schemas.VendaResponse])
 def cozinha_pendentes(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
     empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
@@ -111,3 +76,38 @@ def cozinha_pendentes(db: Session = Depends(get_db), current_user: User = Depend
 def listar_vendas(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
     eid = _get_empresa_id_from_user(current_user, x_empresa_id)
     return db.query(Venda).filter(Venda.empresa_id == eid).order_by(Venda.created_at.desc()).limit(100).all()
+
+@router.get("/{venda_id}", response_model=schemas.VendaResponse)
+def get_venda(venda_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
+    venda = db.query(Venda).filter(Venda.id == venda_id, Venda.empresa_id == empresa_id).first()
+    if not venda: raise HTTPException(404, "Venda não encontrada")
+    return venda
+
+@router.post("/{venda_id}/itens", response_model=schemas.VendaResponse)
+def add_item(venda_id: uuid.UUID, dados: schemas.AddItemRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
+    return service.add_item_comanda(db, venda_id, dados, empresa_id, current_user.id, _get_nome(current_user), ip=_get_ip(request))
+
+@router.post("/{venda_id}/fechar", response_model=schemas.VendaResponse)
+def fechar(venda_id: uuid.UUID, request: Request, dinheiro_recebido: Decimal = Query(...), forma_pagamento: str = Query("DINHEIRO"), db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
+    venda, _ = service.fechar_comanda(db, venda_id, empresa_id, dinheiro_recebido, current_user.id, _get_nome(current_user), ip=_get_ip(request))
+    return venda
+
+@router.post("/{venda_id}/cancelar", response_model=schemas.VendaResponse)
+def cancelar(venda_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
+    return service.cancelar_venda(db, venda_id, empresa_id, current_user.id, _get_nome(current_user), ip=_get_ip(request))
+
+@router.post("/{venda_id}/transferir", response_model=schemas.VendaResponse)
+def transferir(venda_id: uuid.UUID, dados: schemas.TransferirMesaRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
+    return service.transferir_mesa(db, venda_id, dados.nova_mesa_id, empresa_id, current_user.id, _get_nome(current_user), ip=_get_ip(request))
+
+@router.put("/{venda_id}/itens/{item_id}/status")
+def update_status_item(venda_id: uuid.UUID, item_id: uuid.UUID, dados: schemas.UpdateItemStatusRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+    try: novo = VendaItemStatus(dados.status.upper())
+    except: raise HTTPException(400, "Status inválido")
+    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
+    return service.update_item_status(db, venda_id, item_id, novo, empresa_id, current_user.id, _get_nome(current_user), ip=_get_ip(request))

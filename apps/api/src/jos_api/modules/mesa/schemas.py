@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
+from decimal import Decimal
 import uuid
 from.models import MesaStatus, ReservaStatus
 
@@ -52,6 +53,7 @@ class MesaResponse(BaseModel):
     zona: Optional[str] = None
     status: MesaStatus
     venda_atual_id: Optional[uuid.UUID] = None
+    venda_total: Optional[Decimal] = Decimal("0")
     garcom_id: Optional[uuid.UUID] = None
     aberta_em: Optional[datetime] = None
     pessoas_atual: int = 0

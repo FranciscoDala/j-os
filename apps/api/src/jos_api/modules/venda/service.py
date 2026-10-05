@@ -53,17 +53,6 @@ def liberar_todas_reservas_user(db: Session, empresa_id: uuid.UUID, user_id: uui
     db.query(ReservaCarrinho).filter(ReservaCarrinho.empresa_id == empresa_id, ReservaCarrinho.user_id == user_id).delete()
     db.commit()
 
-def get_mesas(db: Session, empresa_id: uuid.UUID):
-    return db.query(Mesa).filter(Mesa.empresa_id == empresa_id, Mesa.ativa == True).order_by(Mesa.numero).all()
-
-def criar_mesa(db: Session, empresa_id: uuid.UUID, numero: str, capacidade: int, zona: str = "Salão"):
-    exists = db.query(Mesa).filter(Mesa.empresa_id == empresa_id, Mesa.numero == numero, Mesa.ativa == True).first()
-    if exists: raise HTTPException(400, f"Mesa {numero} já existe")
-    m = Mesa(empresa_id=empresa_id, numero=numero.strip().upper(), capacidade=capacidade, zona=zona, status=MesaStatus.LIVRE)
-    db.add(m); db.commit(); db.refresh(m)
-    emit(str(empresa_id), "mesa:created", data={"id": str(m.id), "numero": m.numero})
-    return m
-
 def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID, caixa: Caixa, criado_por_nome: str = "Sistema", ip: str | None = None):
     if not data.itens: raise HTTPException(400, "Sem itens")
     _limpar_expiradas(db, empresa_id)
@@ -75,8 +64,11 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
     if data.mesa_id:
         mesa = db.query(Mesa).filter(Mesa.id == data.mesa_id, Mesa.empresa_id == empresa_id).with_for_update().first()
         if not mesa: raise HTTPException(404, "Mesa não encontrada")
-        if mesa.status not in [MesaStatus.LIVRE, MesaStatus.RESERVADA]:
-            raise HTTPException(400, f"Mesa {mesa.numero} está {mesa.status.value}")
+        if mesa.status == MesaStatus.OCUPADA and mesa.venda_atual_id:
+            # se já tem venda aberta, bloqueia criação nova - tem que usar add_item
+            venda_existente = db.query(Venda).filter(Venda.id == mesa.venda_atual_id, Venda.status == VendaStatus.ABERTA).first()
+            if venda_existente:
+                raise HTTPException(400, f"Mesa {mesa.numero} já ocupada com comanda #{venda_existente.numero}. Use adicionar itens.")
         venda_tipo = VendaTipo.MESA
         venda_status = VendaStatus.ABERTA if data.dinheiro_recebido == Decimal("0") else VendaStatus.CONCLUIDA
     else:
@@ -114,29 +106,20 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
         mesa.status = MesaStatus.OCUPADA
         mesa.venda_atual_id = venda.id
         mesa.garcom_id = garcom_id
-        mesa.aberta_em = datetime.utcnow()
+        mesa.aberta_em = mesa.aberta_em or datetime.utcnow()
         mesa.pessoas_atual = pessoas
-        res = db.query(MesaReserva).filter(MesaReserva.mesa_id == mesa.id, MesaReserva.status == ReservaStatus.PENDENTE).order_by(MesaReserva.data_reserva.desc()).first()
-        if res:
-            res.status = ReservaStatus.CHECKIN
-            res.venda_id = venda.id
 
-    nomes = ", ".join([i.nome_produto for i in venda.itens])
     mov = None
     if venda_status == VendaStatus.CONCLUIDA:
-        mov = CaixaMovimento(empresa_id=empresa_id, caixa_id=caixa.id, tipo=TipoMovimento.VENDA, origem=OrigemMovimento.VENDA, valor=venda.total, descricao=f"Venda #{venda.numero} - {venda.forma_pagamento} - Resp: {criado_por_nome}", venda_id=venda.id, forma_pagamento=venda.forma_pagamento, criado_por=created_by, criado_por_nome=criado_por_nome)
+        mov = CaixaMovimento(empresa_id=empresa_id, caixa_id=caixa.id, tipo=TipoMovimento.VENDA, origem=OrigemMovimento.VENDA, valor=venda.total, descricao=f"Venda #{venda.numero} - {venda.forma_pagamento}", venda_id=venda.id, forma_pagamento=venda.forma_pagamento, criado_por=created_by, criado_por_nome=criado_por_nome)
         db.add(mov); db.flush()
 
-    registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="CRIAR", descricao=f"Venda #{venda.numero} - {nomes}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero}", user_id=created_by, user_nome=criado_por_nome, detalhes={"total": str(venda.total)}, ip=ip, commit=False)
+    registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="CRIAR", descricao=f"Venda #{venda.numero}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero}", user_id=created_by, user_nome=criado_por_nome, detalhes={"total": str(venda.total)}, ip=ip, commit=False)
     db.commit(); db.refresh(venda)
 
-    for p in produtos_afectados:
-        emit(str(empresa_id), "produto:update", data=p)
-
-    emit(str(empresa_id), "venda:nova", data={"id": str(venda.id), "numero": venda.numero, "total": str(venda.total), "mesa_id": str(venda.mesa_id) if venda.mesa_id else None, "itens": [{"produto_id": str(i.produto_id), "quantidade": str(i.quantidade)} for i in venda.itens]})
-    if mesa:
-        emit(str(empresa_id), "mesa:update", data={"id": str(mesa.id), "numero": mesa.numero, "status": "OCUPADA", "venda_atual_id": str(venda.id)})
-
+    for p in produtos_afectados: emit(str(empresa_id), "produto:update", data=p)
+    emit(str(empresa_id), "venda:nova", data={"id": str(venda.id), "numero": venda.numero, "total": str(venda.total), "mesa_id": str(venda.mesa_id) if venda.mesa_id else None})
+    if mesa: emit(str(empresa_id), "mesa:update", data={"id": str(mesa.id), "numero": mesa.numero, "status": "OCUPADA", "venda_atual_id": str(venda.id)})
     return venda, produtos_afectados
 
 def add_item_comanda(db: Session, venda_id: uuid.UUID, data, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
@@ -150,32 +133,8 @@ def add_item_comanda(db: Session, venda_id: uuid.UUID, data, empresa_id: uuid.UU
     item = VendaItem(empresa_id=empresa_id, venda_id=venda.id, produto_id=prod.id, nome_produto=prod.nome, quantidade=data.quantidade, preco_unit=prod.preco_venda, tem_iva=getattr(prod, 'tem_iva', False), iva_percent=prod.iva if getattr(prod, 'tem_iva', False) else Decimal("0"), subtotal=sub_item, iva_valor=iva_v, total=tot_item, status=VendaItemStatus.PENDENTE, observacao=getattr(data, 'observacao', None))
     venda.itens.append(item)
     venda.subtotal += sub_item; venda.total_iva += iva_v; venda.total += tot_item
-    db.flush()
-    registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="ADD_ITEM", descricao=f"Adicionou {prod.nome}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero}", user_id=user_id, user_nome=user_nome, ip=ip, commit=False)
-    db.commit(); db.refresh(venda)
+    db.flush(); db.commit(); db.refresh(venda)
     emit(str(empresa_id), "venda:update", data={"id": str(venda.id), "total": str(venda.total)})
-    return venda
-
-def transferir_mesa(db: Session, venda_id: uuid.UUID, nova_mesa_id: uuid.UUID, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
-    venda = db.query(Venda).filter(Venda.id == venda_id, Venda.empresa_id == empresa_id).with_for_update().first()
-    if not venda or venda.status!= VendaStatus.ABERTA: raise HTTPException(400, "Comanda não está aberta")
-    mesa_antiga = db.query(Mesa).filter(Mesa.id == venda.mesa_id, Mesa.empresa_id == empresa_id).with_for_update().first() if venda.mesa_id else None
-    mesa_nova = db.query(Mesa).filter(Mesa.id == nova_mesa_id, Mesa.empresa_id == empresa_id).with_for_update().first()
-    if not mesa_nova: raise HTTPException(404, "Nova mesa não encontrada")
-    if mesa_nova.status!= MesaStatus.LIVRE: raise HTTPException(400, f"Mesa {mesa_nova.numero} ocupada")
-    if mesa_antiga:
-        mesa_antiga.status = MesaStatus.LIVRE
-        mesa_antiga.venda_atual_id = None
-        mesa_antiga.garcom_id = None
-        mesa_antiga.aberta_em = None
-    mesa_nova.status = MesaStatus.OCUPADA
-    mesa_nova.venda_atual_id = venda.id
-    mesa_nova.garcom_id = venda.garcom_id
-    mesa_nova.aberta_em = datetime.utcnow()
-    venda.mesa_id = nova_mesa_id
-    db.commit()
-    emit(str(empresa_id), "mesa:update", data={"id": str(mesa_antiga.id) if mesa_antiga else None, "status": "LIVRE"})
-    emit(str(empresa_id), "mesa:update", data={"id": str(mesa_nova.id), "status": "OCUPADA"})
     return venda
 
 def fechar_comanda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, dinheiro_recebido: Decimal, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
@@ -193,7 +152,7 @@ def fechar_comanda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, dinh
     venda.dinheiro_recebido = dinheiro_recebido
     venda.troco = dinheiro_recebido - venda.total if dinheiro_recebido >= venda.total else Decimal("0")
     venda.status = VendaStatus.CONCLUIDA
-    mov = CaixaMovimento(empresa_id=empresa_id, caixa_id=caixa.id, tipo=TipoMovimento.VENDA, origem=OrigemMovimento.VENDA, valor=venda.total, descricao=f"Fechamento comanda #{venda.numero}", venda_id=venda.id, forma_pagamento=venda.forma_pagamento, criado_por=user_id, criado_por_nome=user_nome)
+    mov = CaixaMovimento(empresa_id=empresa_id, caixa_id=caixa.id, tipo=TipoMovimento.VENDA, origem=OrigemMovimento.VENDA, valor=venda.total, descricao=f"Fechamento #{venda.numero}", venda_id=venda.id, forma_pagamento=venda.forma_pagamento, criado_por=user_id, criado_por_nome=user_nome)
     db.add(mov)
     if venda.mesa_id:
         mesa = db.query(Mesa).filter(Mesa.id == venda.mesa_id).first()
@@ -206,8 +165,7 @@ def fechar_comanda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, dinh
     db.commit(); db.refresh(venda)
     for p in produtos_afectados: emit(str(empresa_id), "produto:update", data=p)
     emit(str(empresa_id), "venda:fechada", data={"id": str(venda.id)})
-    if venda.mesa_id:
-        emit(str(empresa_id), "mesa:update", data={"id": str(venda.mesa_id), "status": "LIVRE"})
+    if venda.mesa_id: emit(str(empresa_id), "mesa:update", data={"id": str(venda.mesa_id), "status": "LIVRE"})
     return venda, produtos_afectados
 
 def cancelar_venda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
@@ -216,13 +174,21 @@ def cancelar_venda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, user
     venda.status = VendaStatus.CANCELADA
     if venda.mesa_id:
         mesa = db.query(Mesa).filter(Mesa.id == venda.mesa_id).first()
-        if mesa:
-            mesa.status = MesaStatus.LIVRE
-            mesa.venda_atual_id = None
+        if mesa: mesa.status = MesaStatus.LIVRE; mesa.venda_atual_id = None
     db.commit()
-    emit(str(empresa_id), "venda:cancelada", data={"id": str(venda.id)})
-    if venda.mesa_id:
-        emit(str(empresa_id), "mesa:update", data={"id": str(venda.mesa_id), "status": "LIVRE"})
+    return venda
+
+def transferir_mesa(db: Session, venda_id: uuid.UUID, nova_mesa_id: uuid.UUID, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
+    venda = db.query(Venda).filter(Venda.id == venda_id, Venda.empresa_id == empresa_id).with_for_update().first()
+    if not venda or venda.status!= VendaStatus.ABERTA: raise HTTPException(400, "Comanda não está aberta")
+    mesa_antiga = db.query(Mesa).filter(Mesa.id == venda.mesa_id, Mesa.empresa_id == empresa_id).with_for_update().first() if venda.mesa_id else None
+    mesa_nova = db.query(Mesa).filter(Mesa.id == nova_mesa_id, Mesa.empresa_id == empresa_id).with_for_update().first()
+    if not mesa_nova: raise HTTPException(404, "Nova mesa não encontrada")
+    if mesa_nova.status!= MesaStatus.LIVRE: raise HTTPException(400, f"Mesa {mesa_nova.numero} ocupada")
+    if mesa_antiga: mesa_antiga.status = MesaStatus.LIVRE; mesa_antiga.venda_atual_id = None
+    mesa_nova.status = MesaStatus.OCUPADA; mesa_nova.venda_atual_id = venda.id
+    venda.mesa_id = nova_mesa_id
+    db.commit()
     return venda
 
 def update_item_status(db: Session, venda_id: uuid.UUID, item_id: uuid.UUID, novo_status: VendaItemStatus, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
@@ -230,5 +196,4 @@ def update_item_status(db: Session, venda_id: uuid.UUID, item_id: uuid.UUID, nov
     if not item: raise HTTPException(404, "Item não encontrado")
     item.status = novo_status
     db.commit()
-    emit(str(empresa_id), "cozinha:update", data={"item_id": str(item.id), "status": novo_status.value})
     return item
