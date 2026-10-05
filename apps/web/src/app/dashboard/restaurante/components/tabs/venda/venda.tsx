@@ -249,54 +249,51 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         <div className="h-full w-full flex flex-col bg-[#EDEBE6] overflow-hidden relative" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
             <Toasts toasts={toasts} setToasts={setToasts} />
             <div className="h-[52px] px-3 flex items-center justify-between shrink-0">
-                <div className="bg-white rounded-full h-9 px-1.5 flex items-center gap-2 border border-[#E2EADF]">
+                <div className="bg-white rounded-full h-9 px-1.5 flex items-center gap-2">
                     <span className="text-[11px] font-bold px-2">Modo Mesas</span>
                     <button onClick={() => setModoMesa(!modoMesa)} className={`w-[38px] h-[24px] rounded-full p-0.5 flex items-center transition-all ${modoMesa? "bg-black" : "bg-[#E5E1D8]"}`}><div className={`w-5 h-5 rounded-full bg-white shadow transition-all ${modoMesa? "translate-x-[14px]" : "translate-x-0"}`} /></button>
                 </div>
                 <button onClick={onClose} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center"><X size={14} /></button>
             </div>
 
-            {/* SEM BG, SEM PADDING EXTRA NA SEÇÃO PRODUTOS */}
+            {/* SEM BG BRANCO/AZUL, SEM BORDA DE SEPARAÇÃO */}
             <div className="flex-1 flex flex-col lg:flex-row gap-3 px-3 pb-3 overflow-hidden min-h-0">
-                {/* PRODUTOS - SEM BG */}
-                <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+                <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-transparent">
                     {modoMesa && <div className="mb-3 shrink-0"><PedidosQrPendentes onAprovado={() => { fetchMesasOcupadas(); }} /></div>}
                     <div className="flex-1 overflow-y-auto no-scrollbar min-h-0">
                         <ProdutosSection dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd} cats={cats} activeCat={activeCat} setActiveCat={setActiveCat} searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef} getQty={getQty} getStockState={getStockState} add={add} modoMesa={modoMesa} mesasOcupadas={mesasOcupadas} loadingMesas={loadingMesas} mesaSelecionada={mesaSelecionada} onSelectMesa={selecionarMesa} fetchMesas={fetchMesasOcupadas} cart={cart} cartTotal={total} onFecharMesa={(m: any) => { setMesaParaFechar(m); setRecebido(String(Number(m.venda_total || m.total || 0) + (m.id === mesaSelecionada?.id? total : 0))); setShowPay(true); }} onImprimirConta={imprimirContaParcial} />
                     </div>
                 </div>
 
-                {/* CARRINHO - SÓ BORDAS, SEM DIV EXTRA DE BG */}
-                <div className="lg:w-[360px] h-full shrink-0 flex flex-col bg-white rounded-[16px] border border-[#E2EADF] overflow-hidden">
-                    <div className="shrink-0 px-4 h-[44px] flex items-center justify-between border-b border-[#E2EADF]">
+                {/* CARRINHO SEM BG, SEM BORDA DE SECÇÃO */}
+                <div className="lg:w-[360px] h-full shrink-0 flex flex-col bg-transparent overflow-hidden">
+                    <div className="shrink-0 px-1 h-[36px] flex items-center justify-between">
                         <p className="text-[12px] font-bold">Seu pedido</p>
                         <span className="w-6 h-6 bg-black text-white text-[10px] font-bold rounded-full flex items-center justify-center">{cart.length}</span>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto no-scrollbar px-3 py-3 flex flex-col gap-2 min-h-0">
+                    <div className="flex-1 overflow-y-auto no-scrollbar py-2 flex flex-col gap-2 min-h-0">
                         {cart.map((item: any, idx: number) => (
-                            <div key={`${item.id}-${idx}`} className="flex justify-between items-start px-3 py-2.5 rounded-[10px] border border-[#E8EFE6]">
+                            <div key={`${item.id}-${idx}`} className="flex justify-between items-start px-3 py-2.5 rounded-[12px] bg-white">
                                 <div className="pr-2 min-w-0"><p className="text-[11px] font-semibold truncate max-w-[160px]">{item.name}</p><p className="text-[10px] text-[#9A9A9A]">x{item.qtd}</p></div>
                                 <span className="text-[11px] font-bold shrink-0">Kz {(item.price * item.qtd).toLocaleString("de-DE")}</span>
                             </div>
                         ))}
                     </div>
 
-                    <div className="shrink-0 border-t border-[#E2EADF] p-3 flex flex-col gap-2 sticky bottom-0 bg-white">
-                        <div className="flex items-center justify-between border border-[#E2EADF] rounded-[10px] px-3 h-9">
-                            <select value={forma} onChange={(e) => setForma(e.target.value as any)} className="flex-1 bg-transparent text-[11px] font-bold outline-none">
-                                <option value="dinheiro">Dinheiro</option>
-                                <option value="transferencia">Transferência</option>
-                                <option value="tpa">TPA</option>
-                            </select>
-                        </div>
+                    <div className="shrink-0 pt-2 flex flex-col gap-2 sticky bottom-0 bg-[#EDEBE6]">
+                        <select value={forma} onChange={(e) => setForma(e.target.value as any)} className="w-full h-9 rounded-full bg-white px-3 text-[11px] font-bold outline-none">
+                            <option value="dinheiro">Dinheiro</option>
+                            <option value="transferencia">Transferência</option>
+                            <option value="tpa">TPA</option>
+                        </select>
                         <div className="flex items-center justify-between px-1">
                             <span className="text-[11px] text-[#8A8A8A]">Total</span>
                             <span className="text-[13px] font-black">Kz {total.toLocaleString("de-DE")}</span>
                         </div>
                         {mesaSelecionada? (
                             <div className="flex gap-2">
-                                <button onClick={() => { setMesaSelecionada(null); setCart([]); setVendaMesa(null); }} className="flex-1 h-9 rounded-full border border-[#E2EADF] text-[11px] font-bold">Limpar</button>
+                                <button onClick={() => { setMesaSelecionada(null); setCart([]); setVendaMesa(null); }} className="flex-1 h-9 rounded-full bg-white text-[11px] font-bold">Limpar</button>
                                 <button onClick={adicionarNaMesa} disabled={finalizando || cart.length === 0} className="flex-[2] h-9 rounded-full bg-black text-white text-[11px] font-bold disabled:opacity-50" style={{ paddingTop: '2px', paddingBottom: '2px' }}>{finalizando? "..." : `Lançar Mesa ${mesaSelecionada.numero}`}</button>
                             </div>
                         ) : (
