@@ -7,7 +7,7 @@ import { MesaCard } from "./cards/mesa";
 import { MesaModal } from "./modals/criar";
 import { MesaOcuparModal } from "./modals/ocupar";
 import { MesaComandaModal } from "./modals/comanda";
-import { CustomSelect } from "./cards/CustomSelect";
+import { CustomSelect } from "./cards/custom";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
 const STATUS_OPTS = ["", "LIVRE", "OCUPADA", "RESERVADA", "SUJA"] as const;
