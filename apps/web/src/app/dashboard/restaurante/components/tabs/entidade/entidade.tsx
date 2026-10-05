@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { EntidadeModal } from "./modals/criar";
 import { DeleteConfirmModal } from "./modals/deletar";
 import { EntidadeCard } from "./cards/entidade";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
@@ -24,6 +24,43 @@ function getEmpresaId() {
     return localStorage.getItem("empresa_id") || localStorage.getItem("empresaId") || null;
 }
 
+function getCanManage(): boolean {
+    if (typeof window === "undefined") return false;
+    const raw = (localStorage.getItem("perfil_slug") || localStorage.getItem("user_role") || localStorage.getItem("role") || localStorage.getItem("perfil") || localStorage.getItem("user_perfil") || "").toLowerCase();
+    const cargo = (localStorage.getItem("cargo") || localStorage.getItem("user_cargo") || "").toLowerCase();
+    const combined = `${raw} ${cargo}`;
+    return combined.includes("dono") || combined.includes("owner") || combined.includes("gerente") || combined.includes("manager") || combined.includes("admin") || combined.includes("supervisor");
+}
+
+function CustomSelect({ value, onChange, options, labelMap }: { value: string, onChange: (v: string) => void, options: string[], labelMap: Record<string,string> }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const h = (e: MouseEvent) => { if (ref.current &&!ref.current.contains(e.target as Node)) setOpen(false); };
+        document.addEventListener("mousedown", h);
+        return () => document.removeEventListener("mousedown", h);
+    }, []);
+    return (
+        <div ref={ref} className={`relative ${open? "z-[60]" : "z-0"} w-full`}>
+            <button type="button" onClick={() => setOpen(!open)} className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 py-2.5 text-[11px] font-black text-left flex items-center justify-between shadow-sm hover:border-[#A67C52] focus:border-[#A67C52] focus:ring-2 focus:ring-[#A67C52]/20 transition-all outline-none">
+                <span className="truncate">{labelMap[value] || value}</span>
+                <ChevronDown size={14} className={`shrink-0 ml-2 transition-transform ${open? "rotate-180" : ""}`} />
+            </button>
+            {open && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[18px] border border-[#E8DCCF] shadow-[0_12px_32px_rgba(0,0,0,0.18)] z-[100] overflow-hidden p-1.5">
+                    <div className="max-h-[200px] overflow-y-auto no-scrollbar space-y-0.5">
+                        {options.map(opt => (
+                            <button key={opt} type="button" onClick={() => { onChange(opt); setOpen(false); }} className={`w-full text-left px-4 py-2 rounded-full text-[11px] font-bold transition-all ${value === opt? "bg-[#A67C52] text-white shadow-sm" : "bg-white text-black hover:bg-[#F5E6D3] hover:text-[#5A3A22]"}`}>
+                                {labelMap[opt]}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
 export function EntidadesTab() {
     const [tipoFiltro, setTipoFiltro] = useState<"FUNCIONARIO" | "CLIENTE" | "FORNECEDOR">("FUNCIONARIO");
     const [lista, setLista] = useState<any[]>([]);
@@ -35,9 +72,13 @@ export function EntidadesTab() {
     const [deleting, setDeleting] = useState(false);
     const [search, setSearch] = useState("");
     const [empresaId, setEmpresaId] = useState<string | null>(null);
+    const [canManage, setCanManage] = useState(false);
     const [form, setForm] = useState<any>({ id: null, tipo: "FUNCIONARIO", nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" });
 
-    useEffect(() => { setEmpresaId(getEmpresaId()); }, []);
+    useEffect(() => {
+        setEmpresaId(getEmpresaId());
+        setCanManage(getCanManage());
+    }, []);
 
     const load = useCallback(async () => {
         if (!empresaId) return;
@@ -48,9 +89,8 @@ export function EntidadesTab() {
             } else {
                 const err = await res.json().catch(()=>({detail:"Erro"}));
                 if (res.status===403) {
-                    // FIX: operador_caixa agora tem permissão, mas se ainda der 403 mostra mensagem amigável
                     console.warn("403 entidades:", err);
-                    toast.error(err.detail || "Sem permissão - faça login novamente como operador_caixa");
+                    toast.error(err.detail || "Sem permissão");
                     setLista([]);
                 }
             }
@@ -65,7 +105,6 @@ export function EntidadesTab() {
             const res = await fetch(`${API_BASE}/entidades/${empresaId}/perfis`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, cache: "no-store" });
             if (res.ok) {
                 const data = await res.json();
-                // Remove duplicados por slug e garante role_equivalente
                 const uniqMap: any = {};
                 data.forEach((p:any) => { uniqMap[p.slug] = p; });
                 setPerfis(Object.values(uniqMap) as any[]);
@@ -78,22 +117,26 @@ export function EntidadesTab() {
     useEffect(() => { if (empresaId) { load(); loadPerfis(); } }, [load, loadPerfis]);
 
     const handleEdit = (ent: any) => {
+        if (!canManage) return toast.error("Apenas dono e gerente podem editar");
         setForm({ id: ent.id, tipo: ent.tipo, nome: ent.nome, telefone: ent.telefone || "", email: ent.email || "", documento: ent.documento || "", endereco: ent.endereco || "", cargo: ent.cargo || "", departamento: ent.departamento || "", salario: ent.salario || "", carga_horaria: ent.carga_horaria || "", data_admissao: ent.data_admissao? ent.data_admissao.split("T")[0] : "", empresa_fornecedora: ent.empresa_fornecedora || "", categoria_fornecedor: ent.categoria_fornecedor || "", tem_acesso_app: ent.tem_acesso_app || false, perfil_id: ent.perfil_id || "", senha: "" });
         setOpen(true);
     };
-    const handleDeleteClick = (ent: any) => { setSelected(ent); setOpenDelete(true); };
+    const handleDeleteClick = (ent: any) => {
+        if (!canManage) return toast.error("Apenas dono e gerente podem apagar");
+        setSelected(ent); setOpenDelete(true);
+    };
 
     const handleSave = async () => {
         if (!empresaId) return toast.error("Empresa não encontrada");
-
         const isEdit =!!form.id;
+        if (isEdit &&!canManage) return toast.error("Sem permissão para editar");
+        if (!isEdit &&!canManage) return toast.error("Apenas dono e gerente podem criar");
         if (form.tem_acesso_app) {
             if (!form.perfil_id) return toast.error("Selecione o perfil de acesso");
             if (!form.email?.trim()) return toast.error("Email obrigatório para acesso ao app");
             if (!isEdit && (!form.senha || form.senha.trim().length < 6)) return toast.error("Senha obrigatória - mínimo 6 caracteres");
             if (form.senha && form.senha.trim().length > 0 && form.senha.trim().length < 6) return toast.error("Senha mínimo 6 caracteres");
         }
-
         setSaving(true);
         try {
             const clean = (v: any) => (v === "" || v === undefined? null : typeof v === 'string'? (v.trim() || null) : v);
@@ -103,13 +146,11 @@ export function EntidadesTab() {
             if (form.senha && form.senha.trim().length >= 6) payload.senha = form.senha.trim();
             else if (!isEdit && payload.tem_acesso_app) throw new Error("Senha obrigatória para acesso ao app");
             if (!payload.tem_acesso_app) payload.perfil_id = null;
-
             const url = isEdit? `${API_BASE}/entidades/${empresaId}/${form.id}` : `${API_BASE}/entidades/${empresaId}`;
             const method = isEdit? "PUT" : "POST";
             const res = await fetch(url, { method, headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, body: JSON.stringify(payload) });
             const json = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(json.detail || "Erro ao salvar");
-
             if (isEdit) { setLista(prev => prev.map(p => p.id === json.id? json : p)); toast.success("Atualizado com sucesso"); }
             else { setLista(prev => [json,...prev]); toast.success("Criado com sucesso"); }
             setOpen(false);
@@ -119,6 +160,7 @@ export function EntidadesTab() {
 
     const confirmDelete = async () => {
         if (!selected ||!empresaId) return;
+        if (!canManage) return toast.error("Apenas dono e gerente podem apagar");
         setDeleting(true);
         const backup = lista;
         setLista(prev => prev.filter(p => p.id!== selected.id));
@@ -137,16 +179,24 @@ export function EntidadesTab() {
         <>
             <div className="space-y-4">
                 <div className="flex items-center justify-between gap-3">
-                    <select value={tipoFiltro} onChange={e => setTipoFiltro(e.target.value as any)} className="bg-white border rounded-full px-5 py-2.5 text-[11px] font-black shadow-sm">
-                        {TIPOS.map(t => <option key={t} value={t}>{TIPO_LABELS[t]}</option>)}
-                    </select>
-                    <div className="flex items-center gap-2">
-                        <div className="flex items-center bg-white border rounded-full px-3 gap-2 shadow-sm"><Search size={14} className="opacity-40" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar..." className="bg-transparent outline-none text-[12px] py-2.5 w-[140px]" /></div>
-                        <button onClick={() => { setForm({ id: null, tipo: tipoFiltro, nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" }); setOpen(true); }} className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-md"><Plus size={18} /></button>
+                    <div className="flex items-center gap-3 flex-1">
+                        <div className="w-1/2 md:w-[calc(33.333%-8px)] lg:w-[calc(25%-9px)]">
+                            <CustomSelect value={tipoFiltro} onChange={(v) => setTipoFiltro(v as any)} options={[...TIPOS]} labelMap={TIPO_LABELS} />
+                        </div>
+                        <div className="w-1/2 md:w-[calc(33.333%-8px)] lg:w-[calc(25%-9px)] relative">
+                            <div className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 py-2.5 flex items-center gap-2 shadow-sm focus-within:border-[#A67C52] focus-within:ring-2 focus-within:ring-[#A67C52]/20 transition-all">
+                                <Search size={14} className="opacity-40 shrink-0" />
+                                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar..." className="bg-transparent outline-none text-[11px] font-bold w-full placeholder:font-bold placeholder:opacity-40" />
+                            </div>
+                        </div>
                     </div>
+                    {canManage && (
+                        <button onClick={() => { setForm({ id: null, tipo: tipoFiltro, nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" }); setOpen(true); }} className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-md hover:bg-zinc-800 shrink-0"><Plus size={18} /></button>
+                    )}
                 </div>
+
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {filtered.length === 0? <div className="col-span-full text-center py-10 text-[12px] opacity-50 font-bold">Nenhum {TIPO_LABELS[tipoFiltro]}</div> : filtered.map(ent => <EntidadeCard key={ent.id} ent={ent} onEdit={handleEdit} onDelete={handleDeleteClick} />)}
+                    {filtered.length === 0? <div className="col-span-full text-center py-10 text-[12px] opacity-50 font-bold">Nenhum {TIPO_LABELS[tipoFiltro]}</div> : filtered.map(ent => <EntidadeCard key={ent.id} ent={ent} onEdit={handleEdit} onDelete={handleDeleteClick} canManage={canManage} />)}
                 </div>
             </div>
             <EntidadeModal open={open} setOpen={setOpen} form={form} setForm={setForm} perfis={perfis} saving={saving} onSave={handleSave} />

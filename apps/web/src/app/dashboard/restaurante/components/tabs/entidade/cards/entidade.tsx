@@ -3,16 +3,18 @@ import { Pencil, Trash2 } from "lucide-react";
 
 const TIPO_LABELS: Record<string, string> = { FUNCIONARIO: "Funcionário", CLIENTE: "Cliente", FORNECEDOR: "Fornecedor" };
 
-export function EntidadeCard({ ent, onEdit, onDelete }: { ent: any, onEdit: (e: any) => void, onDelete: (e: any) => void }) {
+export function EntidadeCard({ ent, onEdit, onDelete, canManage }: { ent: any, onEdit: (e: any) => void, onDelete: (e: any) => void, canManage?: boolean }) {
     const initials = ent.nome?.slice(0,2).toUpperCase() || "EN";
     const cargo = ent.cargo || ent.departamento || ent.email || TIPO_LABELS[ent.tipo] || "—";
 
     return (
         <div className="group relative rounded-[22px] p-2.5 pt-3 pb-3.5 bg-white border shadow-[0_8px_24px_rgba(0,0,0,0.06)] flex flex-col items-center text-center hover:shadow-[0_14px_36px_rgba(0,0,0,0.10)] hover:-translate-y-0.5 transition-all duration-300 overflow-hidden w-full select-none">
-            <div className="absolute top-2.5 right-2.5 flex gap-[2px] opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                <button onClick={() => onEdit(ent)} className="w-8 h-8 bg-black/80 backdrop-blur text-white rounded-full flex items-center justify-center hover:bg-black shadow-lg"><Pencil size={13} /></button>
-                <button onClick={() => onDelete(ent)} className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 shadow-lg"><Trash2 size={13} /></button>
-            </div>
+            {canManage && (
+                <div className="absolute top-2.5 right-2.5 flex gap-[2px] opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    <button onClick={() => onEdit(ent)} className="w-8 h-8 bg-black/80 backdrop-blur text-white rounded-full flex items-center justify-center hover:bg-black shadow-lg"><Pencil size={13} /></button>
+                    <button onClick={() => onDelete(ent)} className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 shadow-lg"><Trash2 size={13} /></button>
+                </div>
+            )}
             <div className="relative w-[122px] h-[122px] shrink-0">
                 <div className="w-full h-full rounded-full p-[3px] shadow-inner bg-[#F5E6D3]">
                     {ent.foto_url? <img src={ent.foto_url} className="w-full h-full rounded-full object-cover" alt={ent.nome} /> : <div className="w-full h-full rounded-full bg-black text-white flex items-center justify-center text-[28px] font-black">{initials}</div>}
