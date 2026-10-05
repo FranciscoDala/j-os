@@ -1,5 +1,4 @@
 "use client";
-
 export function MesaModal({ open, onClose, numero, setNumero, capacidade, setCapacidade, zonaNew, setZonaNew, onCreate, saving }: any) {
     if (!open) return null;
     return (
@@ -7,7 +6,7 @@ export function MesaModal({ open, onClose, numero, setNumero, capacidade, setCap
             <div className="bg-white rounded-[22px] w-full max-w-[380px] p-6 border border-[#E8DCCF] shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
                 <h3 className="font-black text-[14px] mb-4">Nova Mesa</h3>
                 <div className="space-y-3">
-                    <input value={numero} onChange={e => setNumero(e.target.value)} placeholder="Número ex: M01" className="w-full h-11 rounded-full border border-[#E8DCCF] px-4 text-[12px] font-bold outline-none focus:border-[#A67C52]" />
+                    <input value={numero} onChange={e => setNumero(e.target.value)} placeholder="M01" className="w-full h-11 rounded-full border border-[#E8DCCF] px-4 text-[12px] font-bold outline-none focus:border-[#A67C52]" />
                     <div className="grid grid-cols-2 gap-3">
                         <input type="number" value={capacidade} onChange={e => setCapacidade(Number(e.target.value))} className="w-full h-11 rounded-full border border-[#E8DCCF] px-4 text-[12px] font-bold" />
                         <select value={zonaNew} onChange={e => setZonaNew(e.target.value)} className="w-full h-11 rounded-full border border-[#E8DCCF] px-4 text-[12px] font-bold bg-white">
