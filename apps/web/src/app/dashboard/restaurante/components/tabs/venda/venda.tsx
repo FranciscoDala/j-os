@@ -105,28 +105,38 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     useEffect(() => { if (modoMesa && activeCat === "Mesas") fetchMesasOcupadas(); }, [modoMesa, activeCat, fetchMesasOcupadas]);
 
     const selecionarMesa = async (mesa: any) => {
-        if (!mesa.venda_atual_id) {
-            pushToast(`Mesa ${mesa.numero} sem venda_atual_id`, "warning");
-            // tenta recuperar
+        setMesaSelecionada(mesa);
+        setCart([]);
+        setMesaParaFechar(null);
+        setVendaMesa(null);
+
+        // se já tem ID, usa direto
+        if (mesa.venda_atual_id) {
             try {
-                const rList = await fetch(`${VENDAS_API}/`, { headers: getAuthHeaders() as any });
-                if (rList.ok) {
-                    const vendas = await rList.json();
-                    const v = vendas.find((x: any) => x.mesa_id === mesa.id && x.status === "ABERTA");
-                    if (v) {
-                        mesa.venda_atual_id = v.id;
-                    } else {
-                        return; // não chama /vendas/null
-                    }
-                }
-            } catch { return; }
+                const r = await fetch(`${VENDAS_API}/${mesa.venda_atual_id}`, { headers: getAuthHeaders() as any });
+                if (r.ok) setVendaMesa(await r.json());
+            } catch { }
+            pushToast(`Mesa ${mesa.numero} selecionada`, "success");
+            return;
         }
-        setMesaSelecionada(mesa); setCart([]); setMesaParaFechar(null);
+
+        // se não tem ID (mesa antiga suja) - busca a venda aberta dessa mesa
         try {
-            const r = await fetch(`${VENDAS_API}/${mesa.venda_atual_id}`, { headers: getAuthHeaders() as any });
-            if (r.ok) setVendaMesa(await r.json());
+            const rList = await fetch(`${VENDAS_API}/`, { headers: getAuthHeaders() as any });
+            if (rList.ok) {
+                const vendas = await rList.json();
+                const v = vendas.find((x: any) => x.mesa_id === mesa.id && x.status === "ABERTA");
+                if (v) {
+                    // achou! corrige na hora
+                    mesa.venda_atual_id = v.id;
+                    setMesaSelecionada({ ...mesa });
+                    setVendaMesa(v);
+                    pushToast(`Mesa ${mesa.numero} recuperada`, "success");
+                    return;
+                }
+            }
+            pushToast(`Mesa ${mesa.numero} ocupada mas sem comanda. Libere ela em Mesas > Liberar`, "error");
         } catch { }
-        pushToast(`Mesa ${mesa.numero} selecionada`, "success");
     };
 
     useEffect(() => {
