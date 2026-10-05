@@ -98,82 +98,61 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         setLoadingMesas(true);
         try {
             const r = await fetch(`${MESAS_API}/${empresaId}?status=OCUPADA`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
-            if (r.ok) {
-                const data = await r.json();
-                // Filtra mesas realmente com venda, se back novo já auto-liberou órfãs não vem
-                setMesasOcupadas(data);
-            }
+            if (r.ok) setMesasOcupadas(await r.json());
         } catch { } setLoadingMesas(false);
     }, [modoMesa]);
 
     useEffect(() => { if (modoMesa && activeCat === "Mesas") fetchMesasOcupadas(); }, [modoMesa, activeCat, fetchMesasOcupadas]);
 
-    const liberarMesaOrfa = async (mesa: any) => {
-        const empresaId = getEmpresaId(); if (!empresaId) return;
-        try {
-            const r = await fetch(`${MESAS_API}/${empresaId}/${mesa.id}/liberar`, {
-                method: "POST",
-                headers: getAuthHeaders() as any
-            });
-            if (r.ok) {
-                pushToast(`Mesa ${mesa.numero} liberada (estava órfã)`, "success");
-                fetchMesasOcupadas();
-                setMesaSelecionada(null);
-                setVendaMesa(null);
-            } else {
-                const txt = await r.text();
-                pushToast(`Erro ao liberar: ${txt}`, "error");
-            }
-        } catch (e: any) {
-            pushToast(e.message, "error");
-        }
-    };
-
+    // NOVO: Não auto-libera mais. Mesa OCUPADA sem venda é válida.
     const selecionarMesa = async (mesa: any) => {
         setMesaSelecionada(mesa);
         setCart([]);
         setMesaParaFechar(null);
         setVendaMesa(null);
 
-        // 1. Se já tem venda_atual_id, usa direto
         if (mesa.venda_atual_id) {
             try {
                 const r = await fetch(`${VENDAS_API}/${mesa.venda_atual_id}`, { headers: getAuthHeaders() as any });
                 if (r.ok) {
                     const v = await r.json();
-                    setVendaMesa(v);
-                    pushToast(`Mesa ${mesa.numero} selecionada`, "success");
-                    return;
+                    if (v.status === "ABERTA") {
+                        setVendaMesa(v);
+                        pushToast(`Mesa ${mesa.numero} - Kz ${Number(v.total||0).toLocaleString("de-DE")}`, "info");
+                        return;
+                    }
                 }
             } catch { }
-            // Se venda_atual_id inválido, tenta recuperar
         }
 
-        // 2. Tenta recuperar por mesa_id nas vendas abertas
         try {
             const rList = await fetch(`${VENDAS_API}/`, { headers: getAuthHeaders() as any });
             if (rList.ok) {
                 const vendas = await rList.json();
                 const v = vendas.find((x: any) => x.mesa_id === mesa.id && x.status === "ABERTA");
                 if (v) {
-                    mesa.venda_atual_id = v.id;
-                    setMesaSelecionada({...mesa });
+                    setMesaSelecionada({...mesa, venda_atual_id: v.id });
                     setVendaMesa(v);
-                    pushToast(`Mesa ${mesa.numero} recuperada`, "success");
+                    pushToast(`Mesa ${mesa.numero} selecionada`, "success");
                     return;
                 }
             }
-            // 3. Nenhuma venda aberta = mesa órfã
-            pushToast(`Mesa ${mesa.numero} órfã, liberando...`, "warning");
-            await liberarMesaOrfa(mesa);
         } catch { }
+
+        // Mesa ocupada sem venda ainda - pronta para primeiro lançamento
+        pushToast(`Mesa ${mesa.numero} pronta para lançar`, "success");
     };
 
     useEffect(() => {
         const onProdutoUpdate = (e: any) => { const p = e.detail; if (!p?.id) return; setDbProducts(prev => prev.map(x => x.id === p.id? {...x,...p } : x)); };
         window.addEventListener("produto:update" as any, onProdutoUpdate);
-        return () => window.removeEventListener("produto:update" as any, onProdutoUpdate);
-    }, []);
+        const onMesaUpdate = () => { if(modoMesa) fetchMesasOcupadas(); };
+        window.addEventListener("mesa:update" as any, onMesaUpdate);
+        return () => {
+            window.removeEventListener("produto:update" as any, onProdutoUpdate);
+            window.removeEventListener("mesa:update" as any, onMesaUpdate);
+        };
+    }, [modoMesa, fetchMesasOcupadas]);
 
     const cats = modoMesa? ["All", "Mesas",...catsDb] : ["All",...catsDb];
     const getStockState = (p: any) => { if (!p.controlar_stock) return "ok"; const atual = Number(p.stock_atual?? 0); if (atual <= 0) return "zero"; if (atual <= 5) return "low"; return "ok"; };
@@ -193,16 +172,34 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         else { setRecebido((s) => (s + val).slice(0, 10)); }
     };
 
+    // NOVO: Se não tem venda, cria. Se tem, adiciona itens.
     const adicionarNaMesa = async () => {
         if (!mesaSelecionada || cart.length === 0) return;
         const vendaId = mesaSelecionada.venda_atual_id || vendaMesa?.id;
-        if (!vendaId) {
-            pushToast(`Mesa ${mesaSelecionada.numero} sem venda. Será liberada`, "error");
-            await liberarMesaOrfa(mesaSelecionada);
-            return;
-        }
         setFinalizando(true);
         try {
+            if (!vendaId) {
+                // Primeira venda da mesa - cria ABERTA com dinheiro_recebido=0
+                const rCreate = await fetch(`${VENDAS_API}/`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json",...getAuthHeaders() as any },
+                    body: JSON.stringify({
+                        mesa_id: mesaSelecionada.id,
+                        itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })),
+                        dinheiro_recebido: 0,
+                        forma_pagamento: "DINHEIRO",
+                        pessoas: mesaSelecionada.pessoas_atual || 1,
+                        modo: "mesa"
+                    })
+                });
+                const txt = await rCreate.text();
+                let data: any = {}; try { data = JSON.parse(txt); } catch { data = { detail: txt }; }
+                if (!rCreate.ok) throw new Error(data.detail || JSON.stringify(data) || "Erro ao criar comanda");
+                pushToast(`Mesa ${mesaSelecionada.numero} aberta +Kz ${total.toLocaleString("de-DE")}`, "success");
+                setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("Mesas"); fetchMesasOcupadas();
+                return;
+            }
+
             const r = await fetch(`${VENDAS_API}/${vendaId}/itens`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json",...getAuthHeaders() as any },
@@ -224,7 +221,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         try {
             const payload = { itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })), forma_pagamento: forma.toUpperCase(), dinheiro_recebido: forma === "dinheiro"? recebidoNum : total, mesa_id: null, modo: "balcao" };
             const r = await fetch(`${VENDAS_API}/`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() as any }, body: JSON.stringify(payload) });
-            const data = await r.json(); if (!r.ok) throw new Error(data.detail || "Erro");
+            const txt = await r.text(); let data: any = {}; try{ data = JSON.parse(txt)} catch{ data={detail:txt}}; if (!r.ok) throw new Error(data.detail || "Erro");
             setUltimaVenda(data); setShowPay(false); setShowConfirm(true);
         } catch (e: any) { pushToast(e.message, "error"); }
         finally { setFinalizando(false); }
@@ -244,7 +241,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             if (!r.ok) throw new Error(data.detail || "Erro ao fechar");
             const win = window.open("", "_blank", "width=320,height=600");
             if (win) {
-                const itensHtml = (data.itens || []).map((i: any) => `<tr><td>${i.produto_nome || i.nome} x${i.quantidade}</td><td style="text-align:right">Kz ${Number(i.subtotal || 0).toLocaleString("de-DE")}</td></tr>`).join("");
+                const itensHtml = (data.itens || []).map((i: any) => `<tr><td>${i.nome_produto || i.produto_nome || i.nome} x${i.quantidade}</td><td style="text-align:right">Kz ${Number(i.total || i.subtotal || 0).toLocaleString("de-DE")}</td></tr>`).join("");
                 win.document.write(`<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}</style></head><body><div class="center bold">FATURA MESA ${mesa.numero}<br/>#${data.numero || ""}</div><div class="line"></div><table>${itensHtml}</table><div class="line"></div><table><tr><td class="bold">TOTAL</td><td style="text-align:right" class="bold">Kz ${Number(data.total || 0).toLocaleString("de-DE")}</td></tr></table><script>window.print();window.close();</script></body></html>`);
                 win.document.close();
             }
@@ -256,14 +253,14 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
     const imprimirContaParcial = async (mesa: any) => {
         const vendaId = mesa.venda_atual_id || vendaMesa?.id;
-        if (!vendaId) { pushToast("Mesa sem venda", "error"); return; }
+        if (!vendaId) { pushToast("Mesa sem consumo ainda", "info"); return; }
         try {
             const r = await fetch(`${VENDAS_API}/${vendaId}`, { headers: getAuthHeaders() as any });
             let venda = vendaMesa; if (r.ok) venda = await r.json();
             const consumo = Number(venda?.total || mesa.venda_total || 0);
             const pendente = mesaSelecionada?.id === mesa.id? total : 0;
             const win = window.open("", "_blank", "width=320,height=600"); if (!win) return;
-            const itensHtml = (venda?.itens || []).map((i: any) => `<tr><td>${i.produto_nome || i.nome} x${i.quantidade}</td><td style="text-align:right">Kz ${Number(i.subtotal || 0).toLocaleString("de-DE")}</td></tr>`).join("");
+            const itensHtml = (venda?.itens || []).map((i: any) => `<tr><td>${i.nome_produto || i.produto_nome} x${i.quantidade}</td><td style="text-align:right">Kz ${Number(i.total || 0).toLocaleString("de-DE")}</td></tr>`).join("");
             win.document.write(`<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px}.line{border-top:1px dashed #000;margin:8px 0}</style></head><body><div style="text-align:center;font-weight:bold">CONTA PARCIAL Mesa ${mesa.numero}</div><div class="line"></div><table>${itensHtml}</table><div class="line"></div><div>Consumo: Kz ${consumo.toLocaleString("de-DE")}${pendente > 0? `<br/>Pendente: Kz ${pendente.toLocaleString("de-DE")}` : ""}<br/>Total: Kz ${(consumo + pendente).toLocaleString("de-DE")}</div><script>window.print();window.close();</script></body></html>`);
             win.document.close();
         } catch { pushToast("Erro ao imprimir", "error"); }
