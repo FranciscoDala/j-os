@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 import uuid
-from .models import MesaStatus, ReservaStatus
+from.models import MesaStatus, ReservaStatus
 
 class MesaCreate(BaseModel):
     numero: str
@@ -20,23 +20,6 @@ class MesaUpdate(BaseModel):
     pos_x: Optional[int] = None
     pos_y: Optional[int] = None
 
-class MesaResponse(BaseModel):
-    id: uuid.UUID
-    empresa_id: uuid.UUID
-    numero: str
-    capacidade: int
-    zona: Optional[str]
-    status: MesaStatus
-    venda_atual_id: Optional[uuid.UUID] = None
-    garcom_id: Optional[uuid.UUID] = None
-    aberta_em: Optional[datetime] = None
-    ativa: bool
-    created_at: datetime
-    updated_at: datetime
-    reserva_ativa: Optional["ReservaResponse"] = None
-    tempo_ocupada_min: Optional[int] = None
-    class Config: from_attributes = True
-
 class ReservaCreate(BaseModel):
     mesa_id: uuid.UUID
     cliente_nome: str
@@ -49,7 +32,7 @@ class ReservaResponse(BaseModel):
     mesa_id: uuid.UUID
     empresa_id: uuid.UUID
     cliente_nome: str
-    cliente_telefone: Optional[str]
+    cliente_telefone: Optional[str] = None
     pessoas: int
     data_reserva: datetime
     status: ReservaStatus
@@ -60,5 +43,25 @@ class ReservaResponse(BaseModel):
 class OcuparMesaRequest(BaseModel):
     garcom_id: Optional[uuid.UUID] = None
     pessoas: Optional[int] = None
+
+class MesaResponse(BaseModel):
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    numero: str
+    capacidade: int
+    zona: Optional[str] = None
+    status: MesaStatus
+    venda_atual_id: Optional[uuid.UUID] = None
+    garcom_id: Optional[uuid.UUID] = None
+    aberta_em: Optional[datetime] = None
+    pessoas_atual: int = 0
+    pos_x: int = 0
+    pos_y: int = 0
+    ativa: bool
+    created_at: datetime
+    updated_at: datetime
+    reserva_ativa: Optional[ReservaResponse] = None
+    tempo_ocupada_min: Optional[int] = None
+    class Config: from_attributes = True
 
 MesaResponse.model_rebuild()

@@ -47,7 +47,7 @@ class MesaReserva(Base):
     mesa_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("mesas.id", ondelete="CASCADE"), index=True, nullable=False)
     cliente_nome: Mapped[str] = mapped_column(String(120), nullable=False)
     cliente_telefone: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    pessoas: Mapped[int] = mapped_column(Integer, default=2)
+    pessoas: Mapped[int] = mapped_column(Integer, default=2, server_default="2")
     data_reserva: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     status: Mapped[ReservaStatus] = mapped_column(SAEnum(ReservaStatus, name="reservastatus"), default=ReservaStatus.PENDENTE, nullable=False, server_default="PENDENTE")
     venda_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
