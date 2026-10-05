@@ -10,12 +10,13 @@ from jos_api.modules.atividade.routes import router as atividade_router
 from jos_api.core.realtime_router import router as realtime_router
 
 api_router = APIRouter(prefix="/api/v1")
+
 api_router.include_router(auth_router)
 api_router.include_router(empresa_router)
 api_router.include_router(entidades_router)
 api_router.include_router(produto_router)
+api_router.include_router(caixa_router) # caixa primeiro pra não conflitar com {empresa_id}
+api_router.include_router(mesa_router)  # /api/v1/mesas/{empresa_id}
 api_router.include_router(venda_router) # /api/v1/vendas
-api_router.include_router(mesa_router) # /api/v1/mesas/{empresa_id}
-api_router.include_router(caixa_router) # /api/v1/caixa/status
 api_router.include_router(atividade_router)
 api_router.include_router(realtime_router)

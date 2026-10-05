@@ -16,7 +16,6 @@ from jose import jwt
 import json
 
 router = APIRouter(prefix="/vendas", tags=["Vendas"])
-mesa_router = APIRouter(prefix="/mesas", tags=["Mesas"])
 
 def _get_empresa_id_from_user(current_user: User, x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
     eid = x_empresa_id or getattr(current_user, 'empresa_id', None) or current_user.__dict__.get("empresa_id")
@@ -68,21 +67,6 @@ def liberar_todas(db: Session = Depends(get_db), current_user: User = Depends(ge
     empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
     service.liberar_todas_reservas_user(db, empresa_id, current_user.id)
     return {"ok": True}
-
-@mesa_router.get("/", response_model=list[schemas.MesaResponse])
-def listar_mesas(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
-    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
-    return service.get_mesas(db, empresa_id)
-
-@mesa_router.post("/", response_model=schemas.MesaResponse, status_code=201)
-def criar_mesa(dados: schemas.MesaCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
-    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
-    return service.criar_mesa(db, empresa_id, dados.numero, dados.capacidade, dados.zona)
-
-@mesa_router.get("/{mesa_id}/comanda", response_model=schemas.VendaResponse | None)
-def get_comanda_mesa(mesa_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
-    empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
-    return db.query(Venda).filter(Venda.mesa_id == mesa_id, Venda.empresa_id == empresa_id, Venda.status == VendaStatus.ABERTA).first()
 
 @router.post("/", response_model=schemas.VendaResponse, status_code=201)
 def criar_venda(dados: schemas.VendaCreateRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID"), caixa_aberto: Caixa = Depends(_get_caixa_aberto_dep)):
