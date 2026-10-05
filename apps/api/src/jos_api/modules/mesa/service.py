@@ -4,8 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from.models import Mesa, MesaReserva, MesaStatus, ReservaStatus
 
-def _mesa_to_dict(m):
-    # Converte Mesa ORM para dict limpo sem _sa_instance_state
+def _to_dict(m):
     return {
         "id": m.id,
         "empresa_id": m.empresa_id,
@@ -45,40 +44,25 @@ def list_mesas(db: Session, empresa_id: uuid.UUID, status: str = "", zona: str =
             except: pass
 
         venda_total = 0
-        venda_atual_id = m.venda_atual_id
-
-        if m.status == MesaStatus.OCUPADA:
-            try:
-                from jos_api.modules.venda.models import Venda, VendaStatus
-                venda = None
-                if venda_atual_id:
-                    venda = db.query(Venda).filter(Venda.id == venda_atual_id, Venda.empresa_id == empresa_id, Venda.status == VendaStatus.ABERTA).first()
-                if not venda:
-                    venda = db.query(Venda).filter(Venda.mesa_id == m.id, Venda.empresa_id == empresa_id, Venda.status == VendaStatus.ABERTA).order_by(Venda.created_at.desc()).first()
-                    if venda:
-                        venda_atual_id = venda.id
-                        m.venda_atual_id = venda.id
+        # Busca venda só para exibir total, mas NÃO auto-libera
+        try:
+            from jos_api.modules.venda.models import Venda, VendaStatus
+            if m.venda_atual_id:
+                v = db.query(Venda).filter(Venda.id == m.venda_atual_id, Venda.status == VendaStatus.ABERTA).first()
+                if v: venda_total = float(v.total or 0)
+            else:
+                v = db.query(Venda).filter(Venda.mesa_id == m.id, Venda.empresa_id == empresa_id, Venda.status == VendaStatus.ABERTA).order_by(Venda.created_at.desc()).first()
+                if v:
+                    venda_total = float(v.total or 0)
+                    # Se achou venda, vincula
+                    if not m.venda_atual_id:
+                        m.venda_atual_id = v.id
                         db.commit()
-                if venda:
-                    venda_total = float(getattr(venda, 'total', 0) or 0)
-                else:
-                    # Órfã - libera
-                    m.status = MesaStatus.LIVRE
-                    m.venda_atual_id = None
-                    m.garcom_id = None
-                    m.aberta_em = None
-                    m.pessoas_atual = 0
-                    db.commit()
-                    venda_atual_id = None
-                    if status == "OCUPADA":
-                        continue
-            except Exception as e:
-                print(f"[MESAS] erro venda {m.numero}: {e}")
+        except: pass
 
-        d = _mesa_to_dict(m)
+        d = _to_dict(m)
         d["reserva_ativa"] = reserva
         d["tempo_ocupada_min"] = tempo
-        d["venda_atual_id"] = venda_atual_id
         d["venda_total"] = venda_total
         out.append(d)
     return out
@@ -103,13 +87,13 @@ def reservar(db: Session, empresa_id: uuid.UUID, payload):
 def ocupar(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID, venda_id: uuid.UUID | None, garcom_id: uuid.UUID | None, pessoas: int | None = None):
     mesa = db.query(Mesa).filter(Mesa.id == mesa_id, Mesa.empresa_id == empresa_id).first()
     if not mesa: raise ValueError("Mesa não encontrada")
-    if mesa.status == MesaStatus.OCUPADA and mesa.venda_atual_id:
+    if mesa.status == MesaStatus.OCUPADA:
         raise ValueError("Mesa já está ocupada")
     mesa.status = MesaStatus.OCUPADA
     if venda_id: mesa.venda_atual_id = venda_id
     mesa.garcom_id = garcom_id
     mesa.aberta_em = datetime.utcnow()
-    if pessoas: mesa.pessoas_atual = pessoas
+    mesa.pessoas_atual = pessoas or mesa.capacidade
     db.commit(); db.refresh(mesa)
     return mesa
 
