@@ -10,7 +10,6 @@ import { MesaComandaModal } from "./modals/comanda";
 import { CustomSelect } from "./cards/custom";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
-const VENDAS_API = `${API_BASE}/vendas`;
 const STATUS_OPTS = ["", "LIVRE", "OCUPADA", "RESERVADA", "SUJA"] as const;
 const STATUS_LABELS: Record<string, string> = { "": "Todos status", LIVRE: "Livre", OCUPADA: "Ocupada", RESERVADA: "Reservada", SUJA: "Suja" };
 
@@ -28,38 +27,47 @@ export function MesasTab() {
   useEffect(() => { setEmpresaId(getEmpresaId()); }, []);
   const load = useCallback(async () => {
     if (!empresaId) return; setLoading(true);
-    try { const p = new URLSearchParams(); if (zona) p.append("zona", zona); if (status) p.append("status", status); if (search) p.append("search", search); const res = await fetch(`${API_BASE}/mesas/${empresaId}?${p.toString()}`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, cache: "no-store" }); if (res.ok) setMesas(await res.json()); } finally { setLoading(false); }
+    try {
+      const p = new URLSearchParams();
+      if (zona) p.append("zona", zona);
+      if (status) p.append("status", status);
+      if (search) p.append("search", search);
+      const res = await fetch(`${API_BASE}/mesas/${empresaId}?${p.toString()}`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, cache: "no-store" });
+      if (res.ok) setMesas(await res.json());
+      else {
+        const txt = await res.text();
+        console.log("MESAS erro", res.status, txt);
+        // Se der 500 ainda, não trava UI
+        if(res.status===500) toast.error("Erro no servidor de mesas - já corrigido no back, faz deploy");
+      }
+    } catch (e:any) {
+      console.log("MESAS fetch fail", e.message);
+    } finally { setLoading(false); }
   }, [empresaId, zona, status, search]);
+
   const loadZonas = useCallback(async () => { if (!empresaId) return; const r = await fetch(`${API_BASE}/mesas/${empresaId}/zonas`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any }); if (r.ok) setZonas(await r.json()); }, [empresaId]);
   useEffect(() => { if (empresaId) { load(); loadZonas(); } }, [load, loadZonas]);
   useEffect(() => { const t = setTimeout(load, 350); return () => clearTimeout(t); }, [search]);
 
-  const criarMesa = async () => { if (!numero.trim()) return toast.error("Número obrigatório"); if (!empresaId) return; setSaving(true); try { const res = await fetch(`${API_BASE}/mesas/${empresaId}`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, body: JSON.stringify({ numero: numero.trim().toUpperCase(), capacidade: Number(capacidade), zona: zonaNew }) }); const j = await res.json().catch(() => ({})); if (!res.ok) throw new Error(j.detail || "Erro"); toast.success(`Mesa ${j.numero} criada`); setShowNew(false); setNumero(""); load(); loadZonas(); } catch (e: any) { toast.error(e.message); } finally { setSaving(false); } };
+  const criarMesa = async () => {
+    if (!numero.trim()) return toast.error("Número obrigatório");
+    if (!empresaId) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/mesas/${empresaId}`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, body: JSON.stringify({ numero: numero.trim().toUpperCase(), capacidade: Number(capacidade), zona: zonaNew }) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.detail || "Erro");
+      toast.success(`Mesa ${j.numero} criada`);
+      setShowNew(false); setNumero(""); load(); loadZonas();
+    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+  };
 
   const handleOcupar = async (pessoas: number) => {
     if (!mesaAlvo ||!empresaId) return;
     setSaving(true);
     try {
-      // 1. Cria venda vazia para a mesa (evita órfã)
-      let vendaId: string | null = null;
-      try {
-        const rVenda = await fetch(`${VENDAS_API}/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json",...getAuthHeaders() } as any,
-          body: JSON.stringify({ mesa_id: mesaAlvo.id, itens: [], modo: "mesa", pessoas })
-        });
-        if (rVenda.ok) {
-          const v = await rVenda.json();
-          vendaId = v.id;
-        }
-      } catch {}
-
-      // 2. Ocupa mesa com ou sem venda_id
-      const url = vendaId
-       ? `${API_BASE}/mesas/${empresaId}/${mesaAlvo.id}/ocupar?venda_id=${vendaId}`
-        : `${API_BASE}/mesas/${empresaId}/${mesaAlvo.id}/ocupar`;
-
-      const res = await fetch(url, {
+      // Só ocupa - não cria venda aqui. Venda será criada no PDV quando add produto
+      const res = await fetch(`${API_BASE}/mesas/${empresaId}/${mesaAlvo.id}/ocupar`, {
         method: "POST",
         headers: { "Content-Type": "application/json",...getAuthHeaders() } as any,
         body: JSON.stringify({ pessoas })
