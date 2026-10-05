@@ -17,11 +17,21 @@ class VendaCreateRequest(BaseModel):
     observacao: Optional[str] = None
     dinheiro_recebido: Decimal = Decimal("0")
     forma_pagamento: str = "DINHEIRO"
+    modo: Optional[str] = None
+
+# SEU FRONT MANDA ARRAY
+class AddItensBulkRequest(BaseModel):
+    itens: List[VendaItemCreate]
 
 class AddItemRequest(BaseModel):
     produto_id: UUID
     quantidade: Decimal
     observacao: Optional[str] = None
+
+# SEU FRONT MANDA BODY NO FECHAR
+class FecharMesaRequest(BaseModel):
+    forma_pagamento: Optional[str] = "DINHEIRO"
+    dinheiro_recebido: Optional[Decimal] = Decimal("0")
 
 class TransferirMesaRequest(BaseModel):
     nova_mesa_id: UUID

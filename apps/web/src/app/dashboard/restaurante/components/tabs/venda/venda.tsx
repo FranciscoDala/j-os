@@ -105,8 +105,27 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     useEffect(() => { if (modoMesa && activeCat === "Mesas") fetchMesasOcupadas(); }, [modoMesa, activeCat, fetchMesasOcupadas]);
 
     const selecionarMesa = async (mesa: any) => {
+        if (!mesa.venda_atual_id) {
+            pushToast(`Mesa ${mesa.numero} sem venda_atual_id`, "warning");
+            // tenta recuperar
+            try {
+                const rList = await fetch(`${VENDAS_API}/`, { headers: getAuthHeaders() as any });
+                if (rList.ok) {
+                    const vendas = await rList.json();
+                    const v = vendas.find((x: any) => x.mesa_id === mesa.id && x.status === "ABERTA");
+                    if (v) {
+                        mesa.venda_atual_id = v.id;
+                    } else {
+                        return; // não chama /vendas/null
+                    }
+                }
+            } catch { return; }
+        }
         setMesaSelecionada(mesa); setCart([]); setMesaParaFechar(null);
-        try { const r = await fetch(`${VENDAS_API}/${mesa.venda_atual_id}`, { headers: getAuthHeaders() as any }); if (r.ok) setVendaMesa(await r.json()); } catch { }
+        try {
+            const r = await fetch(`${VENDAS_API}/${mesa.venda_atual_id}`, { headers: getAuthHeaders() as any });
+            if (r.ok) setVendaMesa(await r.json());
+        } catch { }
         pushToast(`Mesa ${mesa.numero} selecionada`, "success");
     };
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect, Query, Header
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect, Query, Header, Body
 from sqlalchemy.orm import Session
 import uuid
 from decimal import Decimal
@@ -85,14 +85,30 @@ def get_venda(venda_id: uuid.UUID, db: Session = Depends(get_db), current_user: 
     return venda
 
 @router.post("/{venda_id}/itens", response_model=schemas.VendaResponse)
-def add_item(venda_id: uuid.UUID, dados: schemas.AddItemRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+def add_item(venda_id: uuid.UUID, request: Request, payload: dict = Body(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
     empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
-    return service.add_item_comanda(db, venda_id, dados, empresa_id, current_user.id, _get_nome(current_user), ip=_get_ip(request))
+    itens = payload.get("itens", []) if isinstance(payload, dict) else []
+    if not itens:
+        itens = [payload] if isinstance(payload, dict) else []
+    venda = None
+    for it in itens:
+        if not isinstance(it, dict): continue
+        if "qtd" in it: it["quantidade"] = it.pop("qtd")
+        req = schemas.AddItemRequest(**it)
+        venda = service.add_item_comanda(db, venda_id, req, empresa_id, current_user.id, _get_nome(current_user), ip=_get_ip(request))
+    if venda is None:
+        venda = db.query(Venda).filter(Venda.id == venda_id, Venda.empresa_id == empresa_id).first()
+    return venda
 
 @router.post("/{venda_id}/fechar", response_model=schemas.VendaResponse)
-def fechar(venda_id: uuid.UUID, request: Request, dinheiro_recebido: Decimal = Query(...), forma_pagamento: str = Query("DINHEIRO"), db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
+def fechar(venda_id: uuid.UUID, request: Request, body: schemas.FecharMesaRequest = Body(default=None), dinheiro_recebido: Decimal | None = Query(default=None), forma_pagamento: str | None = Query(default=None), db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
     empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
-    venda, _ = service.fechar_comanda(db, venda_id, empresa_id, dinheiro_recebido, current_user.id, _get_nome(current_user), ip=_get_ip(request))
+    valor = dinheiro_recebido
+    if valor is None and body is not None and body.dinheiro_recebido is not None:
+        valor = body.dinheiro_recebido
+    if valor is None:
+        valor = Decimal("0")
+    venda, _ = service.fechar_comanda(db, venda_id, empresa_id, valor, current_user.id, _get_nome(current_user), ip=_get_ip(request))
     return venda
 
 @router.post("/{venda_id}/cancelar", response_model=schemas.VendaResponse)
