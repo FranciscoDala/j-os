@@ -204,72 +204,60 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         if (cart.length === 0) return;
         if (forma === "dinheiro" && recebidoNum < total) { pushToast("Valor insuficiente", "error"); return; }
         setFinalizando(true);
-        const empresaId = getEmpresaId();
-        if (!empresaId) { pushToast("Sem empresa_id", "error"); setFinalizando(false); return; }
         try {
-            let r: Response;
+            // MESMA ROTA QUE JÁ FUNCIONAVA PRA VOCÊ
+            const payload: any = {
+                itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })),
+                forma_pagamento: forma.toUpperCase(),
+                dinheiro_recebido: forma === "dinheiro" ? recebidoNum : total,
+            };
+
             if (mesaSelecionada) {
-                // TENTA 2 ROTAS POSSÍVEIS - seu backend usa uma delas
-                const payloadItens = { itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })) };
-                // 1ª tentativa: /vendas/{empresa}/mesa/{mesa_id}/adicionar
-                r = await fetch(`${VENDAS_API}/${empresaId}/mesa/${mesaSelecionada.id}/adicionar-itens`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", ...getAuthHeaders() as any },
-                    body: JSON.stringify(payloadItens)
-                });
-                if (r.status === 404 || r.status === 405) {
-                    // fallback: /vendas/{empresa}/{venda_id}/itens
-                    r = await fetch(`${VENDAS_API}/${empresaId}/${mesaSelecionada.venda_atual_id}/itens`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", ...getAuthHeaders() as any },
-                        body: JSON.stringify(payloadItens)
-                    });
-                }
-                if (r.status === 404 || r.status === 405) {
-                    // ultimo fallback: PUT na venda
-                    r = await fetch(`${VENDAS_API}/${empresaId}/${mesaSelecionada.venda_atual_id}`, {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json", ...getAuthHeaders() as any },
-                        body: JSON.stringify({ itens_adicionar: payloadItens.itens })
-                    });
-                }
+                // QUANDO TEM MESA SELECIONADA, SÓ ENVIA O mesa_id
+                payload.mesa_id = mesaSelecionada.id;
+                // se já tem venda aberta, manda venda_atual_id pra somar
+                if (mesaSelecionada.venda_atual_id) payload.venda_atual_id = mesaSelecionada.venda_atual_id;
+                payload.modo = "mesa";
             } else {
-                // BALCÃO - CORRETO É COM empresaId NA URL
-                const payload = {
-                    itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })),
-                    forma_pagamento: forma.toUpperCase(),
-                    dinheiro_recebido: forma === "dinheiro" ? recebidoNum : total,
-                    mesa_id: null,
-                };
-                r = await fetch(`${VENDAS_API}/${empresaId}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", ...getAuthHeaders() as any },
-                    body: JSON.stringify(payload)
-                });
+                payload.mesa_id = null;
+                payload.modo = "balcao";
             }
+
+            console.log("ENVIANDO VENDA PAYLOAD:", payload);
+
+            const r = await fetch(`${VENDAS_API}/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...getAuthHeaders() as any },
+                body: JSON.stringify(payload)
+            });
+
             const text = await r.text();
             console.log("VENDA RESPONSE:", r.status, text);
             let data: any = {};
             try { data = JSON.parse(text); } catch { data = { detail: text }; }
-            if (!r.ok) throw new Error(data.detail || `Erro ${r.status}`);
+
+            if (!r.ok) throw new Error(data.detail || data.message || `Erro ${r.status}`);
 
             if (mesaSelecionada) {
-                pushToast(`Mesa ${mesaSelecionada.numero} atualizada!`, "success");
-                setCart([]); setMesaSelecionada(null); setVendaMesa(null);
+                pushToast(`Mesa ${mesaSelecionada.numero} atualizada - Kz ${Number(data.total || total).toLocaleString("de-DE")}`, "success");
+                setCart([]);
+                setMesaSelecionada(null);
+                setVendaMesa(null);
                 setActiveCat("Mesas");
                 fetchMesasOcupadas();
             } else {
-                setUltimaVenda(data); setShowPay(false); setShowConfirm(true);
+                setUltimaVenda(data);
+                setShowPay(false);
+                setShowConfirm(true);
+                pushToast(`Venda #${data.numero} finalizada`, "success");
             }
+
             setDbProducts(prev => prev.map(p => {
                 const inCart = cart.find(c => c.id === p.id);
                 if (inCart && p.controlar_stock) return { ...p, stock_atual: Number(p.stock_atual || 0) - inCart.qtd };
                 return p;
             }));
-        } catch (e: any) {
-            console.error(e);
-            pushToast(e.message, "error");
-        }
+        } catch (e: any) { pushToast(e.message, "error"); }
         finally { setFinalizando(false); }
     };
 
@@ -277,21 +265,15 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         if (!mesaSelecionada?.venda_atual_id) return;
         setFinalizando(true);
         try {
-            const empresaId = getEmpresaId();
-            // sua rota de fechar pode ser /fechar ou /finalizar
-            let r = await fetch(`${VENDAS_API}/${empresaId}/${mesaSelecionada.venda_atual_id}/fechar`, {
+            // MESMA BASE QUE JÁ FUNCIONAVA: /vendas/{id}/fechar SEM empresa_id na URL
+            const r = await fetch(`${VENDAS_API}/${mesaSelecionada.venda_atual_id}/fechar`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", ...getAuthHeaders() as any },
                 body: JSON.stringify({ forma_pagamento: forma.toUpperCase(), dinheiro_recebido: recebidoNum || total })
             });
-            if (r.status === 404) {
-                r = await fetch(`${VENDAS_API}/${empresaId}/${mesaSelecionada.venda_atual_id}/finalizar`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", ...getAuthHeaders() as any },
-                    body: JSON.stringify({ forma_pagamento: forma.toUpperCase() })
-                });
-            }
-            const data = await r.json();
+            const txt = await r.text();
+            console.log("FECHAR RESPONSE", r.status, txt);
+            let data: any = {}; try { data = JSON.parse(txt); } catch { data = { detail: txt }; }
             if (!r.ok) throw new Error(data.detail || "Erro ao fechar");
             pushToast(`Conta Mesa ${mesaSelecionada.numero} fechada`, "success");
             setCart([]); setMesaSelecionada(null); setShowPay(false); fetchMesasOcupadas();
