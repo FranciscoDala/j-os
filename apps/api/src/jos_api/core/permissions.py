@@ -21,6 +21,20 @@ PERMISSIONS = {
         "restaurante:caixa:read_own",
         "restaurante:caixa:movimento:*",
 
+        # MESA - ocupar, liberar, limpar, comanda
+        "restaurante:mesa:*",
+        "mesa:*",
+        "mesa:read",
+        "mesa:ocupar",
+        "mesa:liberar",
+        "mesa:limpar",
+        "mesa:comanda:read",
+        "mesa:comanda:*",
+        "restaurante:mesa:read",
+        "restaurante:mesa:ocupar",
+        "restaurante:mesa:liberar",
+        "restaurante:mesa:limpar",
+
         # VENDA - criar, ler, atualizar
         "restaurante:venda:*",
         "venda:*",
@@ -44,6 +58,8 @@ PERMISSIONS = {
     "caixa": [
         "restaurante:caixa:*",
         "caixa:*",
+        "restaurante:mesa:*",
+        "mesa:*",
         "restaurante:venda:*",
         "restaurante:pedido:*",
         "restaurante:produto:*",
@@ -62,9 +78,9 @@ NO_DELETE_ROLES = {"operador_caixa", "caixa", "garcom", "funcionario"}
 def check_permission(user_role: str, required: str, owner_id: Optional[str] = None, current_user_id: Optional[str] = None, resource_status: Optional[str] = None):
     role = (user_role or "dono").lower()
 
-    # OPERADOR_CAIXA É QUASE DONO NO CAIXA - libera tudo
+    # DONO / GERENTE / CAIXA - libera tudo de operação de restaurante
     if role in ["operador_caixa", "caixa", "dono", "gerente", "gerente_restaurante"]:
-        if "caixa" in required or "venda" in required or "produto" in required or "entidade" in required or "cliente" in required or "pedido" in required:
+        if any(k in required for k in ["caixa", "venda", "produto", "entidade", "cliente", "pedido", "mesa"]):
             return True
 
     perms = PERMISSIONS.get(role, [])
@@ -79,7 +95,7 @@ def check_permission(user_role: str, required: str, owner_id: Optional[str] = No
             if required.startswith(p[:-2]):
                 return True
 
-    # Se chegou aqui e é operador, libera mesmo assim pra não travar venda
+    # Se chegou aqui e é operador, libera mesmo assim pra não travar venda no PDV
     if role in ["operador_caixa", "caixa"]:
         print(f"[LIBERADO FORÇADO] {role} -> {required}")
         return True

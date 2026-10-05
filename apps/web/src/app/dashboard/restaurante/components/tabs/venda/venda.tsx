@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { X } from "lucide-react";
 import { ProdutosSection } from "./cards/produto";
 import { CarrinhoSection } from "./carrinho/carrinho";
@@ -8,6 +8,7 @@ import { Toasts, PayModal, ConfirmModal } from "./modals/venda";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const API_BASE = `${API_URL}/api/v1/produtos`;
 const VENDAS_API = `${API_URL}/api/v1/vendas`;
+const MESAS_API = `${API_URL}/api/v1/mesas`;
 
 type Toast = { id: string; msg: string; type: "success" | "error" | "info" | "warning" };
 
@@ -18,6 +19,9 @@ function getAuthHeaders() {
     if (token) h["Authorization"] = `Bearer ${token}`;
     if (empresa_id) h["X-Empresa-ID"] = empresa_id;
     return h;
+}
+function getEmpresaId() {
+    return typeof window!== "undefined"? localStorage.getItem("empresa_id") : null;
 }
 
 export function VendasTab({ onClose }: { onClose: () => void }) {
@@ -37,11 +41,32 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const [finalizando, setFinalizando] = useState(false);
     const [ultimaVenda, setUltimaVenda] = useState<any>(null);
 
+    // --- MODO MESAS (OPCIONAL) ---
+    const [modoMesa, setModoMesa] = useState(false);
+    const [mesasOcupadas, setMesasOcupadas] = useState<any[]>([]);
+    const [loadingMesas, setLoadingMesas] = useState(false);
+    const [mesaSelecionada, setMesaSelecionada] = useState<any>(null);
+    const [vendaMesa, setVendaMesa] = useState<any>(null);
+
     const pushToast = (msg: string, type: Toast["type"] = "info") => {
         const id = Date.now().toString() + Math.random().toString().slice(2);
         setToasts(t => [...t, { id, msg, type }]);
         setTimeout(() => setToasts(t => t.filter(x => x.id!== id)), 4000);
     };
+
+    // persistir modo mesa
+    useEffect(() => {
+        const saved = localStorage.getItem("venda_modo_mesa");
+        if (saved === "1") setModoMesa(true);
+    }, []);
+    useEffect(() => {
+        localStorage.setItem("venda_modo_mesa", modoMesa? "1" : "0");
+        if (!modoMesa) {
+            setMesaSelecionada(null);
+            setVendaMesa(null);
+            setActiveCat("All");
+        }
+    }, [modoMesa]);
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
@@ -56,6 +81,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
     useEffect(() => { if (showSearch) searchRef.current?.focus(); }, [showSearch]);
 
+    // produtos
     useEffect(() => {
         const fetchReal = async () => {
             setLoadingProd(true);
@@ -81,63 +107,66 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         fetchCats();
     }, []);
 
-    // REALTIME CIRÚRGICO
+    // buscar mesas ocupadas só quando modo ativo e na categoria Mesas
+    const fetchMesasOcupadas = useCallback(async () => {
+        if (!modoMesa) return;
+        const empresaId = getEmpresaId();
+        if (!empresaId) return;
+        setLoadingMesas(true);
+        try {
+            const r = await fetch(`${MESAS_API}/${empresaId}?status=OCUPADA`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
+            if (r.ok) {
+                const data = await r.json();
+                setMesasOcupadas(data);
+            }
+        } catch {}
+        setLoadingMesas(false);
+    }, [modoMesa]);
+
+    useEffect(() => {
+        if (modoMesa && activeCat === "Mesas") fetchMesasOcupadas();
+    }, [modoMesa, activeCat, fetchMesasOcupadas]);
+
+    // selecionar mesa -> carregar comanda
+    const selecionarMesa = async (mesa: any) => {
+        setMesaSelecionada(mesa);
+        setCart([]);
+        setVendaMesa(null);
+        if (!mesa.venda_atual_id) {
+            pushToast(`Mesa ${mesa.numero} sem venda ativa`, "info");
+            return;
+        }
+        try {
+            const empresaId = getEmpresaId();
+            const r = await fetch(`${VENDAS_API}/${empresaId}/${mesa.venda_atual_id}`, { headers: getAuthHeaders() as any });
+            if (r.ok) {
+                const venda = await r.json();
+                setVendaMesa(venda);
+                const itensCart = (venda.itens || []).map((it: any) => ({
+                    id: it.produto_id,
+                    name: it.produto_nome || it.nome,
+                    price: Number(it.preco_unitario || it.preco || 0),
+                    img: "",
+                    qtd: Number(it.quantidade || 1),
+                }));
+                setCart(itensCart);
+                pushToast(`Comanda da Mesa ${mesa.numero} carregada`, "success");
+            }
+        } catch { pushToast("Erro ao carregar comanda", "error"); }
+    };
+
+    // REALTIME
     useEffect(() => {
         const onProdutoUpdate = (e: any) => {
             const p = e.detail;
             if (!p?.id) return;
             setDbProducts(prev => prev.map(x => x.id === p.id? {...x,...p, stock_atual: p.stock_atual?? p.quantidade?? x.stock_atual } : x));
-            setCart(prev => prev.map(c => {
-                if (c.id === p.id) {
-                    const atual = Number(p.stock_atual?? p.quantidade?? 0);
-                    if (p.controlar_stock!== false && c.qtd > atual && atual > 0) {
-                        pushToast(`Stock de "${p.nome || c.name}" atualizado para ${atual}. Ajustado no carrinho.`, "warning");
-                        return {...c, qtd: atual };
-                    }
-                }
-                return c;
-            }).filter(c => c.qtd > 0));
-        };
-        const onProdutoCreated = (e: any) => {
-            const p = e.detail;
-            if (!p?.id) return;
-            if (p.ativo === false) return;
-            if (!searchV || p.nome?.toLowerCase().includes(searchV.toLowerCase())) {
-                setDbProducts(prev => {
-                    if (prev.some(x => x.id === p.id)) return prev;
-                    return [p,...prev];
-                });
-            }
-        };
-        const onVendaNova = (e: any) => {
-            const venda = e.detail;
-            const itens = venda?.itens || venda?.data?.itens || [];
-            if (!itens.length) return;
-            itens.forEach((it: any) => {
-                const pid = it.produto_id || it.produto?.id;
-                const qtd = Number(it.quantidade || 0);
-                setDbProducts(prev => prev.map(p =>
-                    p.id === pid && p.controlar_stock
-                      ? {...p, stock_atual: Number(p.stock_atual || 0) - qtd }
-                        : p
-                ));
-            });
         };
         window.addEventListener("produto:update" as any, onProdutoUpdate);
-        window.addEventListener("produto:atualizado" as any, onProdutoUpdate);
-        window.addEventListener("produto:created" as any, onProdutoCreated);
-        window.addEventListener("venda:nova" as any, onVendaNova);
-        window.addEventListener("venda:fechada" as any, onVendaNova);
-        return () => {
-            window.removeEventListener("produto:update" as any, onProdutoUpdate);
-            window.removeEventListener("produto:atualizado" as any, onProdutoUpdate);
-            window.removeEventListener("produto:created" as any, onProdutoCreated);
-            window.removeEventListener("venda:nova" as any, onVendaNova);
-            window.removeEventListener("venda:fechada" as any, onVendaNova);
-        };
-    }, [searchV]);
+        return () => window.removeEventListener("produto:update" as any, onProdutoUpdate);
+    }, []);
 
-    const cats = ["All",...catsDb];
+    const cats = modoMesa? ["All", "Mesas",...catsDb] : ["All",...catsDb];
     const getStockState = (p: any) => {
         if (!p.controlar_stock) return "ok";
         const atual = Number(p.stock_atual?? 0);
@@ -151,8 +180,8 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         const state = getStockState(p);
         const atual = Number(p.stock_atual?? 0);
         const qtyInCart = cart.find(c => c.id === p.id)?.qtd || 0;
-        if (state === "zero") { pushToast(`Sem stock: "${p.nome}" está esgotado. Repor stock para continuar a vender.`, "error"); return; }
-        if (p.controlar_stock && qtyInCart >= atual) { pushToast(`Stock insuficiente: só temos ${atual} un. de "${p.nome}" disponível.`, "warning"); return; }
+        if (state === "zero") { pushToast(`Sem stock: "${p.nome}" esgotado`, "error"); return; }
+        if (p.controlar_stock && qtyInCart >= atual) { pushToast(`Stock insuficiente: só ${atual} un.`, "warning"); return; }
         const ex = cart.find((c) => c.id === p.id);
         if (ex) setCart(cart.map((c) => (c.id === p.id? {...c, qtd: c.qtd + 1 } : c)));
         else setCart([...cart, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: p.imagem_url? `${API_URL}${p.imagem_url}` : "", qtd: 1 }]);
@@ -173,48 +202,68 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
     const finalizarVenda = async () => {
         if (cart.length === 0) return;
-        if (forma === "dinheiro" && recebidoNum < total) {
-            pushToast("Valor recebido insuficiente", "error");
-            return;
-        }
+        if (forma === "dinheiro" && recebidoNum < total) { pushToast("Valor insuficiente", "error"); return; }
         setFinalizando(true);
         try {
-            const payload = {
-                itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })),
-                mesa_id: null,
-                dinheiro_recebido: forma === "dinheiro"? recebidoNum : total,
-                forma_pagamento: forma.toUpperCase()
-            };
-            const r = await fetch(`${VENDAS_API}/`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json",...getAuthHeaders() as any },
-                body: JSON.stringify(payload)
-            });
+            const empresaId = getEmpresaId();
+            let r: Response;
+            if (mesaSelecionada) {
+                // adicionar itens na venda da mesa
+                r = await fetch(`${VENDAS_API}/${empresaId}/${mesaSelecionada.venda_atual_id}/itens`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json",...getAuthHeaders() as any },
+                    body: JSON.stringify({ itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })) })
+                });
+            } else {
+                const payload = {
+                    itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })),
+                    mesa_id: null,
+                    dinheiro_recebido: forma === "dinheiro"? recebidoNum : total,
+                    forma_pagamento: forma.toUpperCase()
+                };
+                r = await fetch(`${VENDAS_API}/`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() as any }, body: JSON.stringify(payload) });
+            }
             const data = await r.json();
-            if (!r.ok) throw new Error(data.detail || "Erro ao finalizar venda");
-            setUltimaVenda(data);
-            setShowPay(false);
-            setShowConfirm(true);
-            pushToast(`Venda #${data.numero} finalizada - Kz ${Number(data.total).toLocaleString("de-DE")}`, "success");
+            if (!r.ok) throw new Error(data.detail || "Erro");
+            if (mesaSelecionada) {
+                pushToast(`Itens adicionados na Mesa ${mesaSelecionada.numero}`, "success");
+                setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("Mesas"); fetchMesasOcupadas();
+            } else {
+                setUltimaVenda(data); setShowPay(false); setShowConfirm(true);
+                pushToast(`Venda #${data.numero} finalizada`, "success");
+            }
             setDbProducts(prev => prev.map(p => {
                 const inCart = cart.find(c => c.id === p.id);
-                if (inCart && p.controlar_stock) {
-                    return {...p, stock_atual: Number(p.stock_atual || 0) - inCart.qtd };
-                }
+                if (inCart && p.controlar_stock) return {...p, stock_atual: Number(p.stock_atual || 0) - inCart.qtd };
                 return p;
             }));
-        } catch (e: any) {
-            pushToast(e.message, "error");
-        } finally {
-            setFinalizando(false);
-        }
+        } catch (e: any) { pushToast(e.message, "error"); }
+        finally { setFinalizando(false); }
+    };
+
+    const fecharContaMesa = async () => {
+        if (!mesaSelecionada?.venda_atual_id) return;
+        setFinalizando(true);
+        try {
+            const empresaId = getEmpresaId();
+            const r = await fetch(`${VENDAS_API}/${empresaId}/${mesaSelecionada.venda_atual_id}/fechar`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json",...getAuthHeaders() as any },
+                body: JSON.stringify({ forma_pagamento: forma.toUpperCase(), dinheiro_recebido: recebidoNum || total })
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.detail || "Erro ao fechar");
+            pushToast(`Conta Mesa ${mesaSelecionada.numero} fechada - Kz ${Number(data.total).toLocaleString("de-DE")}`, "success");
+            setCart([]); setMesaSelecionada(null); setVendaMesa(null); setShowPay(false); setActiveCat("Mesas"); fetchMesasOcupadas();
+        } catch (e: any) { pushToast(e.message, "error"); }
+        finally { setFinalizando(false); }
     };
 
     const imprimirFatura = () => {
         const win = window.open("", "_blank", "width=320,height=600");
         if (!win) return;
         const vendaNum = ultimaVenda?.numero? ` #${ultimaVenda.numero}` : "";
-        const html = `<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px;color:#000}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}td{padding:2px 0}</style></head><body><div class="center bold">RESTAURANTE JENATH${vendaNum}<br/>NIF: 123456789<br/>Talatona, Luanda<br/>${forma.toUpperCase()}</div><div class="line"></div><div>Data: ${new Date().toLocaleString()}<br/>Mesa: Balcão<br/>Operador: Admin</div><div class="line"></div><table>${cart.map(i => `<tr><td>${i.name} x${i.qtd}</td><td style="text-align:right">Kz ${(i.price * i.qtd).toLocaleString("de-DE")}</td></tr>`).join("")}</table><div class="line"></div><table><tr><td class="bold">TOTAL</td><td style="text-align:right" class="bold">Kz ${total.toLocaleString("de-DE")}</td></tr>${forma === "dinheiro"? `<tr><td>Recebido</td><td style="text-align:right">Kz ${recebidoNum.toLocaleString("de-DE")}</td></tr><tr><td class="bold">TROCO</td><td style="text-align:right" class="bold">Kz ${troco.toLocaleString("de-DE")}</td></tr>` : ``}<tr><td>Pagamento</td><td style="text-align:right">${forma}</td></tr></table><div class="line"></div><div class="center">Obrigado pela preferência!<br/>Volte sempre</div><script>window.print(); window.close();</script></body></html>`;
+        const html = `<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px;color:#000}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}td{padding:2px 0}</style></head><body><div class="center bold">RESTAURANTE JENATH${vendaNum}</div><div class="line"></div><table>${cart.map(i => `<tr><td>${i.name} x${i.qtd}</td><td style="text-align:right">Kz ${(i.price * i.qtd).toLocaleString("de-DE")}</td></tr>`).join("")}</table><div class="line"></div><div class="center">Obrigado!</div><script>window.print();window.close();</script></body></html>`;
         win.document.write(html); win.document.close();
     };
 
@@ -223,32 +272,35 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         setShowConfirm(false); setShowPay(false); setCart([]); setRecebido(""); setUltimaVenda(null);
     };
 
-    useEffect(() => {
-        if (!showPay || forma!== "dinheiro") return;
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key === "Escape") setShowPay(false);
-            else if (e.key === "Enter") { if (recebidoNum >= total) finalizarVenda(); }
-            else if (e.key === "Backspace") { e.preventDefault(); handleCalc("DEL"); }
-            else if (/^[0-9]$/.test(e.key)) handleCalc(e.key);
-            else if (e.key === "." || e.key === ",") handleCalc(".");
-        };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [showPay, forma, recebidoNum, total, recebido]);
-
-    const filteredByCat = activeCat === "All"? dbProducts : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
+    const filteredByCat = activeCat === "All"? dbProducts : activeCat === "Mesas"? [] : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
 
     return (
         <div className="h-full w-full flex flex-col bg-[#F5F7FB] overflow-hidden relative">
             <Toasts toasts={toasts} setToasts={setToasts} />
-            <div className="h-[48px] px-4 flex items-center justify-end bg-white/80 backdrop-blur-xl border-b border-black/5 shrink-0">
+            <div className="h-[48px] px-4 flex items-center justify-between bg-white/80 backdrop-blur-xl border-b border-black/5 shrink-0">
+                <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-black">Modo Mesas</span>
+                    <button onClick={() => setModoMesa(!modoMesa)} className={`w-[44px] h-[26px] rounded-full p-0.5 flex items-center transition-all ${modoMesa? "bg-black" : "bg-zinc-300"}`}>
+                        <div className={`w-5 h-5 rounded-full bg-white shadow transition-all ${modoMesa? "translate-x-[18px]" : "translate-x-0"}`} />
+                    </button>
+                </div>
                 <button onClick={onClose} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center active:scale-95 hover:bg-zinc-800"><X size={16} /></button>
             </div>
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-                <ProdutosSection dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd} cats={cats} activeCat={activeCat} setActiveCat={setActiveCat} searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef} getQty={getQty} getStockState={getStockState} add={add} />
-                <CarrinhoSection cart={cart} total={total} forma={forma} setForma={setForma} setShowPay={setShowPay} setRecebido={setRecebido} />
+                <ProdutosSection
+                    dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd}
+                    cats={cats} activeCat={activeCat} setActiveCat={setActiveCat}
+                    searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef}
+                    getQty={getQty} getStockState={getStockState} add={add}
+                    modoMesa={modoMesa} mesasOcupadas={mesasOcupadas} loadingMesas={loadingMesas}
+                    mesaSelecionada={mesaSelecionada} onSelectMesa={selecionarMesa} fetchMesas={fetchMesasOcupadas}
+                />
+                <CarrinhoSection
+                    cart={cart} total={total} forma={forma} setForma={setForma} setShowPay={setShowPay} setRecebido={setRecebido}
+                    mesaSelecionada={mesaSelecionada} onFecharConta={fecharContaMesa} onLimparMesa={() => { setMesaSelecionada(null); setCart([]); setVendaMesa(null); }}
+                />
             </div>
-            <PayModal showPay={showPay} setShowPay={setShowPay} total={total} forma={forma} recebido={recebido} recebidoNum={recebidoNum} troco={troco} handleCalc={handleCalc} setShowConfirm={finalizarVenda} loading={finalizando} />
+            <PayModal showPay={showPay} setShowPay={setShowPay} total={total} forma={forma} recebido={recebido} recebidoNum={recebidoNum} troco={troco} handleCalc={handleCalc} setShowConfirm={mesaSelecionada? fecharContaMesa : finalizarVenda} loading={finalizando} isMesa={!!mesaSelecionada} />
             <ConfirmModal showConfirm={showConfirm} setShowConfirm={setShowConfirm} total={total} forma={forma} troco={troco} imprimirFatura={() => aposVenda(true)} onSemRecibo={() => aposVenda(false)} vendaNumero={ultimaVenda?.numero} />
             <style jsx>{`.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none;}`}</style>
         </div>
