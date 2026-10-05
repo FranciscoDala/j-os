@@ -7,6 +7,8 @@ from jos_api.modules.venda.routes import router as venda_router
 from jos_api.modules.mesa.routes import router as mesa_router
 from jos_api.modules.caixa.routes import router as caixa_router
 from jos_api.modules.atividade.routes import router as atividade_router
+from jos_api.modules.pedido.routes import public_router as pedido_qr_public_router
+from jos_api.modules.pedido.routes import private_router as pedido_qr_private_router
 from jos_api.core.realtime_router import router as realtime_router
 
 api_router = APIRouter()
@@ -19,4 +21,6 @@ api_router.include_router(caixa_router)
 api_router.include_router(mesa_router)
 api_router.include_router(venda_router)
 api_router.include_router(atividade_router)
+api_router.include_router(pedido_qr_public_router)
+api_router.include_router(pedido_qr_private_router)
 api_router.include_router(realtime_router)

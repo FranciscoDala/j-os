@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { ProdutosSection } from "./cards/produto";
 import { CarrinhoSection } from "./carrinho/carrinho";
 import { Toasts, PayModal, ConfirmModal } from "./modals/venda";
+import { PedidosQrPendentes } from "../../../../../../components/venda/pedidos/PedidosQrPendentes";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const API_BASE = `${API_URL}/api/v1/produtos`;
@@ -221,7 +222,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         finally { setFinalizando(false); }
     };
 
-    // CORRIGIDO: não imprime direto, mostra modal de sucesso
     const fecharContaMesa = async () => {
         const mesa = mesaParaFechar;
         const vendaId = mesa?.venda_atual_id || vendaMesa?.id || mesaSelecionada?.venda_atual_id;
@@ -234,8 +234,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             });
             const txt = await r.text(); let data: any = {}; try { data = JSON.parse(txt); } catch { data = { detail: txt }; }
             if (!r.ok) throw new Error(data.detail || "Erro ao fechar");
-
-            // NOVO FLUXO: salva e mostra modal de sucesso, não imprime
             setUltimaVenda({...data, mesa_numero: mesa.numero});
             setShowPay(false);
             setShowConfirm(true);
@@ -303,7 +301,15 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                 <button onClick={onClose} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center"><X size={16} /></button>
             </div>
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-                <ProdutosSection dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd} cats={cats} activeCat={activeCat} setActiveCat={setActiveCat} searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef} getQty={getQty} getStockState={getStockState} add={add} modoMesa={modoMesa} mesasOcupadas={mesasOcupadas} loadingMesas={loadingMesas} mesaSelecionada={mesaSelecionada} onSelectMesa={selecionarMesa} fetchMesas={fetchMesasOcupadas} cart={cart} cartTotal={total} onFecharMesa={(m: any) => { setMesaParaFechar(m); setRecebido(String(Number(m.venda_total || m.total || 0) + (m.id === mesaSelecionada?.id? total : 0))); setShowPay(true); }} onImprimirConta={imprimirContaParcial} />
+                {/* COLUNA ESQUERDA COM QR */}
+                <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+                    {modoMesa && (
+                        <div className="px-3 pt-3 shrink-0">
+                            <PedidosQrPendentes onAprovado={()=>{ fetchMesasOcupadas(); }} />
+                        </div>
+                    )}
+                    <ProdutosSection dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd} cats={cats} activeCat={activeCat} setActiveCat={setActiveCat} searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef} getQty={getQty} getStockState={getStockState} add={add} modoMesa={modoMesa} mesasOcupadas={mesasOcupadas} loadingMesas={loadingMesas} mesaSelecionada={mesaSelecionada} onSelectMesa={selecionarMesa} fetchMesas={fetchMesasOcupadas} cart={cart} cartTotal={total} onFecharMesa={(m: any) => { setMesaParaFechar(m); setRecebido(String(Number(m.venda_total || m.total || 0) + (m.id === mesaSelecionada?.id? total : 0))); setShowPay(true); }} onImprimirConta={imprimirContaParcial} />
+                </div>
                 <CarrinhoSection cart={cart} total={total} forma={forma} setForma={setForma} setShowPay={setShowPay} setRecebido={setRecebido} mesaSelecionada={mesaSelecionada} onAddMesa={adicionarNaMesa} onLimparMesa={() => { setMesaSelecionada(null); setCart([]); setVendaMesa(null); }} finalizando={finalizando} />
             </div>
             <PayModal showPay={showPay} setShowPay={(v: boolean) => { if (!v) setMesaParaFechar(null); setShowPay(v); }} total={mesaParaFechar? totalFechamento : total} forma={forma} recebido={recebido} recebidoNum={recebidoNum} troco={recebidoNum - (mesaParaFechar? totalFechamento : total)} handleCalc={handleCalc} setShowConfirm={mesaParaFechar? fecharContaMesa : finalizarBalcao} loading={finalizando} isMesa={!!mesaParaFechar} mesaNumero={mesaParaFechar?.numero} />
