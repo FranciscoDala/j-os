@@ -184,7 +184,7 @@ function PedirMesaInner() {
             </div>
 
             <div className="flex-1 overflow-y-auto hide-scrollbar px-3 py-3">
-                <p className="text-[11px] text-zinc-400 font-bold px-1 pb-3 text-center">Toque 2x no prato para adicionar • Azul celeste = no carrinho</p>
+                {/*<p className="text-[11px] text-zinc-400 font-bold px-1 pb-3 text-center">Toque 2x no prato para adicionar • Azul celeste = no carrinho</p>*/}
                 <div className="grid grid-cols-2 gap-3 pb-[140px]">
                     {filtrados.map(p => {
                         const stockState = getStockState(p);
