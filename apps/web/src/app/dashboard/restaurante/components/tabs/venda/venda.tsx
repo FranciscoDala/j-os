@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X } from "lucide-react";
 import { ProdutosSection } from "./cards/produto";
-import { CarrinhoSection } from "./carrinho/carrinho";
 import { Toasts, PayModal, ConfirmModal } from "./modals/venda";
 import { PedidosQrPendentes } from "../../../../../../components/venda/pedidos/PedidosQrPendentes";
 
@@ -39,7 +38,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const [forma, setForma] = useState<"dinheiro" | "transferencia" | "tpa">("dinheiro");
     const [finalizando, setFinalizando] = useState(false);
     const [ultimaVenda, setUltimaVenda] = useState<any>(null);
-
     const [modoMesa, setModoMesa] = useState(false);
     const [mesasOcupadas, setMesasOcupadas] = useState<any[]>([]);
     const [loadingMesas, setLoadingMesas] = useState(false);
@@ -69,12 +67,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                 const r = await fetch(`${MESAS_API}/${empresaId}`, { headers: getAuthHeaders() as any });
                 if (r.ok) {
                     const mesas = await r.json();
-                    const mesa = mesas.find((m: any) =>
-                        m.id === dados.mesa_id ||
-                        m.numero === dados.mesa_numero ||
-                        m.id === dados.mesa?.id ||
-                        m.numero === dados.mesa?.numero
-                    );
+                    const mesa = mesas.find((m: any) => m.id === dados.mesa_id || m.numero === dados.mesa_numero || m.id === dados.mesa?.id || m.numero === dados.mesa?.numero);
                     if (mesa) {
                         await selecionarMesa(mesa);
                         if (dados.itens?.length) {
@@ -351,34 +344,76 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     return (
         <div className="h-full w-full flex flex-col bg-[#EDEBE6] overflow-hidden relative" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
             <Toasts toasts={toasts} setToasts={setToasts} />
-            {/* HEADER SUAVE IGUAL PRINT */}
             <div className="h-[52px] px-4 flex items-center justify-between shrink-0">
-                <div className="bg-white rounded-full h-9 px-1.5 flex items-center gap-2 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
+                <div className="bg-white rounded-full h-9 px-1.5 flex items-center gap-2 border border-[#E2EADF] shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
                     <span className="text-[11px] font-bold px-2">Modo Mesas</span>
                     <button onClick={() => setModoMesa(!modoMesa)} className={`w-[38px] h-[24px] rounded-full p-0.5 flex items-center transition-all ${modoMesa? "bg-black" : "bg-[#E5E1D8]"}`}><div className={`w-5 h-5 rounded-full bg-white shadow transition-all ${modoMesa? "translate-x-[14px]" : "translate-x-0"}`} /></button>
                 </div>
                 <div className="flex items-center gap-2">
-                    {mesaSelecionada && <div className="bg-white rounded-full px-3 h-9 flex items-center text-[11px] font-bold shadow-[0_1px_6px_rgba(0,0,0,0.05)]">Mesa {mesaSelecionada.numero}</div>}
+                    {mesaSelecionada && <div className="bg-white rounded-full px-3 h-9 flex items-center text-[11px] font-bold border border-[#E2EADF] shadow-sm">Mesa {mesaSelecionada.numero}</div>}
                     <button onClick={onClose} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center shadow-sm active:scale-[0.96]"><X size={14} /></button>
                 </div>
             </div>
 
             <div className="flex-1 flex flex-col lg:flex-row gap-[14px] p-[14px] pt-0 overflow-hidden min-h-0">
-                <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-[#F8F7F5] rounded-[16px] border border-[#E2EADF] shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
                     {modoMesa && (
                         <div className="px-3 pt-3 shrink-0">
                             <PedidosQrPendentes onAprovado={() => { fetchMesasOcupadas(); }} />
                         </div>
                     )}
-                    <ProdutosSection dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd} cats={cats} activeCat={activeCat} setActiveCat={setActiveCat} searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef} getQty={getQty} getStockState={getStockState} add={add} modoMesa={modoMesa} mesasOcupadas={mesasOcupadas} loadingMesas={loadingMesas} mesaSelecionada={mesaSelecionada} onSelectMesa={selecionarMesa} fetchMesas={fetchMesasOcupadas} cart={cart} cartTotal={total} onFecharMesa={(m: any) => { setMesaParaFechar(m); setRecebido(String(Number(m.venda_total || m.total || 0) + (m.id === mesaSelecionada?.id? total : 0))); setShowPay(true); }} onImprimirConta={imprimirContaParcial} />
+                    <div className="flex-1 overflow-hidden min-h-0">
+                        <ProdutosSection dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd} cats={cats} activeCat={activeCat} setActiveCat={setActiveCat} searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef} getQty={getQty} getStockState={getStockState} add={add} modoMesa={modoMesa} mesasOcupadas={mesasOcupadas} loadingMesas={loadingMesas} mesaSelecionada={mesaSelecionada} onSelectMesa={selecionarMesa} fetchMesas={fetchMesasOcupadas} cart={cart} cartTotal={total} onFecharMesa={(m: any) => { setMesaParaFechar(m); setRecebido(String(Number(m.venda_total || m.total || 0) + (m.id === mesaSelecionada?.id? total : 0))); setShowPay(true); }} onImprimirConta={imprimirContaParcial} />
+                    </div>
                 </div>
-                <div className="lg:w-[340px] shrink-0 overflow-hidden bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex flex-col">
-                    <CarrinhoSection cart={cart} total={total} forma={forma} setForma={setForma} setShowPay={setShowPay} setRecebido={setRecebido} mesaSelecionada={mesaSelecionada} onAddMesa={adicionarNaMesa} onLimparMesa={() => { setMesaSelecionada(null); setCart([]); setVendaMesa(null); }} finalizando={finalizando} />
+
+                {/* CARRINHO INLINE CORRIGIDO */}
+                <div className="lg:w-[360px] h-full shrink-0 overflow-hidden bg-white rounded-[16px] border border-[#DDE8DC] shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex flex-col">
+                    <div className="shrink-0 px-4 h-[48px] flex items-center justify-between border-b border-[#E2EADF]">
+                        <p className="text-[12px] font-bold">Seu pedido</p>
+                        <span className="w-6 h-6 bg-black text-white text-[10px] font-bold rounded-full flex items-center justify-center">{cart.length}</span>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto no-scrollbar px-3 py-3 flex flex-col gap-2 min-h-0">
+                        {cart.length === 0? (
+                            <div className="flex-1 flex flex-col items-center justify-center py-10"><p className="text-[11px] text-[#9A9A9A]">Carrinho vazio</p></div>
+                        ) : (
+                            cart.map((item: any, idx: number) => (
+                                <div key={`${item.id}-${idx}`} className="flex justify-between items-start px-3 py-2.5 rounded-[10px] border border-[#E8EFE6] bg-white">
+                                    <div className="pr-2 min-w-0"><p className="text-[11px] font-semibold leading-snug truncate max-w-[170px]">{item.name}</p><p className="text-[10px] text-[#9A9A9A] mt-0.5">x{item.qtd}</p></div>
+                                    <span className="text-[11px] font-bold shrink-0">Kz {(item.price * item.qtd).toLocaleString("de-DE")}</span>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <div className="shrink-0 border-t border-[#DDE8DC] bg-white p-3 flex flex-col gap-2 sticky bottom-0">
+                        <div className="flex items-center justify-between border border-[#E2EADF] rounded-[10px] px-3 h-9">
+                            <select value={forma} onChange={(e) => setForma(e.target.value as any)} className="flex-1 bg-transparent text-[11px] font-bold outline-none">
+                                <option value="dinheiro">Dinheiro</option>
+                                <option value="transferencia">Transferência</option>
+                                <option value="tpa">TPA</option>
+                            </select>
+                        </div>
+                        <div className="flex items-center justify-between px-1">
+                            <span className="text-[11px] text-[#8A8A8A]">Total</span>
+                            <span className="text-[13px] font-black">Kz {total.toLocaleString("de-DE")}</span>
+                        </div>
+                        {mesaSelecionada? (
+                            <div className="flex gap-2">
+                                <button onClick={() => { setMesaSelecionada(null); setCart([]); setVendaMesa(null); }} className="flex-1 h-9 rounded-full border border-[#E2EADF] text-[11px] font-bold">Limpar</button>
+                                <button onClick={adicionarNaMesa} disabled={finalizando || cart.length === 0} className="flex-[2] h-9 rounded-full bg-black text-white text-[11px] font-bold disabled:opacity-50 active:scale-[0.98]" style={{ paddingTop: '2px', paddingBottom: '2px' }}>{finalizando? "..." : `Lançar Mesa ${mesaSelecionada.numero}`}</button>
+                            </div>
+                        ) : (
+                            <button onClick={() => { setRecebido(String(total)); setShowPay(true); }} disabled={cart.length === 0} className="w-full h-9 rounded-full bg-black text-white text-[11px] font-bold disabled:opacity-40 active:scale-[0.98]" style={{ paddingTop: '2px', paddingBottom: '2px' }}>Finalizar - Kz {total.toLocaleString("de-DE")}</button>
+                        )}
+                    </div>
                 </div>
             </div>
 
             <PayModal showPay={showPay} setShowPay={(v: boolean) => { if (!v) setMesaParaFechar(null); setShowPay(v); }} total={mesaParaFechar? totalFechamento : total} forma={forma} recebido={recebido} recebidoNum={recebidoNum} troco={recebidoNum - (mesaParaFechar? totalFechamento : total)} handleCalc={handleCalc} setShowConfirm={mesaParaFechar? fecharContaMesa : finalizarBalcao} loading={finalizando} isMesa={!!mesaParaFechar} mesaNumero={mesaParaFechar?.numero} />
             <ConfirmModal showConfirm={showConfirm} setShowConfirm={setShowConfirm} total={mesaParaFechar? totalFechamento : total} forma={forma} troco={recebidoNum - (mesaParaFechar? totalFechamento : total)} imprimirFatura={() => aposVenda(true)} onSemRecibo={() => aposVenda(false)} vendaNumero={ultimaVenda?.numero} isMesa={!!mesaParaFechar} mesaNumero={ultimaVenda?.mesa_numero || mesaParaFechar?.numero} />
+            <style jsx global>{`.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
         </div>
     );
 }
