@@ -8,7 +8,7 @@ from jos_api.modules.caixa.routes import router as caixa_router
 from jos_api.modules.atividade.routes import router as atividade_router
 from jos_api.core.realtime_router import router as realtime_router
 
-api_router = APIRouter()
+api_router = APIRouter(prefix="/api/v1")
 
 api_router.include_router(auth_router)
 api_router.include_router(empresa_router)

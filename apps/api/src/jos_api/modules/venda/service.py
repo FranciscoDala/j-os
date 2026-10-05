@@ -6,7 +6,7 @@ from sqlalchemy import func
 from typing import Optional
 from datetime import datetime, timedelta
 from jos_api.modules.venda.models import Venda, VendaItem, VendaTipo, VendaStatus, VendaItemStatus, ReservaCarrinho
-from jos_api.modules.mesa.models import Mesa, MesaStatus
+from jos_api.modules.mesa.models import Mesa, MesaStatus, MesaReserva, ReservaStatus
 from jos_api.modules.produto.models import Product
 from jos_api.modules.caixa.models import Caixa, CaixaMovimento, TipoMovimento, OrigemMovimento
 from jos_api.modules.atividade.service import registrar_atividade
@@ -23,14 +23,11 @@ def _limpar_expiradas(db: Session, empresa_id: uuid.UUID):
 def get_stock_disponivel(db: Session, empresa_id: uuid.UUID, produto_id: uuid.UUID, ignorar_user_id: uuid.UUID | None = None) -> Decimal:
     _limpar_expiradas(db, empresa_id)
     prod = db.query(Product).filter(Product.id == produto_id, Product.empresa_id == empresa_id).first()
-    if not prod:
-        return Decimal("0")
+    if not prod: return Decimal("0")
     stock = Decimal(str(prod.stock_atual or 0))
-    if not getattr(prod, 'controlar_stock', False):
-        return Decimal("999999")
+    if not getattr(prod, 'controlar_stock', False): return Decimal("999999")
     q = db.query(func.coalesce(func.sum(ReservaCarrinho.quantidade), 0)).filter(ReservaCarrinho.empresa_id == empresa_id, ReservaCarrinho.produto_id == produto_id)
-    if ignorar_user_id:
-        q = q.filter(ReservaCarrinho.user_id!= ignorar_user_id)
+    if ignorar_user_id: q = q.filter(ReservaCarrinho.user_id!= ignorar_user_id)
     reservado = Decimal(str(q.scalar() or 0))
     return stock - reservado
 
@@ -43,56 +40,52 @@ def reservar_produto(db: Session, empresa_id: uuid.UUID, produto_id: uuid.UUID, 
     db.query(ReservaCarrinho).filter(ReservaCarrinho.empresa_id == empresa_id, ReservaCarrinho.produto_id == produto_id, ReservaCarrinho.user_id == user_id).delete()
     db.flush()
     disponivel = get_stock_disponivel(db, empresa_id, produto_id)
-    if disponivel < quantidade:
-        raise HTTPException(400, f"Stock insuficiente. Disponível: {disponivel}, tentou reservar: {quantidade}")
+    if disponivel < quantidade: raise HTTPException(400, f"Stock insuficiente. Disponível: {disponivel}")
     r = ReservaCarrinho(empresa_id=empresa_id, produto_id=produto_id, user_id=user_id, quantidade=quantidade, expira_em=datetime.utcnow() + timedelta(minutes=5))
-    db.add(r)
-    db.commit()
-    db.refresh(r)
-    emit(str(empresa_id), "reserva:criada", data={"produto_id": str(produto_id), "user_id": str(user_id), "quantidade": str(quantidade)})
-    emit(str(empresa_id), "reserva:update", data={"produto_id": str(produto_id), "user_id": str(user_id), "quantidade": str(quantidade)})
+    db.add(r); db.commit(); db.refresh(r)
     return r
 
 def liberar_reserva(db: Session, empresa_id: uuid.UUID, produto_id: uuid.UUID, user_id: uuid.UUID):
     db.query(ReservaCarrinho).filter(ReservaCarrinho.empresa_id == empresa_id, ReservaCarrinho.produto_id == produto_id, ReservaCarrinho.user_id == user_id).delete()
     db.commit()
-    emit(str(empresa_id), "reserva:liberada", data={"produto_id": str(produto_id), "user_id": str(user_id)})
-    emit(str(empresa_id), "reserva:update", data={"produto_id": str(produto_id), "user_id": str(user_id), "quantidade": "0"})
 
 def liberar_todas_reservas_user(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID):
     db.query(ReservaCarrinho).filter(ReservaCarrinho.empresa_id == empresa_id, ReservaCarrinho.user_id == user_id).delete()
     db.commit()
-    emit(str(empresa_id), "reserva:clear", data={"user_id": str(user_id)})
 
 def get_mesas(db: Session, empresa_id: uuid.UUID):
     return db.query(Mesa).filter(Mesa.empresa_id == empresa_id, Mesa.ativa == True).order_by(Mesa.numero).all()
 
-def criar_mesa(db: Session, empresa_id: uuid.UUID, numero: str, capacidade: int):
+def criar_mesa(db: Session, empresa_id: uuid.UUID, numero: str, capacidade: int, zona: str = "Salão"):
     exists = db.query(Mesa).filter(Mesa.empresa_id == empresa_id, Mesa.numero == numero, Mesa.ativa == True).first()
     if exists: raise HTTPException(400, f"Mesa {numero} já existe")
-    m = Mesa(empresa_id=empresa_id, numero=numero.strip().upper(), capacidade=capacidade, status=MesaStatus.LIVRE)
+    m = Mesa(empresa_id=empresa_id, numero=numero.strip().upper(), capacidade=capacidade, zona=zona, status=MesaStatus.LIVRE)
     db.add(m); db.commit(); db.refresh(m)
     emit(str(empresa_id), "mesa:created", data={"id": str(m.id), "numero": m.numero})
     return m
 
-    
 def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID, caixa: Caixa, criado_por_nome: str = "Sistema", ip: str | None = None):
     if not data.itens: raise HTTPException(400, "Sem itens")
     _limpar_expiradas(db, empresa_id)
     mesa: Optional[Mesa] = None
     venda_tipo = VendaTipo.BALCAO
+    garcom_id = getattr(data, 'garcom_id', None) or created_by
+    pessoas = getattr(data, 'pessoas', 1) or 1
+
     if data.mesa_id:
         mesa = db.query(Mesa).filter(Mesa.id == data.mesa_id, Mesa.empresa_id == empresa_id).with_for_update().first()
         if not mesa: raise HTTPException(404, "Mesa não encontrada")
-        if mesa.status!= MesaStatus.LIVRE: raise HTTPException(400, f"Mesa {mesa.numero} está {mesa.status.value}")
+        if mesa.status not in [MesaStatus.LIVRE, MesaStatus.RESERVADA]:
+            raise HTTPException(400, f"Mesa {mesa.numero} está {mesa.status.value}")
         venda_tipo = VendaTipo.MESA
         venda_status = VendaStatus.ABERTA if data.dinheiro_recebido == Decimal("0") else VendaStatus.CONCLUIDA
     else:
         venda_status = VendaStatus.CONCLUIDA
 
-    venda = Venda(empresa_id=empresa_id, created_by=created_by, caixa_id=caixa.id, numero=_next_numero(db, empresa_id), tipo=venda_tipo, mesa_id=data.mesa_id, status=venda_status, forma_pagamento=data.forma_pagamento, dinheiro_recebido=data.dinheiro_recebido)
+    venda = Venda(empresa_id=empresa_id, created_by=created_by, garcom_id=garcom_id, caixa_id=caixa.id, numero=_next_numero(db, empresa_id), tipo=venda_tipo, mesa_id=data.mesa_id, pessoas=pessoas, observacao=getattr(data,'observacao',None), status=venda_status, forma_pagamento=data.forma_pagamento, dinheiro_recebido=data.dinheiro_recebido)
     sub = Decimal("0"); iva_tot = Decimal("0"); tot = Decimal("0")
     produtos_afectados = []
+
     for it in data.itens:
         prod = db.query(Product).filter(Product.id == it.produto_id, Product.empresa_id == empresa_id).with_for_update().first()
         if not prod: raise HTTPException(404, f"Produto {it.produto_id} não encontrado")
@@ -100,7 +93,7 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
             disp = get_stock_disponivel(db, empresa_id, prod.id, ignorar_user_id=created_by)
             minha_reserva_qtd = db.query(func.coalesce(func.sum(ReservaCarrinho.quantidade),0)).filter(ReservaCarrinho.empresa_id==empresa_id, ReservaCarrinho.produto_id==prod.id, ReservaCarrinho.user_id==created_by).scalar() or Decimal("0")
             if (disp + Decimal(str(minha_reserva_qtd))) < it.quantidade and not getattr(prod, 'allow_negative', False):
-                raise HTTPException(400, f"Stock insuficiente: {prod.nome} (disponível {disp + Decimal(str(minha_reserva_qtd))})")
+                raise HTTPException(400, f"Stock insuficiente: {prod.nome}")
         sub_item = prod.preco_venda * it.quantidade
         if getattr(prod, 'tem_iva', False) and getattr(prod, 'iva', Decimal("0")) > 0:
             iva_v = sub_item * (prod.iva / Decimal("100")); tem_iva = True; iva_p = prod.iva
@@ -110,76 +103,41 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
         sub += sub_item; iva_tot += iva_v; tot += tot_item
         if venda_status == VendaStatus.CONCLUIDA and getattr(prod, 'controlar_stock', False):
             prod.stock_atual -= it.quantidade
-            produtos_afectados.append({"id": str(prod.id), "stock_atual": str(prod.stock_atual), "nome": prod.nome, "controlar_stock": True})
+            produtos_afectados.append({"id": str(prod.id), "stock_atual": str(prod.stock_atual), "nome": prod.nome})
         db.query(ReservaCarrinho).filter(ReservaCarrinho.empresa_id==empresa_id, ReservaCarrinho.produto_id==prod.id, ReservaCarrinho.user_id==created_by).delete()
 
     venda.subtotal = sub; venda.total_iva = iva_tot; venda.total = tot
     venda.troco = data.dinheiro_recebido - tot if data.dinheiro_recebido >= tot else Decimal("0")
-    if mesa: mesa.status = MesaStatus.OCUPADA if venda_status == VendaStatus.ABERTA else MesaStatus.LIVRE
     db.add(venda); db.flush()
+
+    if mesa:
+        mesa.status = MesaStatus.OCUPADA
+        mesa.venda_atual_id = venda.id
+        mesa.garcom_id = garcom_id
+        mesa.aberta_em = datetime.utcnow()
+        mesa.pessoas_atual = pessoas
+        res = db.query(MesaReserva).filter(MesaReserva.mesa_id == mesa.id, MesaReserva.status == ReservaStatus.PENDENTE).order_by(MesaReserva.data_reserva.desc()).first()
+        if res:
+            res.status = ReservaStatus.CHECKIN
+            res.venda_id = venda.id
+
     nomes = ", ".join([i.nome_produto for i in venda.itens])
     mov = None
     if venda_status == VendaStatus.CONCLUIDA:
-        # AQUI: descricao agora com Resp:
         mov = CaixaMovimento(empresa_id=empresa_id, caixa_id=caixa.id, tipo=TipoMovimento.VENDA, origem=OrigemMovimento.VENDA, valor=venda.total, descricao=f"Venda #{venda.numero} - {venda.forma_pagamento} - Resp: {criado_por_nome}", venda_id=venda.id, forma_pagamento=venda.forma_pagamento, criado_por=created_by, criado_por_nome=criado_por_nome)
-        db.add(mov)
-        db.flush()
-    registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="CRIAR", descricao=f"Venda #{venda.numero} - {nomes} - R$ {venda.total} - por {criado_por_nome}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero} - {nomes}", user_id=created_by, user_nome=criado_por_nome, detalhes={"produtos": nomes, "total": str(venda.total)}, ip=ip, commit=False)
+        db.add(mov); db.flush()
+
+    registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="CRIAR", descricao=f"Venda #{venda.numero} - {nomes}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero}", user_id=created_by, user_nome=criado_por_nome, detalhes={"total": str(venda.total)}, ip=ip, commit=False)
     db.commit(); db.refresh(venda)
-    if mov:
-        db.refresh(mov)
 
     for p in produtos_afectados:
         emit(str(empresa_id), "produto:update", data=p)
-        emit(str(empresa_id), "produto:atualizado", data=p)
 
-    venda_payload = {
-        "id": str(venda.id),
-        "numero": venda.numero,
-        "total": str(venda.total),
-        "total_venda": str(venda.total),
-        "valor": str(venda.total),
-        "mesa_id": str(venda.mesa_id) if venda.mesa_id else None,
-        "criado_por_nome": criado_por_nome,
-        "itens": [{"produto_id": str(i.produto_id), "quantidade": str(i.quantidade)} for i in venda.itens]
-    }
-    emit(str(empresa_id), "venda:nova", data=venda_payload)
-    emit(str(empresa_id), "venda:created", data=venda_payload)
-
-    if mov:
-        mov_payload = {
-            "id": str(mov.id),
-            "tipo": mov.tipo.value if hasattr(mov.tipo, 'value') else str(mov.tipo),
-            "valor": str(mov.valor),
-            "descricao": mov.descricao,
-            "criado_em": mov.criado_em.isoformat() if mov.criado_em else datetime.utcnow().isoformat(),
-            "criado_por_nome": mov.criado_por_nome or criado_por_nome,
-            "aberto_por_nome": criado_por_nome,
-            "forma_pagamento": str(mov.forma_pagamento) if mov.forma_pagamento else str(venda.forma_pagamento),
-            "venda_id": str(venda.id),
-            "caixa_id": str(caixa.id)
-        }
-        emit(str(empresa_id), "caixa:extrato", data=mov_payload)
-        emit(str(empresa_id), "caixa:atualizado", data=mov_payload)
-        emit(str(empresa_id), "caixa:update", data=mov_payload)
-    else:
-        fallback = {
-            "id": str(venda.id),
-            "tipo": "VENDA",
-            "valor": str(venda.total),
-            "descricao": f"Venda #{venda.numero} - Resp: {criado_por_nome}",
-            "criado_em": datetime.utcnow().isoformat(),
-            "criado_por_nome": criado_por_nome,
-            "aberto_por_nome": criado_por_nome,
-            "venda_id": str(venda.id),
-            "caixa_id": str(caixa.id)
-        }
-        emit(str(empresa_id), "caixa:extrato", data=fallback)
-        emit(str(empresa_id), "caixa:atualizado", data=fallback)
-        emit(str(empresa_id), "caixa:update", data=fallback)
+    emit(str(empresa_id), "venda:nova", data={"id": str(venda.id), "numero": venda.numero, "total": str(venda.total), "mesa_id": str(venda.mesa_id) if venda.mesa_id else None, "itens": [{"produto_id": str(i.produto_id), "quantidade": str(i.quantidade)} for i in venda.itens]})
+    if mesa:
+        emit(str(empresa_id), "mesa:update", data={"id": str(mesa.id), "numero": mesa.numero, "status": "OCUPADA", "venda_atual_id": str(venda.id)})
 
     return venda, produtos_afectados
-
 
 def add_item_comanda(db: Session, venda_id: uuid.UUID, data, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
     venda = db.query(Venda).filter(Venda.id == venda_id, Venda.empresa_id == empresa_id).with_for_update().first()
@@ -193,21 +151,10 @@ def add_item_comanda(db: Session, venda_id: uuid.UUID, data, empresa_id: uuid.UU
     venda.itens.append(item)
     venda.subtotal += sub_item; venda.total_iva += iva_v; venda.total += tot_item
     db.flush()
-    registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="ADD_ITEM", descricao=f"Adicionou '{prod.nome} x{data.quantidade}' na comanda #{venda.numero}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero} - {prod.nome}", user_id=user_id, user_nome=user_nome, detalhes={"produto": prod.nome, "qtd": str(data.quantidade)}, ip=ip, commit=False)
+    registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="ADD_ITEM", descricao=f"Adicionou {prod.nome}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero}", user_id=user_id, user_nome=user_nome, ip=ip, commit=False)
     db.commit(); db.refresh(venda)
-    emit(str(empresa_id), "venda:item_adicionado", data={"venda_id": str(venda.id), "produto": prod.nome, "qtd": str(data.quantidade)})
+    emit(str(empresa_id), "venda:update", data={"id": str(venda.id), "total": str(venda.total)})
     return venda
-
-def update_item_status(db: Session, venda_id: uuid.UUID, item_id: uuid.UUID, novo_status: VendaItemStatus, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
-    item = db.query(VendaItem).filter(VendaItem.id == item_id, VendaItem.venda_id == venda_id, VendaItem.empresa_id == empresa_id).first()
-    if not item: raise HTTPException(404, "Item não encontrado")
-    antigo = item.status
-    item.status = novo_status
-    db.flush()
-    registrar_atividade(db, empresa_id=empresa_id, modulo="COZINHA", acao=novo_status.value, descricao=f"Cozinha: '{item.nome_produto}' {antigo.value} -> {novo_status.value} - Venda #{venda_id}", entidade="VendaItem", entidade_id=item.id, entidade_nome=item.nome_produto, user_id=user_id, user_nome=user_nome, ip=ip, commit=False)
-    db.commit()
-    emit(str(empresa_id), "cozinha:update", data={"item_id": str(item.id), "status": novo_status.value})
-    return item
 
 def transferir_mesa(db: Session, venda_id: uuid.UUID, nova_mesa_id: uuid.UUID, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
     venda = db.query(Venda).filter(Venda.id == venda_id, Venda.empresa_id == empresa_id).with_for_update().first()
@@ -215,44 +162,52 @@ def transferir_mesa(db: Session, venda_id: uuid.UUID, nova_mesa_id: uuid.UUID, e
     mesa_antiga = db.query(Mesa).filter(Mesa.id == venda.mesa_id, Mesa.empresa_id == empresa_id).with_for_update().first() if venda.mesa_id else None
     mesa_nova = db.query(Mesa).filter(Mesa.id == nova_mesa_id, Mesa.empresa_id == empresa_id).with_for_update().first()
     if not mesa_nova: raise HTTPException(404, "Nova mesa não encontrada")
-    if mesa_nova.status!= MesaStatus.LIVRE: raise HTTPException(400, f"Mesa {mesa_nova.numero} está ocupada")
-    if mesa_antiga: mesa_antiga.status = MesaStatus.LIVRE
+    if mesa_nova.status!= MesaStatus.LIVRE: raise HTTPException(400, f"Mesa {mesa_nova.numero} ocupada")
+    if mesa_antiga:
+        mesa_antiga.status = MesaStatus.LIVRE
+        mesa_antiga.venda_atual_id = None
+        mesa_antiga.garcom_id = None
+        mesa_antiga.aberta_em = None
     mesa_nova.status = MesaStatus.OCUPADA
+    mesa_nova.venda_atual_id = venda.id
+    mesa_nova.garcom_id = venda.garcom_id
+    mesa_nova.aberta_em = datetime.utcnow()
     venda.mesa_id = nova_mesa_id
-    db.flush()
-    registrar_atividade(db, empresa_id=empresa_id, modulo="MESA", acao="TRANSFERIR", descricao=f"Transferiu comanda #{venda.numero} {mesa_antiga.numero if mesa_antiga else 'BALCAO'} -> {mesa_nova.numero}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero} -> Mesa {mesa_nova.numero}", user_id=user_id, user_nome=user_nome, ip=ip, commit=False)
     db.commit()
-    emit(str(empresa_id), "mesa:transferida", data={"venda_id": str(venda.id), "nova_mesa": mesa_nova.numero})
+    emit(str(empresa_id), "mesa:update", data={"id": str(mesa_antiga.id) if mesa_antiga else None, "status": "LIVRE"})
+    emit(str(empresa_id), "mesa:update", data={"id": str(mesa_nova.id), "status": "OCUPADA"})
     return venda
 
 def fechar_comanda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, dinheiro_recebido: Decimal, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
     venda = db.query(Venda).filter(Venda.id == venda_id, Venda.empresa_id == empresa_id).with_for_update().first()
     if not venda or venda.status!= VendaStatus.ABERTA: raise HTTPException(400, "Comanda não está aberta")
     caixa = db.query(Caixa).filter(Caixa.id == venda.caixa_id).first()
-    if not caixa: raise HTTPException(400, "Caixa da venda não encontrado")
+    if not caixa: raise HTTPException(400, "Caixa não encontrado")
     produtos_afectados = []
     for item in venda.itens:
         if item.status == VendaItemStatus.CANCELADO: continue
         prod = db.query(Product).filter(Product.id == item.produto_id).with_for_update().first()
         if prod and getattr(prod, 'controlar_stock', False):
-            if prod.stock_atual < item.quantidade and not getattr(prod, 'allow_negative', False): raise HTTPException(400, f"Sem stock para {prod.nome}")
             prod.stock_atual -= item.quantidade
             produtos_afectados.append({"id": str(prod.id), "stock_atual": str(prod.stock_atual)})
-    venda.dinheiro_recebido = dinheiro_recebido; venda.troco = dinheiro_recebido - venda.total if dinheiro_recebido >= venda.total else Decimal("0"); venda.status = VendaStatus.CONCLUIDA
-    mov = CaixaMovimento(empresa_id=empresa_id, caixa_id=caixa.id, tipo=TipoMovimento.VENDA, origem=OrigemMovimento.VENDA, valor=venda.total, descricao=f"Fechamento comanda #{venda.numero} Mesa {venda.mesa_id}", venda_id=venda.id, forma_pagamento=venda.forma_pagamento, criado_por=user_id, criado_por_nome=user_nome)
+    venda.dinheiro_recebido = dinheiro_recebido
+    venda.troco = dinheiro_recebido - venda.total if dinheiro_recebido >= venda.total else Decimal("0")
+    venda.status = VendaStatus.CONCLUIDA
+    mov = CaixaMovimento(empresa_id=empresa_id, caixa_id=caixa.id, tipo=TipoMovimento.VENDA, origem=OrigemMovimento.VENDA, valor=venda.total, descricao=f"Fechamento comanda #{venda.numero}", venda_id=venda.id, forma_pagamento=venda.forma_pagamento, criado_por=user_id, criado_por_nome=user_nome)
     db.add(mov)
-    nomes = ", ".join([i.nome_produto for i in venda.itens if i.status!= VendaItemStatus.CANCELADO])
-    registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="FECHAR_COMANDA", descricao=f"Fechou comanda #{venda.numero} - {nomes} - R$ {venda.total}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero} - {nomes}", user_id=user_id, user_nome=user_nome, detalhes={"produtos": nomes, "total": str(venda.total)}, ip=ip, commit=False)
     if venda.mesa_id:
         mesa = db.query(Mesa).filter(Mesa.id == venda.mesa_id).first()
-        if mesa: mesa.status = MesaStatus.LIVRE
+        if mesa:
+            mesa.status = MesaStatus.LIVRE
+            mesa.venda_atual_id = None
+            mesa.garcom_id = None
+            mesa.aberta_em = None
+            mesa.pessoas_atual = 0
     db.commit(); db.refresh(venda)
-    for p in produtos_afectados:
-        emit(str(empresa_id), "produto:update", data=p)
-        emit(str(empresa_id), "produto:atualizado", data=p)
-    emit(str(empresa_id), "venda:fechada", data={"id": str(venda.id), "total": str(venda.total)})
-    emit(str(empresa_id), "caixa:atualizado", data={"caixa_id": str(caixa.id), "valor": str(venda.total)})
-    emit(str(empresa_id), "caixa:update", data={"caixa_id": str(caixa.id), "valor": str(venda.total)})
+    for p in produtos_afectados: emit(str(empresa_id), "produto:update", data=p)
+    emit(str(empresa_id), "venda:fechada", data={"id": str(venda.id)})
+    if venda.mesa_id:
+        emit(str(empresa_id), "mesa:update", data={"id": str(venda.mesa_id), "status": "LIVRE"})
     return venda, produtos_afectados
 
 def cancelar_venda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
@@ -261,9 +216,19 @@ def cancelar_venda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, user
     venda.status = VendaStatus.CANCELADA
     if venda.mesa_id:
         mesa = db.query(Mesa).filter(Mesa.id == venda.mesa_id).first()
-        if mesa: mesa.status = MesaStatus.LIVRE
-    nomes = ", ".join([i.nome_produto for i in venda.itens])
-    registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="CANCELAR", descricao=f"Cancelou venda #{venda.numero} - {nomes}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero} - {nomes}", user_id=user_id, user_nome=user_nome, detalhes={"total": str(venda.total)}, ip=ip, commit=False)
+        if mesa:
+            mesa.status = MesaStatus.LIVRE
+            mesa.venda_atual_id = None
     db.commit()
     emit(str(empresa_id), "venda:cancelada", data={"id": str(venda.id)})
+    if venda.mesa_id:
+        emit(str(empresa_id), "mesa:update", data={"id": str(venda.mesa_id), "status": "LIVRE"})
     return venda
+
+def update_item_status(db: Session, venda_id: uuid.UUID, item_id: uuid.UUID, novo_status: VendaItemStatus, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
+    item = db.query(VendaItem).filter(VendaItem.id == item_id, VendaItem.venda_id == venda_id, VendaItem.empresa_id == empresa_id).first()
+    if not item: raise HTTPException(404, "Item não encontrado")
+    item.status = novo_status
+    db.commit()
+    emit(str(empresa_id), "cozinha:update", data={"item_id": str(item.id), "status": novo_status.value})
+    return item

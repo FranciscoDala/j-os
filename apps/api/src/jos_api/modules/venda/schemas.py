@@ -12,18 +12,28 @@ class VendaItemCreate(BaseModel):
 class VendaCreateRequest(BaseModel):
     itens: List[VendaItemCreate]
     mesa_id: Optional[UUID] = None
+    garcom_id: Optional[UUID] = None
+    pessoas: int = 1
+    observacao: Optional[str] = None
     dinheiro_recebido: Decimal = Decimal("0")
     forma_pagamento: str = "DINHEIRO"
 
 class MesaCreateRequest(BaseModel):
     numero: str
     capacidade: int = 4
+    zona: str = "Salão"
 
 class MesaResponse(BaseModel):
     id: UUID
+    empresa_id: UUID
     numero: str
     capacidade: int
+    zona: str
     status: str
+    venda_atual_id: Optional[UUID] = None
+    garcom_id: Optional[UUID] = None
+    aberta_em: Optional[datetime] = None
+    pessoas_atual: int = 0
     class Config:
         from_attributes = True
 
@@ -50,6 +60,9 @@ class VendaResponse(BaseModel):
     numero: int
     tipo: str
     mesa_id: Optional[UUID] = None
+    garcom_id: Optional[UUID] = None
+    pessoas: int
+    observacao: Optional[str] = None
     subtotal: Decimal
     total_iva: Decimal
     total: Decimal
@@ -71,7 +84,7 @@ class TransferirMesaRequest(BaseModel):
     nova_mesa_id: UUID
 
 class UpdateItemStatusRequest(BaseModel):
-    status: str # PENDENTE, EM_PREPARO, PRONTO, ENTREGUE, CANCELADO
+    status: str
 
 class ReservaRequest(BaseModel):
     produto_id: UUID

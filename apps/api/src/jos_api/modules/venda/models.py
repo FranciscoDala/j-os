@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 import enum
-from sqlalchemy import String, DateTime, ForeignKey, Numeric, UniqueConstraint, Boolean
+from sqlalchemy import String, DateTime, ForeignKey, Numeric, UniqueConstraint, Boolean, Integer, Text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -30,10 +30,13 @@ class Venda(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     empresa_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True, nullable=False)
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    garcom_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
     caixa_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("caixas.id", ondelete="RESTRICT"), nullable=False, index=True)
     numero: Mapped[int] = mapped_column(nullable=False)
     tipo: Mapped[VendaTipo] = mapped_column(SAEnum(VendaTipo, name="vendatipo", create_type=False), default=VendaTipo.BALCAO, nullable=False)
     mesa_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("mesas.id"), nullable=True, index=True)
+    pessoas: Mapped[int] = mapped_column(Integer, default=1, nullable=False, server_default="1")
+    observacao: Mapped[str | None] = mapped_column(Text, nullable=True)
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12,2), default=Decimal("0"), nullable=False)
     total_iva: Mapped[Decimal] = mapped_column(Numeric(12,2), default=Decimal("0"), nullable=False)
     total: Mapped[Decimal] = mapped_column(Numeric(12,2), default=Decimal("0"), nullable=False)
@@ -62,7 +65,6 @@ class VendaItem(Base):
     observacao: Mapped[str | None] = mapped_column(String(500), nullable=True)
     venda: Mapped[Venda] = relationship("Venda", back_populates="itens")
 
-# NOVO - RESERVA TEMPORÁRIA DE CARRINHO
 class ReservaCarrinho(Base):
     __tablename__ = "reservas_carrinho"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
