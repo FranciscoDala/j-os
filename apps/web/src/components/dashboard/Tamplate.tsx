@@ -93,7 +93,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                     {!isVendasOpen && (
                         <div className="flex items-center justify-between gap-3 py-3 shrink-0 bg-transparent">
                             <div className="flex-1">
-                                <h1 className="text-[26px] md:text-[30px] font-[900] text-[#1E1E1E] leading-[0.9] tracking-[-0.02em]">
+                                <h1 className="text-[16px] md:text-[20px] font-[900] text-[#1E1E1E] leading-[0.9] tracking-[-0.02em] uppercase">
                                     {headerTitle}
                                 </h1>
                                 <p className="text-[12px] md:text-[13px] text-[#8A8A8A] mt-2 font-medium">
@@ -121,7 +121,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                             </div>
                         </div>
                     )}
-                    
+
                     <div className="flex-1 overflow-y-auto no-scrollbar mt-2 pr-1">{children}</div>
                 </div>
 
