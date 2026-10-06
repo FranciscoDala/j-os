@@ -13,9 +13,9 @@ export const useDashboard = () => useContext(DashboardCtx);
 
 const TAB_META: Record<string, { title: string; desc: string }> = {
     home: { title: "Painel", desc: "Visão geral do seu restaurante" },
-    pedidos: { title: "Pedidos QR", desc: "Tempo real • LIVE" },
-    produtos: { title: "Produtos", desc: "Gerencie seu catálogo e preços" },
-    mesas: { title: "Mesas", desc: "Controle de salão e atendimento" },
+    pedidos: { title: "Pedidos QR", desc: "Gerencie seus pedidos feitos em tempo real • LIVE" },
+    produtos: { title: "Produtos", desc: "Gerencie seus produtos, catálogo e preços" },
+    mesas: { title: "Mesas", desc: "Controle de mesas e atendimento" },
     caixa: { title: "Caixa", desc: "Controle financeiro do dia" },
     funcionarios: { title: "Equipe", desc: "Gestão de funcionários e acessos" },
     vendas: { title: "Vendas", desc: "" },
@@ -93,7 +93,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                     {!isVendasOpen && (
                         <div className="flex items-center justify-between gap-3 py-3 shrink-0 bg-transparent">
                             <div className="flex-1">
-                                <h1 className="text-[16px] md:text-[20px] font-[900] text-[#1E1E1E] leading-[0.9] tracking-[-0.02em] uppercase">
+                                <h1 className="text-[16px] md:text-[20px] font-[900] text-[#1E1E1E] leading-[0.9] tracking-[-0.02em] capitalize">
                                     {headerTitle}
                                 </h1>
                                 <p className="text-[12px] md:text-[13px] text-[#8A8A8A] mt-2 font-medium">
