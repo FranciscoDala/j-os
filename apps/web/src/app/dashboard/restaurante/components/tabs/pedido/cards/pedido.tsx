@@ -15,21 +15,20 @@ function timeAgo(iso: string) {
     if (!iso) return "";
     const diffMs = Date.now() - new Date(iso).getTime();
     if (diffMs < 0) return "agora";
+
     const sec = Math.floor(diffMs / 1000);
-    if (sec < 30) return "agora";
-    if (sec < 60) return `há ${sec}s`;
+    if (sec < 60) return "agora";
+
     const min = Math.floor(sec / 60);
-    if (min < 60) return min === 1? "há 1min" : `há ${min}min`;
+    if (min < 60) return min === 1 ? "há 1min" : `há ${min}min`;
+
     const h = Math.floor(min / 60);
-    const m = min % 60;
+    if (h < 24) return h === 1 ? "há 1h" : `há ${h}h`;
+
     const d = Math.floor(h / 24);
-    if (h < 6) {
-        if (m === 0) return h === 1? "há 1h" : `há ${h}h`;
-        return `há ${h}h ${m}min`;
-    }
-    if (h < 24) return h === 1? "há 1h" : `há ${h}h`;
     if (d === 1) return "ontem";
     if (d < 7) return `há ${d}d`;
+
     return new Date(iso).toLocaleDateString('pt-AO', { day: '2-digit', month: 'short' });
 }
 
