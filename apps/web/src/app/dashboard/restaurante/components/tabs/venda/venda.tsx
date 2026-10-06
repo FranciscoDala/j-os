@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { ProdutosSection } from "./cards/produto";
 import { CarrinhoSection } from "./carrinho/carrinho";
@@ -39,9 +39,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const [finalizando, setFinalizando] = useState(false);
     const [ultimaVenda, setUltimaVenda] = useState<any>(null);
 
-    const [modoMesa, setModoMesa] = useState(false);
-    const [mesasOcupadas, setMesasOcupadas] = useState<any[]>([]);
-    const [loadingMesas, setLoadingMesas] = useState(false);
     const [mesaSelecionada, setMesaSelecionada] = useState<any>(null);
     const [vendaMesa, setVendaMesa] = useState<any>(null);
     const [pedidoQrAtivo, setPedidoQrAtivo] = useState<any>(null);
@@ -65,9 +62,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             qrProcessadoRef.current = idQr;
 
             setPedidoQrAtivo(dados);
-            setModoMesa(true);
             setMostrarCatalogoExtra(false);
-            localStorage.setItem("venda_modo_mesa", "1");
 
             (async () => {
                 const empresaId = getEmpresaId();
@@ -103,23 +98,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     }, []);
 
     useEffect(() => {
-        const saved = localStorage.getItem("venda_modo_mesa");
-        if (saved === "1") setModoMesa(true);
-    }, []);
-
-    useEffect(() => {
-        localStorage.setItem("venda_modo_mesa", modoMesa? "1" : "0");
-        if (!modoMesa &&!localStorage.getItem("atender_mesa_qr")) {
-            setMesaSelecionada(null);
-            setVendaMesa(null);
-            setActiveCat("All");
-            setPedidoQrAtivo(null);
-            setMostrarCatalogoExtra(false);
-            qrProcessadoRef.current = null;
-        }
-    }, [modoMesa]);
-
-    useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if ((e.key === "/" &&!(e.target instanceof HTMLInputElement)) || (e.ctrlKey && e.key.toLowerCase() === "k")) {
                 e.preventDefault(); setShowSearch(true); setTimeout(() => searchRef.current?.focus(), 50);
@@ -150,39 +128,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         }; fetchCats();
     }, []);
 
-    const fetchMesasOcupadas = useCallback(async () => {
-        if (!modoMesa) return;
-        const empresaId = getEmpresaId(); if (!empresaId) return;
-        setLoadingMesas(true);
-        try {
-            const r = await fetch(`${MESAS_API}/${empresaId}?status=OCUPADA`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
-            if (r.ok) setMesasOcupadas(await r.json());
-        } catch { } setLoadingMesas(false);
-    }, [modoMesa]);
-
-    useEffect(() => { if (modoMesa && activeCat === "Mesas") fetchMesasOcupadas(); }, [modoMesa, activeCat, fetchMesasOcupadas]);
-
-    const selecionarMesa = async (mesa: any) => {
-        if(!pedidoQrAtivo) setCart([]);
-        setMesaSelecionada(mesa);
-        setVendaMesa(null);
-        if (mesa.venda_atual_id) {
-            try {
-                const r = await fetch(`${VENDAS_API}/${mesa.venda_atual_id}`, { headers: getAuthHeaders() as any });
-                if (r.ok) {
-                    const v = await r.json();
-                    if (v.status === "ABERTA") {
-                        setVendaMesa(v);
-                        pushToast(`Mesa ${mesa.numero} - Kz ${Number(v.total || 0).toLocaleString("de-DE")}`, "info");
-                        return;
-                    }
-                }
-            } catch { }
-        }
-        pushToast(`Mesa ${mesa.numero} pronta para lançar`, "success");
-    };
-
-    const cats = modoMesa? ["All", "Mesas",...catsDb] : ["All",...catsDb];
+    const cats = ["All",...catsDb];
     const getStockState = (p: any) => { if (!p.controlar_stock) return "ok"; const atual = Number(p.stock_atual?? 0); if (atual <= 0) return "zero"; if (atual <= 5) return "low"; return "ok"; };
 
     const add = (p: any) => {
@@ -233,8 +179,8 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                     qrProcessadoRef.current = null;
                     setMostrarCatalogoExtra(false);
                 }
-                pushToast(`Mesa ${mesaSelecionada.numero} aberta +Kz ${total.toLocaleString("de-DE")}`, "success");
-                setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("Mesas"); fetchMesasOcupadas();
+                pushToast(`Mesa ${mesaSelecionada.numero} +Kz ${total.toLocaleString("de-DE")}`, "success");
+                setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("All");
                 return;
             }
             const r = await fetch(`${VENDAS_API}/${vendaId}/itens`, {
@@ -255,7 +201,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                 setMostrarCatalogoExtra(false);
             }
             pushToast(`Mesa ${mesaSelecionada.numero} +Kz ${total.toLocaleString("de-DE")}`, "success");
-            setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("Mesas"); fetchMesasOcupadas();
+            setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("All");
         } catch (e: any) { pushToast(e.message, "error"); }
         finally { setFinalizando(false); }
     };
@@ -273,21 +219,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             setShowConfirm(true);
         } catch (e: any) { pushToast(e.message, "error"); }
         finally { setFinalizando(false); }
-    };
-
-    const imprimirContaParcial = async (mesa: any) => {
-        const vendaId = mesa.venda_atual_id || vendaMesa?.id;
-        if (!vendaId) { pushToast("Mesa sem consumo ainda", "info"); return; }
-        try {
-            const r = await fetch(`${VENDAS_API}/${vendaId}`, { headers: getAuthHeaders() as any });
-            let venda = vendaMesa; if (r.ok) venda = await r.json();
-            const consumo = Number(venda?.total || mesa.venda_total || 0);
-            const pendente = mesaSelecionada?.id === mesa.id? total : 0;
-            const win = window.open("", "_blank", "width=320,height=600"); if (!win) return;
-            const itensHtml = (venda?.itens || []).map((i: any) => `<tr><td>${i.nome_produto || i.produto_nome} x${i.quantidade}</td><td style="text-align:right">Kz ${Number(i.total || 0).toLocaleString("de-DE")}</td></tr>`).join("");
-            win.document.write(`<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px}.line{border-top:1px dashed #000;margin:8px 0}</style></head><body><div style="text-align:center;font-weight:bold">CONTA PARCIAL Mesa ${mesa.numero}</div><div class="line"></div><table>${itensHtml}</table><div class="line"></div><div>Consumo: Kz ${consumo.toLocaleString("de-DE")}${pendente > 0? `<br/>Pendente: Kz ${pendente.toLocaleString("de-DE")}` : ""}<br/>Total: Kz ${(consumo + pendente).toLocaleString("de-DE")}</div><script>window.print();window.close();</script></body></html>`);
-            win.document.close();
-        } catch { pushToast("Erro ao imprimir", "error"); }
     };
 
     const imprimirFaturaFinal = () => {
@@ -329,14 +260,12 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         _qtd_pedido: it.quantidade
     })) : [];
 
-    const filteredByCatBase = activeCat === "All"? dbProducts : activeCat === "Mesas"? [] : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
-    // SE QR E NÃO ESTÁ MOSTRANDO CATALOGO EXTRA -> SÓ ITENS DO QR, SENÃO CATALOGO COMPLETO
-    const filteredByCat = pedidoQrAtivo &&!mostrarCatalogoExtra && activeCat!== "Mesas"? produtosFiltradosQr : filteredByCatBase;
+    const filteredByCatBase = activeCat === "All"? dbProducts : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
+    const filteredByCat = pedidoQrAtivo &&!mostrarCatalogoExtra? produtosFiltradosQr : filteredByCatBase;
 
     return (
         <div className="h-full w-full flex flex-col bg-[#EDEBE6] overflow-hidden relative" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
             <Toasts toasts={toasts} setToasts={setToasts} />
-            {/* HEADER LIMPO - SEM CHECKBOX */}
             <div className="h-[52px] px-4 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                     {mesaSelecionada? (
@@ -349,9 +278,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                         </div>
                     )}
                 </div>
-                <div className="flex items-center gap-2">
-                    <button onClick={onClose} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center shadow-sm active:scale-[0.96]"><X size={14} /></button>
-                </div>
+                <button onClick={onClose} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center shadow-sm active:scale-[0.96]"><X size={14} /></button>
             </div>
 
             <div className="flex-1 flex flex-col lg:flex-row gap-[14px] p-[14px] pt-0 overflow-hidden min-h-0">
@@ -360,7 +287,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                         dbProducts={dbProducts}
                         filteredByCat={filteredByCat}
                         loadingProd={loadingProd}
-                        cats={pedidoQrAtivo &&!mostrarCatalogoExtra? ["All"] : cats}
+                        cats={cats}
                         activeCat={activeCat}
                         setActiveCat={setActiveCat}
                         searchV={searchV}
@@ -371,16 +298,16 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                         getQty={getQty}
                         getStockState={getStockState}
                         add={add}
-                        modoMesa={modoMesa}
-                        mesasOcupadas={mesasOcupadas}
-                        loadingMesas={loadingMesas}
-                        mesaSelecionada={mesaSelecionada}
-                        onSelectMesa={selecionarMesa}
-                        fetchMesas={fetchMesasOcupadas}
+                        modoMesa={false}
+                        mesasOcupadas={[]}
+                        loadingMesas={false}
+                        mesaSelecionada={null}
+                        onSelectMesa={()=>{}}
+                        fetchMesas={()=>{}}
                         cart={cart}
                         cartTotal={total}
                         onFecharMesa={()=>{}}
-                        onImprimirConta={imprimirContaParcial}
+                        onImprimirConta={()=>{}}
                         pedidoQrAtivo={pedidoQrAtivo}
                         mostrarCatalogoExtra={mostrarCatalogoExtra}
                         setMostrarCatalogoExtra={setMostrarCatalogoExtra}
