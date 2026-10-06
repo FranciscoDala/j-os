@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useEffect, useState, useMemo } from "react";
+import { createContext, useContext, useEffect, useState, useMemo, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { ModuleId } from "./menu_config";
@@ -7,7 +7,18 @@ import { VendasTab } from "@/app/dashboard/restaurante/components/tabs/venda/ven
 import { useGlobalSearch } from "@/features/search/context";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
-type Ctx = { activeTab: string; setActiveTab: (t: string) => void; user: any; moduleId: ModuleId; role: string; can: (p: string) => boolean; };
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
+
+type Ctx = {
+    activeTab: string;
+    setActiveTab: (t: string) => void;
+    user: any;
+    moduleId: ModuleId;
+    role: string;
+    can: (p: string) => boolean;
+    pedidosCount: number;
+    setPedidosCount: (n: number) => void;
+};
 const DashboardCtx = createContext<Ctx>(null as any);
 export const useDashboard = () => useContext(DashboardCtx);
 
@@ -42,6 +53,11 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     const [showWelcome, setShowWelcome] = useState(true);
     const { search, setSearch, setActiveTab: setSearchTab } = useGlobalSearch();
 
+    const [pedidosCount, setPedidosCount] = useState(0);
+    const prevCountRef = useRef(0);
+    const isFirstLoad = useRef(true);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
     useEffect(() => {
         const token = localStorage.getItem("access_token");
         if (!token) { router.push("/login"); return; }
@@ -56,13 +72,65 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
         } catch { setUser({}); }
     }, [moduleId, router]);
 
-    // mostra Bem-vindo por 3s ao iniciar sessão
     useEffect(() => {
         if (!user?.nome) return;
         setShowWelcome(true);
         const t = setTimeout(() => setShowWelcome(false), 3200);
         return () => clearTimeout(t);
     }, [user]);
+
+    // polling real dos pedidos QR pendentes
+    useEffect(() => {
+        audioRef.current = new Audio("/sounds/new-order.wav");
+        audioRef.current.volume = 0.8;
+
+        const fetchPedidosCount = async () => {
+            try {
+                const token = localStorage.getItem("access_token") || "";
+                const u = JSON.parse(localStorage.getItem("user") || "{}");
+                const emp = u.empresa_id || localStorage.getItem("empresa_id") || "";
+                if (!emp) return;
+                const r = await fetch(`${API_URL}/api/v1/pedidos-qr/pendentes`, {
+                    headers: { Authorization: `Bearer ${token}`, "X-Empresa-ID": emp },
+                    cache: "no-store" as any
+                });
+                if (!r.ok) return;
+                const data = await r.json();
+                const newCount = Array.isArray(data) ? data.length : 0;
+
+                // toca som só quando aumenta e não é primeiro load
+                if (!isFirstLoad.current && newCount > prevCountRef.current) {
+                    audioRef.current?.play().catch(() => { });
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                }
+                prevCountRef.current = newCount;
+                setPedidosCount(newCount);
+                isFirstLoad.current = false;
+            } catch { }
+        };
+
+        fetchPedidosCount();
+        const interval = setInterval(fetchPedidosCount, 4000);
+
+        // escuta eventos de aprovação/recusa pra baixar na hora
+        const onAprovado = (e: any) => {
+            const id = e.detail?.id;
+            if (id) {
+                setPedidosCount(c => Math.max(0, c - 1));
+                prevCountRef.current = Math.max(0, prevCountRef.current - 1);
+            } else {
+                fetchPedidosCount();
+            }
+        };
+        window.addEventListener("pedido-qr:aprovado" as any, onAprovado);
+        window.addEventListener("pedido-qr:recusado" as any, onAprovado);
+
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener("pedido-qr:aprovado" as any, onAprovado);
+            window.removeEventListener("pedido-qr:recusado" as any, onAprovado);
+        };
+    }, []);
 
     useEffect(() => {
         localStorage.setItem(`${moduleId}_tab`, activeTab);
@@ -84,12 +152,11 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     const headerDesc = showWelcome ? `Explore as informações e atividades do seu restaurante` : meta.desc;
 
     return (
-        <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId, role, can }}>
+        <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId, role, can, pedidosCount, setPedidosCount }}>
             <div className="h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-[14px] gap-[14px]" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
                 <div className="hidden md:flex shrink-0"><Sidebar activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} /></div>
 
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                    {/* não mostra header quando venda está full */}
                     {!isVendasOpen && (
                         <div className="flex items-center justify-between gap-3 py-3 shrink-0 bg-transparent">
                             <div className="flex-1">
@@ -113,7 +180,17 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                                     </div>
                                 </div>
                                 <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)]">💬</div>
-                                <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)]">🔔</div>
+
+                                {/* SINO COM BADGE */}
+                                <div className="relative w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
+                                    🔔
+                                    {pedidosCount > 0 && (
+                                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#EDEBE6] animate-pulse">
+                                            {pedidosCount > 9 ? "9+" : pedidosCount}
+                                        </span>
+                                    )}
+                                </div>
+
                                 <div className="bg-white rounded-full pl-1 pr-3 py-1 flex items-center gap-2 shadow-[0_1px_6px_rgba(0,0,0,0.05)] h-9 ml-1">
                                     <img src="https://i.pravatar.cc/100?img=33" className="w-7 h-7 rounded-full" alt="user" />
                                     <div className="hidden md:block leading-none"><p className="text-[11px] font-bold">{user?.nome || "Francisco"}</p><p className="text-[9px] text-[#9A9A9A] capitalize">{role.replace('_', ' ')}</p></div>
