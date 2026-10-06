@@ -4,19 +4,19 @@ export function CarrinhoSection({ cart, total, mesaSelecionada, onAddMesa, onLim
     const isQr =!!pedidoQrAtivo;
     return (
         <div className="w-full lg:w-[340px] bg-white border-t lg:border-l flex flex-col h-[42dvh] lg:h-auto shrink-0">
-            <div className="p-4 flex justify-between items-center border-b">
+            <div className="p-4 flex justify-between items-start border-b">
                 <div>
-                    <p className="font-black text-[13px]">{isMesa? `Mesa ${mesaSelecionada.numero}` : "Seu pedido"}</p>
-                    {isMesa && <p className="text-[10px] text-amber-600 font-bold">{isQr? `${pedidoQrAtivo.cliente_nome} • ` : ''}pendente Kz {total.toLocaleString("de-DE")}</p>}
+                    <p className="font-black text-[13px]">{isMesa? "Cliente" : "Seu pedido"}</p>
+                    {isMesa && <p className="text-[11px] text-amber-600">{isQr? `${pedidoQrAtivo.cliente_nome} • ` : ''}pendente</p>}
+                    {!isMesa && <p className="text-[10px] text-zinc-400">Dê 2 cliques no produto</p>}
                 </div>
                 <span className="text-[11px] bg-black text-white px-3 py-1 rounded-full">{cart.length}</span>
             </div>
 
-            {/* LISTA SIMPLES - SEM PADDING, TUDO JUNTO */}
+            {/* LISTA - SEM NEGRITO, QUEBRA LINHA */}
             <div className="flex-1 overflow-y-auto">
-                {/* headerzinho seco */}
                 {cart.length > 0 && (
-                    <div className="flex text-[9px] font-black tracking-widest text-zinc-400 px-2 py-1.5 border-b border-black/10">
+                    <div className="flex text-[9px] tracking-widest text-zinc-400 px-2 py-1.5 border-b border-black/10">
                         <span className="w-[28px]">REF</span>
                         <span className="flex-1">DESCRIÇÃO</span>
                         <span className="w-[36px] text-center">QTD</span>
@@ -27,11 +27,11 @@ export function CarrinhoSection({ cart, total, mesaSelecionada, onAddMesa, onLim
                 {cart.length === 0 && <p className="text-center text-[12px] text-gray-400 mt-10 whitespace-pre-line">{isMesa? "Adicione produtos\npara somar na mesa" : "Dê 2 cliques no produto"}</p>}
 
                 {cart.map((i: any, idx: number) => (
-                    <div key={i.id} className="flex items-center px-2 py-[6px] border-b border-dashed border-black/10 text-[11px] leading-none">
-                        <span className="w-[28px] font-bold text-[10px]">{idx + 1}</span>
-                        <span className="flex-1 font-bold truncate pr-2">{i.name}</span>
-                        <span className="w-[36px] text-center font-bold">{i.qtd}</span>
-                        <span className="w-[70px] text-right font-black">{i.price.toLocaleString("de-DE")}</span>
+                    <div key={i.id} className="flex items-start px-2 py-2 border-b border-dashed border-black/10 text-[11px]">
+                        <span className="w-[28px] shrink-0 text-[11px]">{idx + 1}</span>
+                        <span className="flex-1 pr-2 break-words whitespace-normal leading-[13px]">{i.name}</span>
+                        <span className="w-[36px] shrink-0 text-center">{i.qtd}</span>
+                        <span className="w-[70px] shrink-0 text-right">{i.price.toLocaleString("de-DE")}</span>
                     </div>
                 ))}
             </div>
@@ -39,8 +39,11 @@ export function CarrinhoSection({ cart, total, mesaSelecionada, onAddMesa, onLim
             <div className="p-3 border-t space-y-2">
                 {isMesa? (
                     <>
-                        <div className="flex justify-between px-1"><span className="text-[12px]">{isQr? "Pedido QR" : "A adicionar"}</span><span className="font-black">Kz {total.toLocaleString("de-DE")}</span></div>
-                        <button disabled={cart.length === 0 || finalizando} onClick={onAddMesa} className="w-full bg-[#A67C52] disabled:bg-gray-300 text-white rounded-full py-3 font-black text-[13px]">{finalizando? "..." : isQr? `Adicionar na Mesa ${mesaSelecionada.numero} • ${cart.length} itens` : `Adicionar na Mesa ${mesaSelecionada.numero}`}</button>
+                        <div className="flex justify-between items-center px-1 py-1">
+                            <span className="text-[12px]">Kz</span>
+                            <span className="text-[30px] leading-none text-[#2F4A8A]">{total.toLocaleString("de-DE")}</span>
+                        </div>
+                        <button disabled={cart.length === 0 || finalizando} onClick={onAddMesa} className="w-full bg-[#A67C52] disabled:bg-gray-300 text-white rounded-full py-2.5 text-[12px] font-bold">{finalizando? "..." : "Adicionar"}</button>
                         <button onClick={onLimparMesa} className="w-full bg-zinc-100 rounded-full py-2.5 text-[11px] font-bold">Cancelar</button>
                     </>
                 ) : (
