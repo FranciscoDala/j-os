@@ -79,7 +79,9 @@ export function PedidoCard({ p, onAtender, onRecusar, onDetalhe }: any) {
                 {itens.length > 1 && <span className="absolute bottom-2 right-2 bg-white/90 backdrop-blur text-[9px] font-black px-2 py-0.5 rounded-full shadow">+{itens.length - 1}</span>}
             </div>
             <div className="px-3.5 pt-3 pb-4 flex flex-col flex-1 bg-[#FFFEFB]">
-                <h3 className="font-black text-[13px] leading-[1.15] text-[#1E1E1E] line-clamp-1">{p.cliente_nome || "Cliente"}</h3>
+                <h3 className="font-black text-[13px] leading-[1.2] text-[#1E1E1E] line-clamp-2 break-words whitespace-normal min-h-[31px]">
+                    {p.cliente_nome || "Cliente"}
+                </h3>
                 <div className="mt-1.5 flex items-center gap-1 flex-wrap min-h-[18px]">
                     <span className="text-[9px] font-bold text-[#8A8A8A] bg-[#F5F0E9] px-2 py-0.5 rounded-full">{itens.length} itens</span>
                     <span className="text-[9px] font-bold text-[#8A8A8A] bg-[#F5F0E9] px-2 py-0.5 rounded-full">Mesa {p.mesa_numero}</span>
