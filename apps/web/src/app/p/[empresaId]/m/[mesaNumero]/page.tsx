@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { AlertTriangle, Ban, ShoppingBag, X, Search, QrCode, Clock3, Sparkles } from "lucide-react";
+import { AlertTriangle, Ban, ShoppingBag, X, Search, QrCode, Clock3 } from "lucide-react";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const FALLBACK_IMG = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=200";
@@ -51,10 +51,18 @@ function PedirMesaInner() {
     const onTouchEnd = () => { dragging.current = false; };
 
     useEffect(() => {
+        // FIX ZOOM iOS: garante viewport sem zoom
+        let viewport = document.querySelector('meta[name="viewport"]');
+        if (viewport) {
+            viewport.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0');
+        }
+    }, []);
+
+    useEffect(() => {
         if (!empresaId ||!mesaNumero) return;
         const url = `${API_URL}/api/v1/public/${empresaId}/cardapio?mesa=${mesaNumero}&t=${token}`;
         fetch(url)
-     .then(async r => {
+    .then(async r => {
             const text = await r.text();
             let data: any = {};
             try { data = JSON.parse(text); } catch {}
@@ -62,13 +70,13 @@ function PedirMesaInner() {
             if (!r.ok) throw new Error(data.detail || "Cardápio não encontrado");
             return data;
         })
-     .then(d => {
+    .then(d => {
             if (d.mesa && d.mesa.token_valido === false) throw new Error("EXPIRADO");
             setProdutos(d.produtos || []);
             setCats(["All",...(d.categorias || [])]);
             setLoading(false);
         })
-     .catch(e => {
+    .catch(e => {
             if (e.message === "EXPIRADO" || e.message.toLowerCase().includes("expirou") || e.message.toLowerCase().includes("fechada")) {
                 setExpirado(true);
             } else {
@@ -157,9 +165,22 @@ function PedirMesaInner() {
     return (
         <div className="h-[100dvh] flex flex-col bg-[#F5F7FB] overflow-hidden">
             <style>{`
-          .hide-scrollbar::-webkit-scrollbar{display:none}
-          .hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
-             input,textarea,select{font-size:11px!important}
+         .hide-scrollbar::-webkit-scrollbar{display:none}
+         .hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+          /* FIX ZOOM iOS - input precisa ter 16px no DOM, mas visual continua 11px */
+          input, textarea, select {
+            font-size: 16px!important;
+            -webkit-text-size-adjust: 100%;
+          }
+         .input-visual {
+            font-size: 11px!important;
+          }
+          @supports (-webkit-touch-callout: none) {
+            input, textarea, select {
+              font-size: 16px!important;
+            }
+          }
+          html { touch-action: manipulation; }
             `}</style>
 
             <div className="bg-white border-b shrink-0 z-20">
@@ -169,8 +190,12 @@ function PedirMesaInner() {
                         <span className="bg-black text-white text-[8px] font-bold px-2.5 py-1 rounded-full">QR • PEDIDO NA MESA</span>
                     </div>
                     <div className="mt-2.5 flex gap-2 overflow-x-auto hide-scrollbar snap-x snap-mandatory">
-                        <input value={nome} onChange={e=>setNome(e.target.value)} placeholder="Seu nome*" className="min-w-[100%] snap-center bg-[#F5F7FB] rounded-full px-4 h-9 text-[11px] font-bold outline-none focus:ring-2 focus:ring-sky-400" />
-                        <input value={tel} onChange={e=>setTel(e.target.value)} placeholder="WhatsApp" className="min-w-[100%] snap-center bg-[#F5F7FB] rounded-full px-4 h-9 text-[11px] outline-none focus:ring-2 focus:ring-sky-400" />
+                        <input value={nome} onChange={e=>setNome(e.target.value)} placeholder="Seu nome*"
+                          className="input-visual min-w-[100%] snap-center bg-[#F5F7FB] rounded-full px-4 h-9 font-bold outline-none focus:ring-2 focus:ring-sky-400"
+                          style={{fontSize:'16px'}} />
+                        <input value={tel} onChange={e=>setTel(e.target.value)} placeholder="WhatsApp"
+                          className="input-visual min-w-[100%] snap-center bg-[#F5F7FB] rounded-full px-4 h-9 outline-none focus:ring-2 focus:ring-sky-400"
+                          style={{fontSize:'16px'}} />
                     </div>
                     <p className="text-[9px] text-zinc-400 mt-1.5 ml-1">← arraste para o lado →</p>
                 </div>
@@ -243,7 +268,9 @@ function PedirMesaInner() {
                     <div className="bg-white rounded-[16px] w-full max-w-[340px] p-3 shadow-2xl">
                         <div className="flex items-center gap-2 bg-[#F5F7FB] rounded-full px-3 h-9">
                             <Search size={14} className="text-zinc-400"/>
-                            <input autoFocus value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar prato..." className="flex-1 bg-transparent outline-none text-[11px] font-bold" />
+                            <input autoFocus value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar prato..."
+                              className="flex-1 bg-transparent outline-none font-bold input-visual"
+                              style={{fontSize:'16px'}} />
                             <button onClick={()=>{setQuery(""); setBuscaOpen(false)}} className="w-6 h-6 bg-black text-white rounded-full flex items-center justify-center"><X size={10}/></button>
                         </div>
                         <button onClick={()=>setBuscaOpen(false)} className="mt-2.5 w-full bg-black text-white rounded-full h-9 font-bold text-[11px]">Ver {filtrados.length} resultados</button>

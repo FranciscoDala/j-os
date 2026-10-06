@@ -10,16 +10,17 @@ class ItemQrCreate(BaseModel):
     observacao: Optional[str] = None
 
 class PedidoQrPublicCreate(BaseModel):
-    mesa_numero: str # FIX: era int
+    mesa_numero: str
     cliente_nome: str
     cliente_telefone: Optional[str] = None
     itens: List[ItemQrCreate]
+    qr_token: Optional[str] = None # FIX: faltava
 
 class PedidoQrResponse(BaseModel):
     id: UUID
     empresa_id: UUID
     mesa_id: Optional[UUID] = None
-    mesa_numero: str # FIX
+    mesa_numero: str
     cliente_nome: str
     cliente_telefone: Optional[str] = None
     itens: list
@@ -33,3 +34,4 @@ class CardapioPublicResponse(BaseModel):
     empresa_nome: str
     produtos: list
     categorias: list
+    mesa: Optional[dict] = None
