@@ -1,5 +1,5 @@
 "use client";
-import { Users, Clock, Receipt, MapPin, Ban } from "lucide-react";
+import { Users, Clock, Receipt, MapPin } from "lucide-react";
 
 const statusConfig: any = {
     LIVRE: {
@@ -45,7 +45,7 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
     return (
         <div className={`group relative w-full h-[272px] rounded-[22px] overflow-hidden border shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 flex flex-col ${cfg.cardBg} ${cfg.border}`}>
 
-            <div className={`relative w-full h-[138px] bg-gradient-to-br ${cfg.topBg} flex items-center justify-center overflow-hidden shrink-0`}>
+            <div className={`relative w-full h-[138px] overflow-hidden flex items-center justify-center ${cfg.topBg} shrink-0`}>
                 <div className="flex flex-col items-center">
                     <span className="text-[44px] font-black tracking-tight text-[#1A1A1A] leading-none">{m.numero}</span>
                     <span className="mt-1 text-[11px] font-black tracking-widest opacity-60">MESA</span>
@@ -58,7 +58,7 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
                         </span>
                     </div>
                 </div>
-                <span className={`absolute top-2.5 left-2.5 text-[8px] font-black px-2.5 py-1 rounded-full tracking-widest shadow-sm ${cfg.badge}`}>
+                <span className={`absolute top-2 left-2 text-[8px] font-black px-2.5 py-1 rounded-full tracking-widest shadow-sm ${cfg.badge}`}>
                     {cfg.label}
                 </span>
                 {m.status === "OCUPADA" && (
@@ -66,10 +66,12 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
                 )}
             </div>
 
-            <div className="px-3.5 pt-3 pb-4 flex flex-col flex-1 overflow-hidden">
-                <h3 className="font-black text-[13px] leading-[1.1] text-[#1E1E1E] shrink-0">MESA {m.numero}</h3>
+            <div className="px-3.5 py-3 flex flex-col flex-1">
+                <h3 className="font-black text-[13px] leading-[1.15] text-[#1E1E1E] line-clamp-1">
+                    MESA {m.numero}
+                </h3>
 
-                <div className="mt-1.5 flex items-center gap-1 flex-wrap min-h-[18px] shrink-0">
+                <div className="mt-1.5 flex items-center gap-1 flex-wrap min-h-[18px]">
                     {m.status === "OCUPADA" ? (
                         <>
                             <span className="text-[9px] font-bold text-[#8A8A8A] bg-[#F5F0E9] px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -94,30 +96,27 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
                     )}
                 </div>
 
-                <div className="mt-2 min-h-[26px] flex-1">
-                    <p className="text-[10px] leading-[1.3] text-[#7A7A7A] line-clamp-2">
-                        {m.status === "OCUPADA"
-                            ? hasConsumo
-                                ? `${total.toLocaleString("de-DE")} Kz em consumo`
-                                : "Sem consumo ainda"
-                            : `${m.zona || "Salão principal"} • ${m.capacidade} pessoas`}
-                    </p>
-                </div>
+                <p className="mt-2 text-[10px] leading-[1.3] text-[#7A7A7A] line-clamp-2 min-h-[26px]">
+                    {m.status === "OCUPADA"
+                        ? hasConsumo
+                            ? `${total.toLocaleString("de-DE")} Kz em consumo`
+                            : "Sem consumo ainda"
+                        : `${m.zona || "Salão principal"} • ${m.capacidade} pessoas`}
+                </p>
 
-                <div className="mt-auto flex items-end justify-between gap-2 shrink-0 pt-3">
+                <div className="mt-3 flex items-end justify-between gap-2">
                     <div className="leading-none">
-                        <div className="w-4 h-0.5 bg-[#FFC91A] rounded-full mb-1.5" />
                         <p className={`text-[15px] font-black tracking-tight ${cfg.price}`}>
-                            {hasConsumo ? `${total.toLocaleString("de-DE")}` : "—"}
+                            {hasConsumo ? total.toLocaleString("de-DE") : "—"}
                             {hasConsumo && <span className="text-[10px]">Kz</span>}
                         </p>
-                        <p className="text-[9px] font-bold text-[#9A9A9A] mt-1.5">
+                        <p className="text-[9px] font-bold text-[#9A9A9A] mt-1 flex items-center gap-1">
                             + {hasConsumo ? "Consumo" : cfg.label}
                         </p>
                     </div>
 
                     {m.status === "LIVRE" && (
-                        <button onClick={() => onOcupar(m)} className="h-[30px] px-4 rounded-full bg-[#FFC91A] hover:bg-[#FFB800] text-black text-[11px] font-black shadow-sm shrink-0">
+                        <button onClick={() => onOcupar(m)} className="h-[30px] px-4 rounded-full bg-[#FFC91A] hover:bg-[#FFB800] text-black text-[11px] font-black shadow-sm transition-colors shrink-0">
                             Ocupar
                         </button>
                     )}
