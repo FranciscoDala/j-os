@@ -5,6 +5,7 @@ import { Sidebar } from "./Sidebar";
 import { ModuleId } from "./menu_config";
 import { VendasTab } from "@/app/dashboard/restaurante/components/tabs/venda/venda";
 import { useGlobalSearch } from "@/features/search/context";
+import { Menu, X } from "lucide-react";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
@@ -52,7 +53,6 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     const [role, setRole] = useState("funcionario");
     const [showWelcome, setShowWelcome] = useState(true);
     const { search, setSearch, setActiveTab: setSearchTab } = useGlobalSearch();
-
     const [pedidosCount, setPedidosCount] = useState(0);
     const prevCountRef = useRef(0);
     const isFirstLoad = useRef(true);
@@ -79,11 +79,9 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
         return () => clearTimeout(t);
     }, [user]);
 
-    // polling real dos pedidos QR pendentes
     useEffect(() => {
         audioRef.current = new Audio("/sounds/new-order.wav");
         audioRef.current.volume = 0.8;
-
         const fetchPedidosCount = async () => {
             try {
                 const token = localStorage.getItem("access_token") || "";
@@ -96,9 +94,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                 });
                 if (!r.ok) return;
                 const data = await r.json();
-                const newCount = Array.isArray(data) ? data.length : 0;
-
-                // toca som só quando aumenta e não é primeiro load
+                const newCount = Array.isArray(data)? data.length : 0;
                 if (!isFirstLoad.current && newCount > prevCountRef.current) {
                     audioRef.current?.play().catch(() => { });
                     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
@@ -108,23 +104,17 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                 isFirstLoad.current = false;
             } catch { }
         };
-
         fetchPedidosCount();
         const interval = setInterval(fetchPedidosCount, 4000);
-
-        // escuta eventos de aprovação/recusa pra baixar na hora
         const onAprovado = (e: any) => {
             const id = e.detail?.id;
             if (id) {
                 setPedidosCount(c => Math.max(0, c - 1));
                 prevCountRef.current = Math.max(0, prevCountRef.current - 1);
-            } else {
-                fetchPedidosCount();
-            }
+            } else fetchPedidosCount();
         };
         window.addEventListener("pedido-qr:aprovado" as any, onAprovado);
         window.addEventListener("pedido-qr:recusado" as any, onAprovado);
-
         return () => {
             clearInterval(interval);
             window.removeEventListener("pedido-qr:aprovado" as any, onAprovado);
@@ -143,54 +133,65 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     }, [activeTab, moduleId, setSearchTab, setSearch]);
 
     const can = useMemo(() => (tab: string) => { const a = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS["funcionario"]; return a.includes("*") || a.includes(tab); }, [role]);
-    useEffect(() => { if (role && !can(activeTab)) setActiveTab("home"); }, [role, activeTab, can]);
+    useEffect(() => { if (role &&!can(activeTab)) setActiveTab("home"); }, [role, activeTab, can]);
     const logout = () => { localStorage.clear(); router.push("/login"); };
     const isVendasOpen = activeTab === "vendas";
 
     const meta = TAB_META[activeTab] || { title: "Painel", desc: "Visão geral" };
-    const headerTitle = showWelcome ? `Bem-vindo, ${user?.nome || "Francisco Dala"}!` : meta.title;
-    const headerDesc = showWelcome ? `Explore as informações e atividades do seu restaurante` : meta.desc;
+    const headerTitle = showWelcome? `Bem-vindo, ${user?.nome || "Francisco Dala"}!` : meta.title;
+    const headerDesc = showWelcome? `Explore as informações e atividades do seu restaurante` : meta.desc;
 
     return (
         <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId, role, can, pedidosCount, setPedidosCount }}>
-            <div className="h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-[14px] gap-[14px]" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
+            <div className="h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-0 md:p-[14px] md:gap-[14px]" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
+                {/* SIDEBAR DESKTOP */}
                 <div className="hidden md:flex shrink-0"><Sidebar activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} /></div>
+
+                {/* SIDEBAR MOBILE DRAWER */}
+                <div className={`fixed inset-0 z-[300] md:hidden transition ${isMobileOpen? "visible" : "invisible"}`}>
+                    <div className={`absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity ${isMobileOpen? "opacity-100" : "opacity-0"}`} onClick={() => setIsMobileOpen(false)} />
+                    <div className={`absolute left-0 top-0 h-full w-[82%] max-w-[300px] bg-[#EDEBE6] p-3 shadow-[8px_0_30px_rgba(0,0,0,0.15)] transition-transform duration-300 ${isMobileOpen? "translate-x-0" : "-translate-x-full"}`}>
+                        <div className="flex justify-between items-center mb-4 px-1">
+                            <span className="font-black text-[14px]">Menu</span>
+                            <button onClick={() => setIsMobileOpen(false)} className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center"><X size={14}/></button>
+                        </div>
+                        <Sidebar activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} />
+                    </div>
+                </div>
 
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                     {!isVendasOpen && (
-                        <div className="flex items-center justify-between gap-3 py-3 shrink-0 bg-transparent">
-                            <div className="flex-1">
-                                <h1 className="text-[15px] md:text-[18px] font-[900] text-[#1E1E1E] leading-[0.9] tracking-[-0.02em] capitalize">
-                                    {headerTitle}
-                                </h1>
-                                <p className="text-[12px] md:text-[13px] text-[#8A8A8A] mt-1 font-medium">
-                                    {headerDesc}
-                                </p>
+                        <div className="flex items-center justify-between gap-3 px-4 md:px-0 py-3 shrink-0 bg-[#EDEBE6] md:bg-transparent border-b md:border-0 border-black/5">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                {/* BTN ABRIR SIDEBAR - MOBILE */}
+                                <button onClick={() => setIsMobileOpen(true)} className="md:hidden w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.08)] shrink-0 active:scale-95">
+                                    <Menu size={18}/>
+                                </button>
+                                <div className="flex-1 min-w-0">
+                                    <h1 className="text-[14px] md:text-[18px] font-[900] text-[#1E1E1E] leading-[0.9] tracking-[-0.02em] truncate">
+                                        {headerTitle}
+                                    </h1>
+                                    <p className="text-[11px] md:text-[13px] text-[#8A8A8A] mt-1 font-medium truncate hidden sm:block">
+                                        {headerDesc}
+                                    </p>
+                                </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                                <div className="bg-white rounded-full flex items-center pl-4 pr-1.5 py-1 w-[300px] h-9 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
-                                    <input
-                                        value={search}
-                                        onChange={e => setSearch(e.target.value)}
-                                        className="flex-1 outline-none text-[11px] bg-transparent placeholder:text-[#AAAAAA]"
-                                        placeholder={`Pesquisar em ${meta.title}...`}
-                                    />
+                                <div className="hidden lg:flex bg-white rounded-full items-center pl-4 pr-1.5 py-1 w-[300px] h-9 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
+                                    <input value={search} onChange={e => setSearch(e.target.value)} className="flex-1 outline-none text-[11px] bg-transparent placeholder:text-[#AAAAAA]" placeholder={`Pesquisar em ${meta.title}...`} />
                                     <div className="w-7 h-7 bg-black rounded-full flex items-center justify-center">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><circle cx="11" cy="11" r="6" /><path d="m21 21-4.3-4.3" /></svg>
                                     </div>
                                 </div>
-                                <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)]">💬</div>
-
-                                {/* SINO COM BADGE */}
+                                <div className="w-9 h-9 bg-white rounded-full hidden sm:flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)]">💬</div>
                                 <div className="relative w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
                                     🔔
                                     {pedidosCount > 0 && (
                                         <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#EDEBE6] animate-pulse">
-                                            {pedidosCount > 9 ? "9+" : pedidosCount}
+                                            {pedidosCount > 9? "9+" : pedidosCount}
                                         </span>
                                     )}
                                 </div>
-
                                 <div className="bg-white rounded-full pl-1 pr-3 py-1 flex items-center gap-2 shadow-[0_1px_6px_rgba(0,0,0,0.05)] h-9 ml-1">
                                     <img src="https://i.pravatar.cc/100?img=33" className="w-7 h-7 rounded-full" alt="user" />
                                     <div className="hidden md:block leading-none"><p className="text-[11px] font-bold">{user?.nome || "Francisco"}</p><p className="text-[9px] text-[#9A9A9A] capitalize">{role.replace('_', ' ')}</p></div>
@@ -199,14 +200,25 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                         </div>
                     )}
 
-                    <div className="flex-1 overflow-y-auto no-scrollbar mt-2 pr-1">{children}</div>
+                    {/* CONTENT - PADRAO PX-4 NO MOBILE, SEM PADDING EXTRA */}
+                    <div className="flex-1 overflow-y-auto no-scrollbar px-4 md:px-0 md:pr-1 pb-4 md:pb-0 mt-0 md:mt-2">{children}</div>
                 </div>
 
                 {isVendasOpen && (
-                    <div className="absolute inset-0 z-[100] bg-[#EDEBE6] p-[14px] flex flex-col overflow-hidden"><VendasTab onClose={() => setActiveTab("home")} /></div>
+                    <div className="absolute inset-0 z-[100] bg-[#EDEBE6] flex flex-col overflow-hidden">
+                        {/* BTN MENU TAMBEM DENTRO DE VENDAS NO MOBILE */}
+                        <div className="md:hidden absolute top-3 left-4 z-10">
+                            <button onClick={() => setIsMobileOpen(true)} className="w-9 h-9 bg-white border border-black/10 rounded-full flex items-center justify-center shadow-sm active:scale-95">
+                                <Menu size={18}/>
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-hidden p-0 md:p-[14px]">
+                            <VendasTab onClose={() => setActiveTab("home")} />
+                        </div>
+                    </div>
                 )}
             </div>
-            <style jsx global>{`html,body{height:100%;overflow:hidden;background:#EDEBE6;scrollbar-width:none}::-webkit-scrollbar{display:none}.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
+            <style jsx global>{`html,body{height:100%;overflow:hidden;background:#EDEBE6;scrollbar-width:none}::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
         </DashboardCtx.Provider>
     );
 }
