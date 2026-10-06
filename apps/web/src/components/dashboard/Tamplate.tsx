@@ -91,13 +91,14 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                     {/* não mostra header quando venda está full */}
                     {!isVendasOpen && (
-                        <div className="flex items-center justify-between gap-3 px-2 md:px-3 py-2 shrink-0 bg-transparent">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-[#E8F0E8] flex items-center justify-center text-[#6A9A6A]">✳</div>
-                                <div>
-                                    <h1 className="text-[16px] font-bold text-[#1E1E1E] leading-none transition-all">{headerTitle}</h1>
-                                    <p className="text-[11px] text-[#9A9A9A] mt-1 transition-all">{headerDesc}</p>
-                                </div>
+                        <div className="flex items-center justify-between gap-3 py-3 shrink-0 bg-transparent">
+                            <div className="flex-1">
+                                <h1 className="text-[26px] md:text-[30px] font-[900] text-[#1E1E1E] leading-[0.9] tracking-[-0.02em]">
+                                    {headerTitle}
+                                </h1>
+                                <p className="text-[12px] md:text-[13px] text-[#8A8A8A] mt-2 font-medium">
+                                    {headerDesc}
+                                </p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                                 <div className="bg-white rounded-full flex items-center pl-4 pr-1.5 py-1 w-[300px] h-9 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
@@ -107,7 +108,9 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                                         className="flex-1 outline-none text-[11px] bg-transparent placeholder:text-[#AAAAAA]"
                                         placeholder={`Pesquisar em ${meta.title}...`}
                                     />
-                                    <div className="w-7 h-7 bg-black rounded-full flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><circle cx="11" cy="11" r="6" /><path d="m21 21-4.3-4.3" /></svg></div>
+                                    <div className="w-7 h-7 bg-black rounded-full flex items-center justify-center">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><circle cx="11" cy="11" r="6" /><path d="m21 21-4.3-4.3" /></svg>
+                                    </div>
                                 </div>
                                 <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)]">💬</div>
                                 <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)]">🔔</div>
@@ -118,6 +121,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                             </div>
                         </div>
                     )}
+                    
                     <div className="flex-1 overflow-y-auto no-scrollbar mt-2 pr-1">{children}</div>
                 </div>
 
