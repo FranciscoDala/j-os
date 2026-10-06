@@ -144,28 +144,40 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     return (
         <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId, role, can, pedidosCount, setPedidosCount }}>
             <div className="h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-0 md:p-[14px] md:gap-[14px]" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
-                {/* SIDEBAR DESKTOP */}
-                <div className="hidden md:flex shrink-0"><Sidebar activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} /></div>
-
-                {/* SIDEBAR MOBILE DRAWER */}
-                <div className={`fixed inset-0 z-[300] md:hidden transition ${isMobileOpen? "visible" : "invisible"}`}>
-                    <div className={`absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity ${isMobileOpen? "opacity-100" : "opacity-0"}`} onClick={() => setIsMobileOpen(false)} />
-                    <div className={`absolute left-0 top-0 h-full w-[82%] max-w-[300px] bg-[#EDEBE6] p-3 shadow-[8px_0_30px_rgba(0,0,0,0.15)] transition-transform duration-300 ${isMobileOpen? "translate-x-0" : "-translate-x-full"}`}>
-                        <div className="flex justify-between items-center mb-4 px-1">
-                            <span className="font-black text-[14px]">Menu</span>
-                            <button onClick={() => setIsMobileOpen(false)} className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center"><X size={14}/></button>
-                        </div>
-                        <Sidebar activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} />
-                    </div>
+                {/* SIDEBAR DESKTOP - MANTEM ROUNDED-FULL */}
+                <div className="hidden md:flex shrink-0">
+                    <Sidebar activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} />
                 </div>
+
+                {/* SIDEBAR MOBILE - DRAWER FULL - SO FORA DE VENDAS */}
+                {!isVendasOpen && (
+                    <div className={`fixed inset-0 z-[300] md:hidden transition ${isMobileOpen? "visible" : "invisible"}`}>
+                        <div className={`absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity ${isMobileOpen? "opacity-100" : "opacity-0"}`} onClick={() => setIsMobileOpen(false)} />
+                        <div className={`absolute left-0 top-0 h-full w-[84%] max-w-[330px] bg-[#EDEBE6] p-4 shadow-[8px_0_30px_rgba(0,0,0,0.15)] transition-transform duration-300 overflow-y-auto no-scrollbar ${isMobileOpen? "translate-x-0" : "-translate-x-full"}`}>
+                            <div className="flex justify-between items-center mb-6">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 bg-black text-white rounded-full grid place-items-center text-[10px] font-black">JD</div>
+                                    <div className="leading-none">
+                                        <p className="text-[12px] font-black">Menu</p>
+                                        <p className="text-[10px] text-[#8A8A8A] capitalize">{role.replace('_', ' ')}</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setIsMobileOpen(false)} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center active:scale-95">
+                                    <X size={16} />
+                                </button>
+                            </div>
+                            {/* AQUI USA MODO MOBILE */}
+                            <Sidebar isMobile={true} activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} />
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                     {!isVendasOpen && (
                         <div className="flex items-center justify-between gap-3 px-4 md:px-0 py-3 shrink-0 bg-[#EDEBE6] md:bg-transparent border-b md:border-0 border-black/5">
                             <div className="flex items-center gap-3 flex-1 min-w-0">
-                                {/* BTN ABRIR SIDEBAR - MOBILE */}
                                 <button onClick={() => setIsMobileOpen(true)} className="md:hidden w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.08)] shrink-0 active:scale-95">
-                                    <Menu size={18}/>
+                                    <Menu size={18} />
                                 </button>
                                 <div className="flex-1 min-w-0">
                                     <h1 className="text-[14px] md:text-[18px] font-[900] text-[#1E1E1E] leading-[0.9] tracking-[-0.02em] truncate">
@@ -200,18 +212,11 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                         </div>
                     )}
 
-                    {/* CONTENT - PADRAO PX-4 NO MOBILE, SEM PADDING EXTRA */}
                     <div className="flex-1 overflow-y-auto no-scrollbar px-4 md:px-0 md:pr-1 pb-4 md:pb-0 mt-0 md:mt-2">{children}</div>
                 </div>
 
                 {isVendasOpen && (
                     <div className="absolute inset-0 z-[100] bg-[#EDEBE6] flex flex-col overflow-hidden">
-                        {/* BTN MENU TAMBEM DENTRO DE VENDAS NO MOBILE */}
-                        <div className="md:hidden absolute top-3 left-4 z-10">
-                            <button onClick={() => setIsMobileOpen(true)} className="w-9 h-9 bg-white border border-black/10 rounded-full flex items-center justify-center shadow-sm active:scale-95">
-                                <Menu size={18}/>
-                            </button>
-                        </div>
                         <div className="flex-1 overflow-hidden p-0 md:p-[14px]">
                             <VendasTab onClose={() => setActiveTab("home")} />
                         </div>
