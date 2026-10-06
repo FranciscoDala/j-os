@@ -11,12 +11,31 @@ export function CarrinhoSection({ cart, total, mesaSelecionada, onAddMesa, onLim
                 </div>
                 <span className="text-[11px] bg-black text-white px-3 py-1 rounded-full">{cart.length}</span>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+
+            {/* LISTA SIMPLES - SEM PADDING, TUDO JUNTO */}
+            <div className="flex-1 overflow-y-auto">
+                {/* headerzinho seco */}
+                {cart.length > 0 && (
+                    <div className="flex text-[9px] font-black tracking-widest text-zinc-400 px-2 py-1.5 border-b border-black/10">
+                        <span className="w-[28px]">REF</span>
+                        <span className="flex-1">DESCRIÇÃO</span>
+                        <span className="w-[36px] text-center">QTD</span>
+                        <span className="w-[70px] text-right">P/UNIT</span>
+                    </div>
+                )}
+
                 {cart.length === 0 && <p className="text-center text-[12px] text-gray-400 mt-10 whitespace-pre-line">{isMesa? "Adicione produtos\npara somar na mesa" : "Dê 2 cliques no produto"}</p>}
-                {cart.map((i: any) => (
-                    <div key={i.id} className="flex gap-3 bg-[#F8FAFF] border rounded-[14px] p-2.5"><div className="flex-1"><p className="font-semibold text-[12px] line-clamp-2 break-words">{i.name}</p><p className="text-[11px]">x{i.qtd}</p></div><p className="font-bold text-[12px]">Kz {(i.price * i.qtd).toLocaleString("de-DE")}</p></div>
+
+                {cart.map((i: any, idx: number) => (
+                    <div key={i.id} className="flex items-center px-2 py-[6px] border-b border-dashed border-black/10 text-[11px] leading-none">
+                        <span className="w-[28px] font-bold text-[10px]">{idx + 1}</span>
+                        <span className="flex-1 font-bold truncate pr-2">{i.name}</span>
+                        <span className="w-[36px] text-center font-bold">{i.qtd}</span>
+                        <span className="w-[70px] text-right font-black">{i.price.toLocaleString("de-DE")}</span>
+                    </div>
                 ))}
             </div>
+
             <div className="p-3 border-t space-y-2">
                 {isMesa? (
                     <>
