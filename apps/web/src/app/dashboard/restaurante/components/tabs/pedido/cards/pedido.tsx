@@ -4,13 +4,27 @@ import { Clock, User, Check, X, FileText } from "lucide-react";
 const FALLBACK_IMG = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=400";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 
-export const getPedidoImg = (p: any) => {
-    const first = p.itens?.[0];
-    const url = first?.imagem_url || first?.produto_imagem || first?.imagem || p.imagem_url;
-    if (!url) return FALLBACK_IMG;
-    if (url.startsWith("http")) return url;
+const getImgUrl = (url?: string) => {
+    if (!url) return "";
+    if (url.startsWith("blob:") || url.startsWith("http")) return url;
     if (url.startsWith("/media")) return `${API_URL}${url}`;
     return url;
+};
+
+export const getPedidoImg = (pedido: any) => {
+    const first = pedido.itens?.[0];
+    if (!first) return FALLBACK_IMG;
+    // tenta todos os campos possíveis que tua API retorna
+    const raw =
+        first.produto?.imagem_url ||
+        first.produto_imagem_url ||
+        first.imagem_url ||
+        first.imagem ||
+        first.produto?.imagem ||
+        pedido.imagem_url;
+
+    const resolved = getImgUrl(raw);
+    return resolved || FALLBACK_IMG;
 };
 
 function timeAgo(iso: string) {
@@ -61,12 +75,9 @@ export function PedidoCard({ p, onAtender, onRecusar, onDetalhe }: Props) {
                         <FileText size={11} />
                     </button>
                 </div>
-                <div className="absolute bottom-2 left-2 bg-white text-black text-[8px] font-black px-2 py-0.5 rounded-full border border-white flex items-center gap-1 shadow">
-                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> QR
-                </div>
             </div>
 
-            <div className="px-3.5 py-3 flex flex-col flex-1">
+            <div className="px-3.5 pt-3 pb-4 flex flex-col flex-1">
                 <h3 className="font-black text-[13px] leading-[1.15] text-[#1E1E1E] line-clamp-1">
                     {p.cliente_nome || "Cliente"}
                 </h3>
