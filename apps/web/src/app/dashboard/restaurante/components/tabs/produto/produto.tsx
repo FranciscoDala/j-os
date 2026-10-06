@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { X, Plus, Search, CheckCircle, AlertTriangle, Info, ChevronDown } from "lucide-react";
+import { X, Plus, CheckCircle, AlertTriangle, Info, ChevronDown } from "lucide-react";
 import { ProdutoCard } from "./cards/produto";
 import { ProdutoDeleteModal } from "./modals/apagar";
 import { ProdutoModal } from "./modals/criar";
 import { useDashboard } from "@/components/dashboard/Tamplate";
+import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const API_BASE = `${API_URL}/api/v1/produtos`;
@@ -29,7 +30,7 @@ function FilterSelect({ value, onChange, options, placeholder }: { value: string
     }, []);
     return (
         <div ref={ref} className={`relative w-full ${open? "z-[60]" : "z-0"}`}>
-            <button type="button" onClick={() => setOpen(!open)} className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 py-2.5 text-[11px] font-black flex items-center justify-between shadow-sm hover:border-[#A67C52] focus:border-[#A67C52] focus:ring-2 focus:ring-[#A67C52]/20 transition-all outline-none">
+            <button type="button" onClick={() => setOpen(!open)} className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 py-2.5 text-[11px] font-black flex items-center justify-between shadow-sm hover:border-[#A67C52] focus:ring-2 focus:ring-[#A67C52]/20 transition-all outline-none">
                 <span className="truncate">{value || placeholder || "Todas"}</span>
                 <ChevronDown size={14} className={`shrink-0 ml-2 transition-transform ${open? "rotate-180" : ""}`} />
             </button>
@@ -50,11 +51,11 @@ function FilterSelect({ value, onChange, options, placeholder }: { value: string
 
 export function ProdutosTab() {
     const { role } = useDashboard();
+    const { search: globalSearch } = useGlobalSearch();
     const canManage = ["dono","gerente","gerente_restaurante","admin","owner"].includes((role||"").toLowerCase());
 
     const [items, setItems] = useState<any[]>([]);
     const [total, setTotal] = useState(0);
-    const [search, setSearch] = useState("");
     const [cat, setCat] = useState("");
     const [cats, setCats] = useState<string[]>([]);
     const [open, setOpen] = useState(false);
@@ -81,7 +82,7 @@ export function ProdutosTab() {
 
     const fetchProds = async () => {
         try {
-            const qs = new URLSearchParams({ skip: "0", limit: "20", search, categoria: cat });
+            const qs = new URLSearchParams({ skip: "0", limit: "20", search: globalSearch, categoria: cat });
             const r = await fetch(`${API_BASE}/?${qs}`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
             const data = await r.json();
             if (r.ok) { setItems(data.items || []); setTotal(data.total || 0); }
@@ -89,16 +90,16 @@ export function ProdutosTab() {
         } catch { pushToast("Falha de conexão ao listar produtos", "error") }
     };
     const fetchCats = async () => { try { const r = await fetch(`${API_BASE}/categorias/lista`, { headers: getAuthHeaders() as any, cache: "no-store" as any }); if (r.ok) setCats(await r.json()); } catch {} };
-    useEffect(() => { fetchProds(); fetchCats(); }, [search, cat]);
+    useEffect(() => { fetchProds(); fetchCats(); }, [globalSearch, cat]);
 
     useEffect(() => {
         const onUpdate = (e: any) => { const p = e.detail; if (!p?.id) return; setItems(prev => { const exists = prev.some(x => x.id === p.id); if (!exists) return prev; return prev.map(x => x.id === p.id? {...x,...p } : x); }); };
-        const onCreated = (e: any) => { const p = e.detail; if (!p?.id) return; if (!search && (!cat || (p.categoria || "").toLowerCase() === cat.toLowerCase())) { setItems(prev => { if (prev.some(x => x.id === p.id)) return prev; return [p,...prev].slice(0, 20); }); setTotal(t => t + 1); } };
+        const onCreated = (e: any) => { const p = e.detail; if (!p?.id) return; if (!globalSearch && (!cat || (p.categoria || "").toLowerCase() === cat.toLowerCase())) { setItems(prev => { if (prev.some(x => x.id === p.id)) return prev; return [p,...prev].slice(0, 20); }); setTotal(t => t + 1); } };
         const onVenda = (e: any) => { const venda = e.detail; const itens = venda?.itens || venda?.data?.itens || venda?.produtos || []; if (!itens.length) return; itens.forEach((it: any) => { const pid = it.produto_id || it.produto?.id || it.id; const qtd = Number(it.quantidade || 1); setItems(prev => prev.map(p => p.id === pid && p.controlar_stock? {...p, stock_atual: Number(p.stock_atual || 0) - qtd } : p)); }); };
         const onDelete = (e: any) => { const d = e.detail; const id = d?.id || d?.produto_id; if (!id) return; setItems(prev => prev.filter(x => x.id!== id)); setTotal(t => Math.max(0, t - 1)); };
         window.addEventListener("produto:update" as any, onUpdate); window.addEventListener("produto:atualizado" as any, onUpdate); window.addEventListener("produto:created" as any, onCreated); window.addEventListener("produto:deleted" as any, onDelete); window.addEventListener("venda:nova" as any, onVenda); window.addEventListener("venda:fechada" as any, onVenda);
         return () => { window.removeEventListener("produto:update" as any, onUpdate); window.removeEventListener("produto:atualizado" as any, onUpdate); window.removeEventListener("produto:created" as any, onCreated); window.removeEventListener("produto:deleted" as any, onDelete); window.removeEventListener("venda:nova" as any, onVenda); window.removeEventListener("venda:fechada" as any, onVenda); };
-    }, [search, cat]);
+    }, [globalSearch, cat]);
 
     const genCode = () => `P-${Date.now().toString().slice(-6)}`;
     const resetForm = () => { setForm({ nome: "", codigo: genCode(), preco_venda: "", preco_custo: "0", tipo: "RESTAURANT_DISH", unidade: "UNIT", categoria: "", descricao: "", codigo_barras: "", codigo_qr: "", iva: "0", tem_iva: false, peso: "", ativo: true, controlar_stock: true, allow_negative: false, stock_atual: "0", stock_minimo: "0", prep_time: "", kitchen_station: "", is_modifiable: false, service_duration: "", imagem_url: "" }); setImgFile(null); setPreview(""); setEditId(null); setTab("Geral"); };
@@ -123,33 +124,21 @@ export function ProdutosTab() {
                 ))}
             </div>
 
-            {/* HEADER LIVRE - MESMO GRID DOS CARDS */}
-            <div className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 items-center">
-                {/* SELECT = 1 card */}
-                <div className="col-span-1 order-1">
+            {/* HEADER - SÓ FILTRO + ADD */}
+            <div className="w-full flex items-center justify-between gap-3">
+                <div className="w-[200px]">
                     <FilterSelect value={cat} onChange={setCat} options={["",...cats]} placeholder="Todas categorias" />
                 </div>
-                {/* BUSCA = 2 cards */}
-                <div className="col-span-1 md:col-span-2 lg:col-span-2 order-2">
-                    <div className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 py-2.5 flex items-center gap-2 shadow-sm focus-within:border-[#A67C52] focus-within:ring-2 focus-within:ring-[#A67C52]/20 transition-all">
-                        <Search size={14} className="opacity-40 shrink-0" />
-                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar produto..." className="bg-transparent outline-none text-[11px] font-bold w-full placeholder:text-gray-400" />
-                    </div>
-                </div>
-                {/* ESPAÇADOR DESKTOP */}
-                <div className="hidden lg:block lg:col-span-1 order-3" />
-                {/* BTN ADD - DIREITA - SÓ DONO/GERENTE */}
-                <div className="col-span-2 md:col-span-3 lg:col-span-1 order-4 flex justify-end">
-                    {canManage && (
-                        <button onClick={() => { resetForm(); setOpen(true); }} className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center hover:bg-zinc-800 active:scale-95 transition-all shadow-md">
-                            <Plus size={18} strokeWidth={3} />
-                        </button>
-                    )}
-                </div>
+                <div className="flex-1" />
+                {canManage && (
+                    <button onClick={() => { resetForm(); setOpen(true); }} className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center hover:bg-zinc-800 active:scale-95 transition-all shadow-md shrink-0">
+                        <Plus size={18} strokeWidth={3} />
+                    </button>
+                )}
             </div>
 
-            {/* CARDS - 5 colunas, mesmo gap */}
-            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+            {/* CARDS */}
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 {items.map(p => (
                     <ProdutoCard key={p.id} p={p} onEdit={openEdit} onDelete={(prod) => setDeleteModal({ id: prod.id, nome: prod.nome, img: prod.imagem_url })} />
                 ))}
