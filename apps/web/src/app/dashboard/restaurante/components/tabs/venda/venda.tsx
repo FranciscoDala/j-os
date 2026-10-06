@@ -4,7 +4,6 @@ import { X } from "lucide-react";
 import { ProdutosSection } from "./cards/produto";
 import { CarrinhoSection } from "./carrinho/carrinho";
 import { Toasts, PayModal, ConfirmModal } from "./modals/venda";
-import { PedidosQrPendentes } from "../../../../../../components/venda/pedidos/PedidosQrPendentes";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const API_BASE = `${API_URL}/api/v1/produtos`;
@@ -45,10 +44,9 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const [loadingMesas, setLoadingMesas] = useState(false);
     const [mesaSelecionada, setMesaSelecionada] = useState<any>(null);
     const [vendaMesa, setVendaMesa] = useState<any>(null);
-    const [mesaParaFechar, setMesaParaFechar] = useState<any>(null);
     const [pedidoQrAtivo, setPedidoQrAtivo] = useState<any>(null);
     const PEDIDOS_QR_API = `${API_URL}/api/v1/pedidos-qr`;
-    const qrProcessadoRef = useRef<string | null>(null); // trava duplicação
+    const qrProcessadoRef = useRef<string | null>(null);
 
     const pushToast = (msg: string, type: Toast["type"] = "info") => {
         const id = Date.now().toString() + Math.random().toString().slice(2);
@@ -56,14 +54,13 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         setTimeout(() => setToasts(t => t.filter(x => x.id!== id)), 4000);
     };
 
-    // FIX: MODO QR - sem duplicar e sem chamar selecionarMesa que limpa carrinho
     useEffect(() => {
         const raw = localStorage.getItem("atender_mesa_qr");
         if (!raw) return;
         try {
             const dados = JSON.parse(raw);
             const idQr = dados.id || dados.pedido_id;
-            if (qrProcessadoRef.current === idQr) return; // já processado
+            if (qrProcessadoRef.current === idQr) return;
             qrProcessadoRef.current = idQr;
 
             setPedidoQrAtivo(dados);
@@ -83,10 +80,8 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                         m.numero === dados.mesa?.numero
                     );
                     if (mesa) {
-                        // NÃO chama selecionarMesa() para não limpar e não buscar venda que causa race
                         setMesaSelecionada(mesa);
                         setVendaMesa(mesa.venda_atual_id? { id: mesa.venda_atual_id } : null);
-                        setMesaParaFechar(null);
                         if (dados.itens?.length) {
                             const cartItens = dados.itens.map((it: any) => ({
                                 id: it.produto_id || it.produto?.id || it.id,
@@ -110,16 +105,12 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     }, []);
     useEffect(() => {
         localStorage.setItem("venda_modo_mesa", modoMesa? "1" : "0");
-        if (!modoMesa) {
+        if (!modoMesa &&!localStorage.getItem("atender_mesa_qr")) {
             setMesaSelecionada(null);
             setVendaMesa(null);
-            setMesaParaFechar(null);
             setActiveCat("All");
-            // se sair do modo mesa, limpa QR
-            if(!localStorage.getItem("atender_mesa_qr")){
-                setPedidoQrAtivo(null);
-                qrProcessadoRef.current = null;
-            }
+            setPedidoQrAtivo(null);
+            qrProcessadoRef.current = null;
         }
     }, [modoMesa]);
 
@@ -167,12 +158,8 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     useEffect(() => { if (modoMesa && activeCat === "Mesas") fetchMesasOcupadas(); }, [modoMesa, activeCat, fetchMesasOcupadas]);
 
     const selecionarMesa = async (mesa: any) => {
-        // se vier do QR, não limpa cart
-        if(!pedidoQrAtivo){
-            setCart([]);
-        }
+        if(!pedidoQrAtivo) setCart([]);
         setMesaSelecionada(mesa);
-        setMesaParaFechar(null);
         setVendaMesa(null);
         if (mesa.venda_atual_id) {
             try {
@@ -187,37 +174,13 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                 }
             } catch { }
         }
-        try {
-            const rList = await fetch(`${VENDAS_API}/`, { headers: getAuthHeaders() as any });
-            if (rList.ok) {
-                const vendas = await rList.json();
-                const v = vendas.find((x: any) => x.mesa_id === mesa.id && x.status === "ABERTA");
-                if (v) {
-                    setMesaSelecionada({...mesa, venda_atual_id: v.id });
-                    setVendaMesa(v);
-                    pushToast(`Mesa ${mesa.numero} selecionada`, "success");
-                    return;
-                }
-            }
-        } catch { }
         pushToast(`Mesa ${mesa.numero} pronta para lançar`, "success");
     };
-
-    useEffect(() => {
-        const onProdutoUpdate = (e: any) => { const p = e.detail; if (!p?.id) return; setDbProducts(prev => prev.map(x => x.id === p.id? {...x,...p } : x)); };
-        window.addEventListener("produto:update" as any, onProdutoUpdate);
-        const onMesaUpdate = () => { if (modoMesa) fetchMesasOcupadas(); };
-        window.addEventListener("mesa:update" as any, onMesaUpdate);
-        return () => {
-            window.removeEventListener("produto:update" as any, onProdutoUpdate);
-            window.removeEventListener("mesa:update" as any, onMesaUpdate);
-        };
-    }, [modoMesa, fetchMesasOcupadas]);
 
     const cats = modoMesa? ["All", "Mesas",...catsDb] : ["All",...catsDb];
     const getStockState = (p: any) => { if (!p.controlar_stock) return "ok"; const atual = Number(p.stock_atual?? 0); if (atual <= 0) return "zero"; if (atual <= 5) return "low"; return "ok"; };
     const add = (p: any) => {
-        if(pedidoQrAtivo) return; // em modo QR não adiciona mais produtos da loja
+        if(pedidoQrAtivo) return;
         const state = getStockState(p); if (state === "zero") { pushToast(`Sem stock: "${p.nome}"`, "error"); return; }
         const ex = cart.find((c) => c.id === p.id);
         if (ex) setCart(cart.map((c) => (c.id === p.id? {...c, qtd: c.qtd + 1 } : c)));
@@ -303,26 +266,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         finally { setFinalizando(false); }
     };
 
-    const fecharContaMesa = async () => {
-        const mesa = mesaParaFechar;
-        const vendaId = mesa?.venda_atual_id || vendaMesa?.id || mesaSelecionada?.venda_atual_id;
-        if (!vendaId) { pushToast("Mesa sem venda para fechar", "error"); return; }
-        setFinalizando(true);
-        try {
-            const r = await fetch(`${VENDAS_API}/${vendaId}/fechar`, {
-                method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() as any },
-                body: JSON.stringify({ forma_pagamento: forma.toUpperCase(), dinheiro_recebido: recebidoNum || 0 })
-            });
-            const txt = await r.text(); let data: any = {}; try { data = JSON.parse(txt); } catch { data = { detail: txt }; }
-            if (!r.ok) throw new Error(data.detail || "Erro ao fechar");
-            setUltimaVenda({...data, mesa_numero: mesa.numero });
-            setShowPay(false);
-            setShowConfirm(true);
-            pushToast(`Mesa ${mesa.numero} fechada!`, "success");
-        } catch (e: any) { pushToast(e.message, "error"); }
-        finally { setFinalizando(false); }
-    };
-
     const imprimirContaParcial = async (mesa: any) => {
         const vendaId = mesa.venda_atual_id || vendaMesa?.id;
         if (!vendaId) { pushToast("Mesa sem consumo ainda", "info"); return; }
@@ -342,7 +285,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         const v = ultimaVenda;
         if (!v) return;
         const win = window.open("", "_blank", "width=320,height=600"); if (!win) return;
-        const isMesa =!!v.mesa_numero ||!!mesaParaFechar;
         const itens = v.itens || cart;
         const itensHtml = itens.map((i: any) => {
             const nome = i.nome_produto || i.produto_nome || i.nome || i.name;
@@ -351,7 +293,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             return `<tr><td>${nome} x${qtd}</td><td style="text-align:right">Kz ${Number(tot).toLocaleString("de-DE")}</td></tr>`;
         }).join("");
         const totalFinal = Number(v.total || total).toLocaleString("de-DE");
-        const titulo = isMesa? `FATURA MESA ${v.mesa_numero || mesaParaFechar?.numero || ""}` : `FATURA #${v.numero || ""}`;
+        const titulo = `FATURA #${v.numero || ""}`;
         win.document.write(`<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}</style></head><body><div class="center bold">${titulo}<br/>#${v.numero || ""}</div><div class="line"></div><table>${itensHtml}</table><div class="line"></div><table><tr><td class="bold">TOTAL</td><td style="text-align:right" class="bold">Kz ${totalFinal}</td></tr></table><script>window.print();</script></body></html>`);
         win.document.close();
     };
@@ -364,12 +306,9 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         setRecebido("");
         setUltimaVenda(null);
         setMesaSelecionada(null);
-        setMesaParaFechar(null);
         setVendaMesa(null);
-        if (mesaParaFechar) fetchMesasOcupadas();
     };
 
-    // quando é modo QR, mostra só produtos do pedido na secção de produtos
     const produtosDoPedidoIds = pedidoQrAtivo?.itens?.map((it:any)=> it.produto_id || it.produto?.id) || [];
     const produtosFiltradosQr = pedidoQrAtivo? dbProducts.filter((p:any)=> produtosDoPedidoIds.includes(p.id)).length > 0? dbProducts.filter((p:any)=> produtosDoPedidoIds.includes(p.id)) : pedidoQrAtivo.itens.map((it:any)=>({
         id: it.produto_id || it.id,
@@ -383,8 +322,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
     const filteredByCatBase = activeCat === "All"? dbProducts : activeCat === "Mesas"? [] : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
     const filteredByCat = pedidoQrAtivo && activeCat!== "Mesas"? produtosFiltradosQr : filteredByCatBase;
-
-    const totalFechamento = Number(mesaParaFechar?.venda_total || mesaParaFechar?.total || vendaMesa?.total || 0) + (mesaParaFechar?.id === mesaSelecionada?.id? total : 0);
 
     return (
         <div className="h-full w-full flex flex-col bg-[#EDEBE6] overflow-hidden relative" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
@@ -402,12 +339,33 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
             <div className="flex-1 flex flex-col lg:flex-row gap-[14px] p-[14px] pt-0 overflow-hidden min-h-0">
                 <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                    {modoMesa && (
-                        <div className="px-3 pt-3 shrink-0">
-                            <PedidosQrPendentes onAprovado={() => { fetchMesasOcupadas(); }} />
-                        </div>
-                    )}
-                    <ProdutosSection dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd} cats={cats} activeCat={activeCat} setActiveCat={setActiveCat} searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef} getQty={getQty} getStockState={getStockState} add={add} modoMesa={modoMesa} mesasOcupadas={mesasOcupadas} loadingMesas={loadingMesas} mesaSelecionada={mesaSelecionada} onSelectMesa={selecionarMesa} fetchMesas={fetchMesasOcupadas} cart={cart} cartTotal={total} onFecharMesa={(m: any) => { setMesaParaFechar(m); setRecebido(String(Number(m.venda_total || m.total || 0) + (m.id === mesaSelecionada?.id? total : 0))); setShowPay(true); }} onImprimirConta={imprimirContaParcial} pedidoQrAtivo={pedidoQrAtivo} />
+                    <ProdutosSection
+                        dbProducts={dbProducts}
+                        filteredByCat={filteredByCat}
+                        loadingProd={loadingProd}
+                        cats={pedidoQrAtivo? ["All"] : cats}
+                        activeCat={activeCat}
+                        setActiveCat={setActiveCat}
+                        searchV={searchV}
+                        setSearchV={setSearchV}
+                        showSearch={showSearch}
+                        setShowSearch={setShowSearch}
+                        searchRef={searchRef}
+                        getQty={getQty}
+                        getStockState={getStockState}
+                        add={add}
+                        modoMesa={modoMesa}
+                        mesasOcupadas={mesasOcupadas}
+                        loadingMesas={loadingMesas}
+                        mesaSelecionada={mesaSelecionada}
+                        onSelectMesa={selecionarMesa}
+                        fetchMesas={fetchMesasOcupadas}
+                        cart={cart}
+                        cartTotal={total}
+                        onFecharMesa={()=>{}}
+                        onImprimirConta={imprimirContaParcial}
+                        pedidoQrAtivo={pedidoQrAtivo}
+                    />
                 </div>
                 <div className="lg:w-[340px] shrink-0 overflow-hidden bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex flex-col">
                     <CarrinhoSection cart={cart} total={total} forma={forma} setForma={setForma} setShowPay={setShowPay} setRecebido={setRecebido} mesaSelecionada={mesaSelecionada} onAddMesa={adicionarNaMesa} onLimparMesa={() => {
@@ -421,8 +379,8 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                 </div>
             </div>
 
-            <PayModal showPay={showPay} setShowPay={(v: boolean) => { if (!v) setMesaParaFechar(null); setShowPay(v); }} total={mesaParaFechar? totalFechamento : total} forma={forma} recebido={recebido} recebidoNum={recebidoNum} troco={recebidoNum - (mesaParaFechar? totalFechamento : total)} handleCalc={handleCalc} setShowConfirm={mesaParaFechar? fecharContaMesa : finalizarBalcao} loading={finalizando} isMesa={!!mesaParaFechar} mesaNumero={mesaParaFechar?.numero} />
-            <ConfirmModal showConfirm={showConfirm} setShowConfirm={setShowConfirm} total={mesaParaFechar? totalFechamento : total} forma={forma} troco={recebidoNum - (mesaParaFechar? totalFechamento : total)} imprimirFatura={() => aposVenda(true)} onSemRecibo={() => aposVenda(false)} vendaNumero={ultimaVenda?.numero} isMesa={!!mesaParaFechar} mesaNumero={ultimaVenda?.mesa_numero || mesaParaFechar?.numero} />
+            <PayModal showPay={showPay} setShowPay={setShowPay} total={total} forma={forma} recebido={recebido} recebidoNum={recebidoNum} troco={recebidoNum - total} handleCalc={handleCalc} setShowConfirm={finalizarBalcao} loading={finalizando} isMesa={false} mesaNumero={null} />
+            <ConfirmModal showConfirm={showConfirm} setShowConfirm={setShowConfirm} total={total} forma={forma} troco={recebidoNum - total} imprimirFatura={() => aposVenda(true)} onSemRecibo={() => aposVenda(false)} vendaNumero={ultimaVenda?.numero} isMesa={false} mesaNumero={null} />
         </div>
     );
 }
