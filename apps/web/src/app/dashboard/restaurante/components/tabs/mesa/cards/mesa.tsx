@@ -66,7 +66,7 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
                 )}
             </div>
 
-            <div className="px-3.5 py-3 flex flex-col flex-1 overflow-hidden">
+            <div className="px-3.5 pt-3 pb-4 flex flex-col flex-1 overflow-hidden">
                 <h3 className="font-black text-[13px] leading-[1.1] text-[#1E1E1E] shrink-0">MESA {m.numero}</h3>
 
                 <div className="mt-1.5 flex items-center gap-1 flex-wrap min-h-[18px] shrink-0">
@@ -106,12 +106,12 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
 
                 <div className="mt-auto flex items-end justify-between gap-2 shrink-0 pt-3">
                     <div className="leading-none">
-                        <div className="w-4 h-0.5 bg-[#FFC91A] rounded-full mb-1" />
+                        <div className="w-4 h-0.5 bg-[#FFC91A] rounded-full mb-1.5" />
                         <p className={`text-[15px] font-black tracking-tight ${cfg.price}`}>
                             {hasConsumo ? `${total.toLocaleString("de-DE")}` : "—"}
                             {hasConsumo && <span className="text-[10px]">Kz</span>}
                         </p>
-                        <p className="text-[9px] font-bold text-[#9A9A9A] mt-1">
+                        <p className="text-[9px] font-bold text-[#9A9A9A] mt-1.5">
                             + {hasConsumo ? "Consumo" : cfg.label}
                         </p>
                     </div>
