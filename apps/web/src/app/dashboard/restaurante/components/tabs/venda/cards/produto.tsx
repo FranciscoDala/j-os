@@ -17,14 +17,18 @@ type Props = {
 export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, setActiveCat, searchV, setSearchV, showSearch, setShowSearch, searchRef, getQty, add, pedidoQrAtivo, mostrarCatalogoExtra, setMostrarCatalogoExtra }: Props) {
     const isQrOnly =!!pedidoQrAtivo &&!mostrarCatalogoExtra;
 
+    const handleOpenSearch = () => {
+        setShowSearch(true);
+        setTimeout(()=> searchRef.current?.focus(), 80);
+    };
+
     return (
         <div className="flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {/* MODO QR PURO - SEM CATEGORIAS, SEM HEADER GRANDE, SÓ PRODUTOS + BOTÃO FINO */}
             {isQrOnly? (
                 <>
                     <div className="flex items-center justify-between mb-3">
                         <span className="text-[10px] font-black tracking-widest text-zinc-400">{filteredByCat.length} ITENS</span>
-                        <button onClick={()=>setMostrarCatalogoExtra?.(true)} className="h-7 px-3 rounded-full bg-black text-white text-[10px] font-black flex items-center gap-1"><Plus size={10}/> Adicionar produto</button>
+                        <button onClick={()=>setMostrarCatalogoExtra?.(true)} className="h-8 px-3.5 rounded-full bg-black text-white text-[11px] font-black flex items-center gap-1"><Plus size={11}/> Adicionar produto</button>
                     </div>
                     {loadingProd? <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">{[...Array(4)].map((_, i) => <div key={i} className="bg-white rounded-[14px] h-[140px] animate-pulse border" />)}</div> :
                         <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
@@ -34,29 +38,33 @@ export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, s
                 </>
             ) : (
                 <>
-                    {/* MODO BALCÃO OU ADD EXTRA - COM CATEGORIAS FINAS */}
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    {/* CATEGORIAS ESQUERDA - UM POUCO MAIORES + BUSCA DIREITA MAIOR */}
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden flex-1 min-w-0">
+                            {cats.map(c => (
+                                <button key={c} onClick={() => setActiveCat(c)} className={`whitespace-nowrap px-3.5 h-8 rounded-full text-[11px] border font-bold leading-none transition-all ${activeCat === c? "bg-black text-white border-black shadow-sm" : "bg-white text-zinc-700 border-[#E8DCCF] hover:border-black"}`}>{c}</button>
+                            ))}
+                            <button className="w-8 h-8 rounded-full bg-white border border-[#E8DCCF] flex items-center justify-center shrink-0"><SlidersHorizontal size={12} /></button>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                            {pedidoQrAtivo && mostrarCatalogoExtra && (
+                                <button onClick={()=>setMostrarCatalogoExtra?.(false)} className="h-8 px-3 rounded-full bg-zinc-100 text-[11px] font-bold">Voltar</button>
+                            )}
                             {!showSearch? (
-                                <button onClick={() => setShowSearch(true)} className="w-7 h-7 bg-white border border-[#E8DCCF] rounded-full flex items-center justify-center"><Search size={11} className="text-zinc-500" /></button>
+                                <button onClick={handleOpenSearch} className="w-9 h-9 bg-white border border-[#E8DCCF] rounded-full flex items-center justify-center shadow-sm hover:border-black transition-all"><Search size={14} className="text-zinc-600" /></button>
                             ) : (
-                                <div className="relative w-[200px]">
-                                    <Search size={10} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-                                    <input ref={searchRef} value={searchV} onChange={e => setSearchV(e.target.value)} onBlur={() => { if (!searchV) setShowSearch(false) }} placeholder="Buscar..." className="w-full h-7 bg-white rounded-full pl-7 pr-6 text-[11px] font-bold outline-none border border-[#E8DCCF]" />
-                                    <button onClick={() => { setSearchV(""); setShowSearch(false); }} className="absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 bg-zinc-100 rounded-full flex items-center justify-center"><X size={8} /></button>
+                                <div className="relative w-[380px] max-w-[42vw]">
+                                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                                    <input ref={searchRef} value={searchV} onChange={e => setSearchV(e.target.value)} placeholder="Buscar produto..." autoFocus className="w-full h-9 bg-white rounded-full pl-10 pr-9 text-[12px] font-bold outline-none border border-black shadow-sm focus:ring-2 focus:ring-black/10" />
+                                    <button onClick={() => { setSearchV(""); setShowSearch(false); }} className="absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 bg-zinc-100 hover:bg-black hover:text-white rounded-full flex items-center justify-center transition-colors"><X size={12} /></button>
                                 </div>
                             )}
-                            <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                {cats.map(c => <button key={c} onClick={() => setActiveCat(c)} className={`whitespace-nowrap px-2.5 h-7 rounded-full text-[10px] border font-bold leading-none ${activeCat === c? "bg-black text-white border-black" : "bg-white text-zinc-600 border-[#E8DCCF]"}`}>{c}</button>)}
-                                <button className="w-7 h-7 rounded-full bg-white border border-[#E8DCCF] flex items-center justify-center shrink-0"><SlidersHorizontal size={10} /></button>
-                            </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                            {pedidoQrAtivo && mostrarCatalogoExtra && (
-                                <button onClick={()=>setMostrarCatalogoExtra?.(false)} className="h-7 px-2.5 rounded-full bg-zinc-100 text-[10px] font-bold">Voltar</button>
-                            )}
-                            <span className="text-[10px] text-zinc-400 font-bold whitespace-nowrap">{filteredByCat.length}</span>
-                        </div>
+                    </div>
+
+                    <div className="md:hidden flex items-center gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        {cats.map(c => <button key={c} onClick={() => setActiveCat(c)} className={`whitespace-nowrap px-3 h-8 rounded-full text-[11px] border font-bold shrink-0 ${activeCat === c? "bg-black text-white border-black" : "bg-white border-[#E8DCCF]"}`}>{c}</button>)}
                     </div>
 
                     {pedidoQrAtivo && mostrarCatalogoExtra && (

@@ -38,7 +38,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const [forma, setForma] = useState<"dinheiro" | "transferencia" | "tpa">("dinheiro");
     const [finalizando, setFinalizando] = useState(false);
     const [ultimaVenda, setUltimaVenda] = useState<any>(null);
-
     const [mesaSelecionada, setMesaSelecionada] = useState<any>(null);
     const [vendaMesa, setVendaMesa] = useState<any>(null);
     const [pedidoQrAtivo, setPedidoQrAtivo] = useState<any>(null);
@@ -91,14 +90,15 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if ((e.key === "/" &&!(e.target instanceof HTMLInputElement)) || (e.ctrlKey && e.key.toLowerCase() === "k")) {
-                e.preventDefault(); setShowSearch(true); setTimeout(() => searchRef.current?.focus(), 50);
+                e.preventDefault(); setShowSearch(true); setTimeout(() => searchRef.current?.focus(), 80);
             }
             if (e.key === "Escape" && showSearch) { setShowSearch(false); setSearchV(""); }
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
     }, [showSearch]);
-    useEffect(() => { if (showSearch) searchRef.current?.focus(); }, [showSearch]);
+
+    useEffect(() => { if (showSearch) { setTimeout(()=>searchRef.current?.focus(), 50); } }, [showSearch]);
 
     useEffect(() => {
         const fetchReal = async () => {
@@ -144,10 +144,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         setFinalizando(true);
         try {
             if (!vendaId) {
-                const rCreate = await fetch(`${VENDAS_API}/`, {
-                    method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() as any },
-                    body: JSON.stringify({ mesa_id: mesaSelecionada.id, itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })), dinheiro_recebido: 0, forma_pagamento: "DINHEIRO", pessoas: mesaSelecionada.pessoas_atual || 1, modo: "mesa" })
-                });
+                const rCreate = await fetch(`${VENDAS_API}/`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() as any }, body: JSON.stringify({ mesa_id: mesaSelecionada.id, itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })), dinheiro_recebido: 0, forma_pagamento: "DINHEIRO", pessoas: mesaSelecionada.pessoas_atual || 1, modo: "mesa" }) });
                 const txt = await rCreate.text(); let data: any = {}; try { data = JSON.parse(txt); } catch { data = { detail: txt }; }
                 if (!rCreate.ok) throw new Error(data.detail || "Erro ao criar comanda");
                 if (pedidoQrAtivo) {
@@ -204,8 +201,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     return (
         <div className="h-full w-full flex flex-col bg-[#EDEBE6] overflow-hidden relative" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
             <Toasts toasts={toasts} setToasts={setToasts} />
-            {/* HEADER COM BORDER BOTTOM VERDE ESCURO E TITULO 20PX */}
-            <div className="h-[56px] px-4 flex items-center justify-between shrink-0 border-b-[2px] border-[#0F2D1F] bg-[#EDEBE6]">
+            <div className="h-[56px] px-4 flex items-center justify-between shrink-0 border-b-[1px] border-[#026135a0] bg-[#EDEBE6]">
                 <h1 className="text-[20px] font-black tracking-tight text-black leading-none">
                     {mesaSelecionada? `Mesa ${mesaSelecionada.numero}` : "Balcão"}
                 </h1>
