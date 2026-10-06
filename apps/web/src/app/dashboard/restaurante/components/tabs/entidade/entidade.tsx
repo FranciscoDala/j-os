@@ -28,14 +28,14 @@ function CustomSelect({ value, onChange, options, labelMap }: { value: string, o
     useEffect(() => { const h = (e: MouseEvent) => { if (ref.current &&!ref.current.contains(e.target as Node)) setOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
     return (
         <div ref={ref} className={`relative ${open? "z-[60]" : "z-0"} w-full`}>
-            <button type="button" onClick={() => setOpen(!open)} className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 py-2.5 text-[11px] font-black text-left flex items-center justify-between shadow-sm hover:border-[#A67C52] focus:ring-2 focus:ring-[#A67C52]/20 transition-all outline-none">
+            <button type="button" onClick={() => setOpen(!open)} className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 h-10 text-[11px] font-black text-left flex items-center justify-between shadow-sm hover:border-[#A67C52] focus:ring-2 focus:ring-[#A67C52]/20 transition-all outline-none">
                 <span className="truncate">{labelMap[value] || value}</span>
                 <ChevronDown size={14} className={`shrink-0 ml-2 transition-transform ${open? "rotate-180" : ""}`} />
             </button>
             {open && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[18px] border border-[#E8DCCF] shadow-[0_12px_32px_rgba(0,0,0,0.18)] z-[100] overflow-hidden p-1.5">
                     <div className="max-h-[200px] overflow-y-auto no-scrollbar space-y-0.5">
-                        {options.map(opt => (<button key={opt} type="button" onClick={() => { onChange(opt); setOpen(false); }} className={`w-full text-left px-4 py-2 rounded-full text-[11px] font-bold transition-all ${value === opt? "bg-[#A67C52] text-white shadow-sm" : "bg-white text-black hover:bg-[#F5E6D3] hover:text-[#5A3A22]"}`}>{labelMap[opt]}</button>))}
+                        {options.map(opt => (<button key={opt} type="button" onClick={() => { onChange(opt); setOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full text-[11px] font-bold transition-all ${value === opt? "bg-[#A67C52] text-white shadow-sm" : "bg-white text-black hover:bg-[#F5E6D3] hover:text-[#5A3A22]"}`}>{labelMap[opt]}</button>))}
                     </div>
                 </div>
             )}
@@ -78,19 +78,21 @@ export function EntidadesTab() {
 
     return (
         <>
-            <div className="w-full space-y-4 relative">
-                <div className="w-full flex items-center justify-between gap-3">
-                    <div className="w-[200px]">
+            <div className="w-full space-y-3 md:space-y-4 relative">
+                <div className="w-full flex items-center justify-between gap-2.5 md:gap-3">
+                    <div className="flex-1 sm:flex-none sm:w-[180px] md:w-[200px]">
                         <CustomSelect value={tipoFiltro} onChange={(v) => setTipoFiltro(v as any)} options={[...TIPOS]} labelMap={TIPO_LABELS} />
                     </div>
-                    <div className="flex-1" />
+                    <div className="flex-1 hidden sm:block" />
                     {canManage && (
-                        <button onClick={() => { setForm({ id: null, tipo: tipoFiltro, nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" }); setOpen(true); }} className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-md hover:bg-zinc-800 active:scale-95 transition-all shrink-0"><Plus size={18} strokeWidth={3} /></button>
+                        <button onClick={() => { setForm({ id: null, tipo: tipoFiltro, nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" }); setOpen(true); }} className="h-10 px-4 md:w-10 md:px-0 bg-black text-white rounded-full flex items-center justify-center gap-1.5 shadow-md hover:bg-zinc-800 active:scale-95 transition-all shrink-0">
+                            <Plus size={18} strokeWidth={3} /><span className="md:hidden text-[12px] font-black">Novo</span>
+                        </button>
                     )}
                 </div>
 
-                <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                    {filtered.length === 0? <div className="col-span-full text-center py-10 text-[12px] opacity-50 font-bold">Nenhum {TIPO_LABELS[tipoFiltro]} {globalSearch && `para "${globalSearch}"`}</div> : filtered.map(ent => <EntidadeCard key={ent.id} ent={ent} onEdit={handleEdit} onDelete={handleDeleteClick} canManage={canManage} />)}
+                <div className="grid gap-2.5 md:gap-3 grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                    {filtered.length === 0? <div className="col-span-full text-center py-12 md:py-10 text-[12px] opacity-50 font-bold border border-dashed border-[#E8DCCF] rounded-[18px] md:rounded-[22px] bg-white/50">Nenhum {TIPO_LABELS[tipoFiltro]} {globalSearch && `para "${globalSearch}"`}</div> : filtered.map(ent => <EntidadeCard key={ent.id} ent={ent} onEdit={handleEdit} onDelete={handleDeleteClick} canManage={canManage} />)}
                 </div>
             </div>
             <EntidadeModal open={open} setOpen={setOpen} form={form} setForm={setForm} perfis={perfis} saving={saving} onSave={handleSave} />

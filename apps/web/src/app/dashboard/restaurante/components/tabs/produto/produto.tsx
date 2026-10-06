@@ -30,7 +30,7 @@ function FilterSelect({ value, onChange, options, placeholder }: { value: string
     }, []);
     return (
         <div ref={ref} className={`relative w-full ${open? "z-[60]" : "z-0"}`}>
-            <button type="button" onClick={() => setOpen(!open)} className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 py-2.5 text-[11px] font-black flex items-center justify-between shadow-sm hover:border-[#A67C52] focus:ring-2 focus:ring-[#A67C52]/20 transition-all outline-none">
+            <button type="button" onClick={() => setOpen(!open)} className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 h-10 text-[11px] font-black flex items-center justify-between shadow-sm hover:border-[#A67C52] focus:ring-2 focus:ring-[#A67C52]/20 transition-all outline-none">
                 <span className="truncate">{value || placeholder || "Todas"}</span>
                 <ChevronDown size={14} className={`shrink-0 ml-2 transition-transform ${open? "rotate-180" : ""}`} />
             </button>
@@ -38,7 +38,7 @@ function FilterSelect({ value, onChange, options, placeholder }: { value: string
                 <div className="absolute top-full left-0 right-0 mt-2 min-w-[160px] bg-white rounded-[18px] border border-[#E8DCCF] shadow-[0_12px_32px_rgba(0,0,0,0.18)] z-[100] overflow-hidden p-1.5">
                     <div className="max-h-[220px] overflow-y-auto no-scrollbar space-y-0.5">
                         {options.map(opt => (
-                            <button key={opt || "todas"} type="button" onClick={() => { onChange(opt); setOpen(false); }} className={`w-full text-left px-4 py-2 rounded-full text-[11px] font-bold transition-all ${value === opt? "bg-[#A67C52] text-white" : "bg-white text-black hover:bg-[#F5E6D3]"}`}>
+                            <button key={opt || "todas"} type="button" onClick={() => { onChange(opt); setOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full text-[11px] font-bold transition-all ${value === opt? "bg-[#A67C52] text-white" : "bg-white text-black hover:bg-[#F5E6D3]"}`}>
                                 {opt === ""? "Todas" : opt}
                             </button>
                         ))}
@@ -114,8 +114,8 @@ export function ProdutosTab() {
     const confirmDelete = async () => { if (!deleteModal) return; const r = await fetch(`${API_BASE}/${deleteModal.id}`, { method: "DELETE", headers: getAuthHeaders() as any }); if (r.ok) { pushToast("Produto apagado", "success"); fetchProds(); setDeleteModal(null); } else pushToast("Erro ao apagar", "error"); };
 
     return (
-        <div className="w-full space-y-4 relative">
-            <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 w-[340px] pointer-events-none">
+        <div className="w-full space-y-3 md:space-y-4 relative">
+            <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 w-[92%] max-w-[340px] pointer-events-none">
                 {toasts.map(t => (
                     <div key={t.id} className={`pointer-events-auto flex gap-2 items-start p-3 rounded-[14px] border backdrop-blur-xl shadow-2xl text-[12px] font-medium ${t.type === "success"? "bg-[#E8F5E9] border-green-200 text-green-800" : t.type === "error"? "bg-[#FDECEA] border-red-200 text-red-800" : "bg-white border-gray-200 text-gray-800"}`}>
                         {t.type === "success" && <CheckCircle size={16} className="shrink-0 mt-0.5" />}{t.type === "error" && <AlertTriangle size={16} className="shrink-0 mt-0.5" />}{t.type === "info" && <Info size={16} className="shrink-0 mt-0.5" />}
@@ -124,25 +124,32 @@ export function ProdutosTab() {
                 ))}
             </div>
 
-            {/* HEADER - SÓ FILTRO + ADD */}
-            <div className="w-full flex items-center justify-between gap-3">
-                <div className="w-[200px]">
+            {/* HEADER - RESPONSIVO */}
+            <div className="w-full flex items-center justify-between gap-2.5 md:gap-3">
+                <div className="flex-1 sm:flex-none sm:w-[180px] md:w-[200px]">
                     <FilterSelect value={cat} onChange={setCat} options={["",...cats]} placeholder="Todas categorias" />
                 </div>
-                <div className="flex-1" />
+                <div className="flex-1 hidden sm:block" />
                 {canManage && (
-                    <button onClick={() => { resetForm(); setOpen(true); }} className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center hover:bg-zinc-800 active:scale-95 transition-all shadow-md shrink-0">
-                        <Plus size={18} strokeWidth={3} />
+                    <button onClick={() => { resetForm(); setOpen(true); }} className="h-10 px-4 md:w-10 md:px-0 bg-black text-white rounded-full flex items-center justify-center gap-1.5 hover:bg-zinc-800 active:scale-95 transition-all shadow-md shrink-0">
+                        <Plus size={18} strokeWidth={3} /><span className="md:hidden text-[12px] font-black">Novo</span>
                     </button>
                 )}
             </div>
 
-            {/* CARDS */}
-            <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+            {/* CARDS - GRID RESPONSIVO */}
+            <div className="grid gap-2.5 md:gap-3 grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {items.map(p => (
                     <ProdutoCard key={p.id} p={p} onEdit={openEdit} onDelete={(prod) => setDeleteModal({ id: prod.id, nome: prod.nome, img: prod.imagem_url })} />
                 ))}
             </div>
+
+            {items.length === 0 && (
+                <div className="py-12 text-center border border-dashed border-[#E8DCCF] rounded-[18px] md:rounded-[22px] bg-white/50">
+                    <p className="font-black text-[13px]">Nenhum produto</p>
+                    <p className="text-[11px] opacity-60 mt-1">Crie seu primeiro produto</p>
+                </div>
+            )}
 
             <ProdutoDeleteModal data={deleteModal} onClose={() => setDeleteModal(null)} onConfirm={confirmDelete} />
             <ProdutoModal open={open} editId={editId} tab={tab} setTab={setTab} form={form} setForm={setForm} preview={preview} setPreview={setPreview} setImgFile={setImgFile} cats={cats} saving={saving} onClose={() => setOpen(false)} onSave={handleSave} />

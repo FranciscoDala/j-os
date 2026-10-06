@@ -39,7 +39,7 @@ export function EntidadeCard({
     const telefone = ent.telefone || ent.documento || "";
 
     return (
-        <div className="group relative w-full h-[272px] rounded-[22px] overflow-hidden bg-[#FFFEFB] border border-[#F0E6D8] shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 flex flex-col">
+        <div className="group relative w-full h-[250px] sm:h-[265px] md:h-[272px] rounded-[18px] md:rounded-[22px] overflow-hidden bg-[#FFFEFB] border border-[#F0E6D8] shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] md:hover:-translate-y-0.5 transition-all duration-300 flex flex-col">
 
             {canManage && (
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
@@ -52,46 +52,46 @@ export function EntidadeCard({
                 </div>
             )}
 
-            <div className="relative w-full h-[138px] bg-[#FFEAA6] overflow-hidden flex items-center justify-center shrink-0">
-                {ent.foto_url ? (
+            <div className="relative w-full h-[118px] sm:h-[128px] md:h-[138px] bg-[#FFEAA6] overflow-hidden flex items-center justify-center shrink-0">
+                {ent.foto_url? (
                     <img src={ent.foto_url} alt={ent.nome} className="w-full h-full object-cover" />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#FFF3C0] to-[#FFD86A]">
-                        <span className="text-[32px] font-black text-[#1A1A1A] tracking-tight">{initials}</span>
+                        <span className="text-[28px] sm:text-[30px] md:text-[32px] font-black text-[#1A1A1A] tracking-tight">{initials}</span>
                     </div>
                 )}
             </div>
 
-            <div className="px-3.5 py-3 flex flex-col flex-1 overflow-hidden">
-                <h3 className="font-black text-[13px] leading-[1.15] text-[#1E1E1E] line-clamp-1 shrink-0">
+            <div className="px-3 md:px-3.5 py-2.5 md:py-3 flex flex-col flex-1 overflow-hidden">
+                <h3 className="font-black text-[12px] md:text-[13px] leading-[1.15] text-[#1E1E1E] line-clamp-1 shrink-0">
                     {ent.nome}
                 </h3>
 
                 <div className="mt-1.5 flex items-center gap-1 flex-wrap min-h-[18px] shrink-0">
                     {tags.slice(0, 2).map((t, i) => (
-                        <span key={i} className="text-[9px] font-bold text-[#8A8A8A] bg-[#F5F0E9] px-2 py-0.5 rounded-full truncate max-w-[90px]">
+                        <span key={i} className="text-[8px] md:text-[9px] font-bold text-[#8A8A8A] bg-[#F5F0E9] px-2 py-0.5 rounded-full truncate max-w-[90px]">
                             {t}
                         </span>
                     ))}
                 </div>
 
                 <div className="mt-2 min-h-[26px] flex-1">
-                    <p className="text-[10px] leading-[1.3] text-[#7A7A7A] line-clamp-2">
-                        {email}{telefone ? ` • ${telefone}` : ""}
+                    <p className="text-[10px] leading-[1.3] text-[#7A7A7A] line-clamp-2 break-all">
+                        {email}{telefone? ` • ${telefone}` : ""}
                     </p>
                 </div>
 
-                <div className="mt-auto flex items-end justify-between gap-2 shrink-0 pt-3">
+                <div className="mt-auto flex items-end justify-between gap-2 shrink-0 pt-2.5 md:pt-3">
                     <div className="leading-none">
                         <div className="w-4 h-0.5 bg-[#FFC91A] rounded-full mb-1" />
-                        <p className="text-[9px] font-bold text-[#9A9A9A]">+ Salário</p>
-                        {ent.salario ? (
+                        <p className="text-[8px] md:text-[9px] font-bold text-[#9A9A9A]">+ Salário</p>
+                        {ent.salario? (
                             <p className="text-[11px] font-black text-[#1E1E1E] mt-0.5">{fmtMoney(ent.salario)}</p>
                         ) : (
                             <p className="text-[11px] font-black text-[#1E1E1E] mt-0.5">—</p>
                         )}
                     </div>
-                    <button onClick={() => onEdit(ent)} className="h-[30px] px-4 rounded-full bg-[#FFC91A] hover:bg-[#FFB800] text-black text-[11px] font-black shadow-sm transition-colors shrink-0">
+                    <button onClick={() => onEdit(ent)} className="h-[30px] px-4 rounded-full bg-[#FFC91A] hover:bg-[#FFB800] text-black text-[11px] font-black shadow-sm transition-colors shrink-0 active:scale-95">
                         Detalhes
                     </button>
                 </div>
