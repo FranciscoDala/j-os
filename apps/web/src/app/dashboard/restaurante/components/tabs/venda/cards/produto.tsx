@@ -1,7 +1,7 @@
 "use client";
 import { Search, SlidersHorizontal, X, Clock, Users, Printer, Receipt } from "lucide-react";
 import { RefObject } from "react";
-import { ProdutoCard } from "../../produto/cards/produto"; // MESMO CARD
+import { ProdutoCard } from "../../produto/cards/produto";
 
 type Props = {
     dbProducts: any[]; filteredByCat: any[]; loadingProd: boolean; cats: string[]; activeCat: string; setActiveCat: (v: string) => void;
@@ -9,6 +9,7 @@ type Props = {
     getQty: (id: string) => number; getStockState: (p: any) => string; add: (p: any) => void;
     modoMesa: boolean; mesasOcupadas: any[]; loadingMesas: boolean; mesaSelecionada: any; onSelectMesa: (m: any) => void; fetchMesas: () => void;
     cart: any[]; cartTotal: number; onFecharMesa: (mesa: any) => void; onImprimirConta: (mesa: any) => void;
+    pedidoQrAtivo?: any;
 };
 
 function minutesSince(iso?: string) {
@@ -20,10 +21,21 @@ function minutesSince(iso?: string) {
     return `${h}h ${m % 60}min`;
 }
 
-export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, setActiveCat, searchV, setSearchV, showSearch, setShowSearch, searchRef, getQty, getStockState, add, mesasOcupadas, loadingMesas, mesaSelecionada, onSelectMesa, cart, cartTotal, onFecharMesa, onImprimirConta }: Props) {
+export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, setActiveCat, searchV, setSearchV, showSearch, setShowSearch, searchRef, getQty, getStockState, add, mesasOcupadas, loadingMesas, mesaSelecionada, onSelectMesa, cart, cartTotal, onFecharMesa, onImprimirConta, pedidoQrAtivo }: Props) {
     const isMesasCat = activeCat === "Mesas";
+    const isModoQr =!!pedidoQrAtivo &&!isMesasCat;
+
     return (
         <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#F5F7FB] p-3 md:p-5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {isModoQr && (
+                <div className="mb-4 bg-black text-white rounded-[14px] px-4 py-2.5 flex items-center justify-between">
+                    <div>
+                        <p className="font-black text-[12px]">Pedido QR • Mesa {pedidoQrAtivo.mesa_numero} • {pedidoQrAtivo.cliente_nome}</p>
+                        <p className="text-[10px] opacity-70">{pedidoQrAtivo.itens?.length} itens para adicionar na mesa</p>
+                    </div>
+                    <span className="text-[10px] bg-white text-black px-2.5 py-1 rounded-full font-black">MODO QR</span>
+                </div>
+            )}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                     <div className="flex items-center shrink-0">
@@ -42,7 +54,7 @@ export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, s
                         <button className="w-10 h-10 rounded-full bg-white border border-[#E8DCCF] flex items-center justify-center shrink-0"><SlidersHorizontal size={14} /></button>
                     </div>
                 </div>
-                <span className="text-[11px] text-zinc-500 font-black tracking-widest whitespace-nowrap">{isMesasCat? `${mesasOcupadas.length} OCUPADAS` : `${filteredByCat.length} PRODUTOS`}</span>
+                <span className="text-[11px] text-zinc-500 font-black tracking-widest whitespace-nowrap">{isMesasCat? `${mesasOcupadas.length} OCUPADAS` : isModoQr? `${filteredByCat.length} ITENS DO PEDIDO` : `${filteredByCat.length} PRODUTOS`}</span>
             </div>
 
             <div className="md:hidden flex items-center gap-2 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -85,7 +97,7 @@ export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, s
                 loadingProd? <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">{[...Array(8)].map((_, i) => <div key={i} className="bg-white rounded-[24px] h-[210px] animate-pulse border" />)}</div> :
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
                     {filteredByCat.map((p: any) => (
-                        <ProdutoCard key={p.id} p={p} cartQty={getQty(p.id)} onAdd={add} />
+                        <ProdutoCard key={p.id} p={p} cartQty={getQty(p.id)} onAdd={pedidoQrAtivo? undefined : add} />
                     ))}
                 </div>
             )}
