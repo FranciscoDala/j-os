@@ -121,6 +121,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
     const cats = ["All",...catsDb];
     const getStockState = (p: any) => { if (!p.controlar_stock) return "ok"; const atual = Number(p.stock_atual?? 0); if (atual <= 0) return "zero"; if (atual <= 5) return "low"; return "ok"; };
+
     const add = (p: any) => {
         const state = getStockState(p);
         if (state === "zero") { pushToast(`Sem stock: "${p.nome}"`, "error"); return; }
@@ -128,6 +129,12 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         if (ex) setCart(cart.map((c) => (c.id === p.id? {...c, qtd: c.qtd + 1 } : c)));
         else setCart([...cart, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: p.imagem_url? `${API_URL}${p.imagem_url}` : "", qtd: 1, origem: pedidoQrAtivo? "extra" : "balcao" }]);
     };
+
+    const removerDoCarrinho = (id: string) => {
+        setCart(prev => prev.filter((c: any) => c.id!== id));
+        pushToast("Item removido", "info");
+    };
+
     const getQty = (id: string) => cart.find((c) => c.id === id)?.qtd || 0;
     const total = cart.reduce((s, i) => s + i.price * i.qtd, 0);
     const recebidoNum = recebido? parseFloat(recebido) : 0;
@@ -213,7 +220,30 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                     <ProdutosSection dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd} cats={cats} activeCat={activeCat} setActiveCat={setActiveCat} searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef} getQty={getQty} getStockState={getStockState} add={add} modoMesa={false} mesasOcupadas={[]} loadingMesas={false} mesaSelecionada={null} onSelectMesa={()=>{}} fetchMesas={()=>{}} cart={cart} cartTotal={total} onFecharMesa={()=>{}} onImprimirConta={()=>{}} pedidoQrAtivo={pedidoQrAtivo} mostrarCatalogoExtra={mostrarCatalogoExtra} setMostrarCatalogoExtra={setMostrarCatalogoExtra} />
                 </div>
                 <div className="lg:w-[340px] shrink-0 overflow-hidden bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex flex-col">
-                    <CarrinhoSection cart={cart} total={total} forma={forma} setForma={setForma} setShowPay={setShowPay} setRecebido={setRecebido} mesaSelecionada={mesaSelecionada} onAddMesa={adicionarNaMesa} onLimparMesa={() => { if(pedidoQrAtivo){ localStorage.removeItem("atender_mesa_qr"); setPedidoQrAtivo(null); qrProcessadoRef.current = null; setMostrarCatalogoExtra(false); } setMesaSelecionada(null); setCart([]); setVendaMesa(null); }} finalizando={finalizando} pedidoQrAtivo={pedidoQrAtivo} />
+                    <CarrinhoSection
+                        cart={cart}
+                        total={total}
+                        forma={forma}
+                        setForma={setForma}
+                        setShowPay={setShowPay}
+                        setRecebido={setRecebido}
+                        mesaSelecionada={mesaSelecionada}
+                        onAddMesa={adicionarNaMesa}
+                        onLimparMesa={() => {
+                            if(pedidoQrAtivo){
+                                localStorage.removeItem("atender_mesa_qr");
+                                setPedidoQrAtivo(null);
+                                qrProcessadoRef.current = null;
+                                setMostrarCatalogoExtra(false);
+                            }
+                            setMesaSelecionada(null);
+                            setCart([]);
+                            setVendaMesa(null);
+                        }}
+                        finalizando={finalizando}
+                        pedidoQrAtivo={pedidoQrAtivo}
+                        onRemoveItem={removerDoCarrinho}
+                    />
                 </div>
             </div>
             <PayModal showPay={showPay} setShowPay={setShowPay} total={total} forma={forma} recebido={recebido} recebidoNum={recebidoNum} troco={recebidoNum - total} handleCalc={handleCalc} setShowConfirm={finalizarBalcao} loading={finalizando} isMesa={false} mesaNumero={null} />
