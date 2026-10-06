@@ -90,7 +90,7 @@ export function PedidoCard({ p, onAtender, onRecusar, onDetalhe }: any) {
                 <div className="mt-auto pt-3 flex items-end justify-between gap-2">
                     <div className="leading-none pb-0.5">
                         <p className="text-[15px] font-black text-[#EBA500] tracking-tight"><span className="text-[10px]">Kz </span>{safeKz(total)}</p>
-                        <p className="text-[9px] font-bold text-[#9A9A9A] mt-1">+ {itens.length} itens • {timeAgo(p.created_at)}</p>
+                        <p className="text-[9px] font-bold text-[#9A9A9A] mt-1">+ {itens.length} itens</p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                         <button onClick={() => onRecusar(p)} className="w-[30px] h-[30px] rounded-full bg-red-50 border border-red-100 text-red-600 flex items-center justify-center hover:bg-red-100"><X size={12} strokeWidth={3} /></button>
