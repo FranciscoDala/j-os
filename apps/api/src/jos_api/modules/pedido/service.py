@@ -21,10 +21,9 @@ def get_cardapio_publico(db: Session, empresa_id: uuid.UUID, mesa_numero: str | 
     if mesa_numero:
         mesa = db.query(Mesa).filter(Mesa.empresa_id == empresa_id, Mesa.numero == mesa_numero.upper()).with_for_update().first()
         if mesa:
-            # TOKEN EXPIRADO - conta foi fechada
             if mesa.status == MesaStatus.LIVRE and mesa.qr_token is None and token:
                 raise HTTPException(status_code=410, detail="Mesa já foi fechada. Faça scan novamente.")
-            if mesa.qr_token and token and mesa.qr_token!= token.upper():
+            if mesa.qr_token and token and mesa.qr_token != token.upper():
                 raise HTTPException(status_code=410, detail="Sessão desta mesa expirou. Faça scan novamente do QR da mesa.")
 
             # GERA TOKEN NOVO NO PRIMEIRO SCAN QUANDO MESA ESTA LIVRE
@@ -34,7 +33,6 @@ def get_cardapio_publico(db: Session, empresa_id: uuid.UUID, mesa_numero: str | 
                 db.commit()
                 db.refresh(mesa)
 
-            # VERIFICA SE TEM PEDIDO PENDENTE DO PRIMEIRO PEDIDO
             pendentes_q = db.query(PedidoQr).filter(
                 PedidoQr.empresa_id == empresa_id,
                 PedidoQr.mesa_numero == mesa.numero,
@@ -43,7 +41,40 @@ def get_cardapio_publico(db: Session, empresa_id: uuid.UUID, mesa_numero: str | 
             pendentes_count = pendentes_q.count()
             primeiro_pendente = pendentes_q.order_by(PedidoQr.created_at.asc()).first()
 
-            # BLOQUEADA = tem pendente e ainda não tem venda_atual (primeiro pedido não aprovado)
+            # CASO 1: MESA OCUPADA MAS AINDA SEM VENDA (primeiro pedido pendente) -> BLOQUEIA OUTROS
+            if pendentes_count > 0 and not mesa.venda_atual_id:
+                token_upper = (token or "").upper().strip()
+                # se não é o dono do token, bloqueia e sugere livres
+                if not token_upper or (mesa.qr_token and token_upper != mesa.qr_token):
+                    livres = db.query(Mesa).filter(
+                        Mesa.empresa_id == empresa_id,
+                        Mesa.ativa == True,
+                        Mesa.status == MesaStatus.LIVRE
+                    ).order_by(Mesa.numero).limit(6).all()
+
+                    mesa_info = {
+                        "numero": mesa.numero,
+                        "status": "OCUPADA",
+                        "qr_token": mesa.qr_token,
+                        "token_valido": False,
+                        "bloqueada": True,
+                        "ocupada_por_outro": True,
+                        "cliente_atual": primeiro_pendente.cliente_nome if primeiro_pendente else "outro cliente",
+                        "cliente_bloqueio": primeiro_pendente.cliente_nome if primeiro_pendente else None,
+                        "pendentes_count": pendentes_count,
+                        "venda_atual_id": None,
+                        "mesas_livres": [{"numero": m.numero, "capacidade": m.capacidade} for m in livres]
+                    }
+                    return {"empresa_nome": "Restaurante", "mesa": mesa_info, "produtos": [], "categorias": []}
+
+            # CASO 2: MESA JA OCUPADA COM VENDA -> LIBERA PRA AMIGOS (mesmo token pra todos)
+            if mesa.status == MesaStatus.OCUPADA and mesa.venda_atual_id and mesa.qr_token:
+                # se escaneou sem token, entrega o mesmo token existente
+                token_upper = (token or "").upper().strip()
+                if not token_upper:
+                    # não tem token na url, mas vamos deixar ele usar o token da mesa
+                    pass  # vai retornar qr_token igual abaixo
+
             bloqueada = False
             cliente_bloqueio = None
             if pendentes_count > 0 and not mesa.venda_atual_id:
@@ -54,11 +85,13 @@ def get_cardapio_publico(db: Session, empresa_id: uuid.UUID, mesa_numero: str | 
                 "numero": mesa.numero,
                 "status": mesa.status,
                 "qr_token": mesa.qr_token,
-                "token_valido": True if not mesa.qr_token or mesa.qr_token == (token.upper() if token else None) or not token else False,
+                "token_valido": True,
                 "bloqueada": bloqueada,
+                "ocupada_por_outro": False,
                 "pendentes_count": pendentes_count,
                 "cliente_bloqueio": cliente_bloqueio,
-                "venda_atual_id": str(mesa.venda_atual_id) if mesa.venda_atual_id else None
+                "venda_atual_id": str(mesa.venda_atual_id) if mesa.venda_atual_id else None,
+                "mesas_livres": []
             }
 
     return {
@@ -78,6 +111,7 @@ def get_cardapio_publico(db: Session, empresa_id: uuid.UUID, mesa_numero: str | 
         ],
         "categorias": cats
     }
+
 
 def criar_pedido_qr(db: Session, empresa_id: uuid.UUID, dados, ip: str | None):
     mesa_num_norm = dados.mesa_numero.strip().upper()
@@ -132,7 +166,17 @@ def criar_pedido_qr(db: Session, empresa_id: uuid.UUID, dados, ip: str | None):
             if stock <= 0: raise HTTPException(400, f"{prod.nome} esgotado")
             if stock < it.quantidade: raise HTTPException(400, f"{prod.nome} só tem {stock}")
         total += prod.preco_venda * it.quantidade
-        itens_norm.append({"produto_id": str(it.produto_id), "nome": prod.nome, "quantidade": str(it.quantidade), "preco": str(prod.preco_venda), "observacao": it.observacao})
+        itens_norm.append({
+            "produto_id": str(it.produto_id),
+            "nome": prod.nome,
+            "produto_nome": prod.nome,
+            "quantidade": str(it.quantidade),
+            "preco": str(prod.preco_venda),
+            "imagem_url": prod.imagem_url,
+            "imagem": prod.imagem_url,
+            "produto_imagem_url": prod.imagem_url,
+            "observacao": it.observacao
+        })
 
     pedido = PedidoQr(
         empresa_id=empresa_id, mesa_id=mesa.id, mesa_numero=mesa.numero,
@@ -144,8 +188,44 @@ def criar_pedido_qr(db: Session, empresa_id: uuid.UUID, dados, ip: str | None):
     emit(str(empresa_id), "pedido_qr:novo", data={"id": str(pedido.id), "mesa": pedido.mesa_numero, "cliente": pedido.cliente_nome, "total": str(total)})
     return pedido
 
+
 def listar_pendentes(db: Session, empresa_id: uuid.UUID):
-    return db.query(PedidoQr).filter(PedidoQr.empresa_id == empresa_id, PedidoQr.status == PedidoQrStatus.AGUARDANDO_APROVACAO).order_by(PedidoQr.created_at.asc()).all()
+    pedidos = db.query(PedidoQr).filter(
+        PedidoQr.empresa_id == empresa_id,
+        PedidoQr.status == PedidoQrStatus.AGUARDANDO_APROVACAO
+    ).order_by(PedidoQr.created_at.asc()).all()
+
+    # ENRIQUECE ITENS COM IMG DO PRODUTO ATUAL (primeiro ou ultimo tanto faz)
+    for ped in pedidos:
+        itens_enriquecidos = []
+        for it in (ped.itens or []):
+            # it pode ser dict ou já objeto
+            prod_id = it.get("produto_id") if isinstance(it, dict) else getattr(it, 'produto_id', None)
+            prod = None
+            if prod_id:
+                try:
+                    prod = db.query(Product).filter(Product.id == uuid.UUID(prod_id)).first()
+                except:
+                    prod = None
+
+            # pega imagem do produto se não tiver no item salvo
+            img = it.get("imagem_url") or it.get("imagem") if isinstance(it, dict) else None
+            if not img and prod:
+                img = prod.imagem_url
+
+            if isinstance(it, dict):
+                it["imagem_url"] = img
+                it["imagem"] = img
+                it["produto_imagem_url"] = img
+                it["produto_nome"] = it.get("produto_nome") or it.get("nome") or (prod.nome if prod else "Produto")
+                itens_enriquecidos.append(it)
+            else:
+                itens_enriquecidos.append(it)
+
+        ped.itens = itens_enriquecidos
+
+    return pedidos
+
 
 def aprovar_pedido(db: Session, pedido_id: uuid.UUID, empresa_id: uuid.UUID, user_id: uuid.UUID, caixa):
     pedido = db.query(PedidoQr).filter(PedidoQr.id == pedido_id, PedidoQr.empresa_id == empresa_id).with_for_update().first()

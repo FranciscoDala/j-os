@@ -15,48 +15,55 @@ function timeAgo(iso: string) {
     if (!iso) return "";
     const diffMs = Date.now() - new Date(iso).getTime();
     if (diffMs < 0) return "agora";
-
     const sec = Math.floor(diffMs / 1000);
     if (sec < 30) return "agora";
     if (sec < 60) return `há ${sec}s`;
-
     const min = Math.floor(sec / 60);
-    if (min < 60) return min === 1 ? "há 1min" : `há ${min}min`;
-
+    if (min < 60) return min === 1? "há 1min" : `há ${min}min`;
     const h = Math.floor(min / 60);
     const m = min % 60;
     const d = Math.floor(h / 24);
-
-    // até 6h mostra hora + min: há 1h 22min
     if (h < 6) {
-        if (m === 0) return h === 1 ? "há 1h" : `há ${h}h`;
+        if (m === 0) return h === 1? "há 1h" : `há ${h}h`;
         return `há ${h}h ${m}min`;
     }
-    if (h < 24) return h === 1 ? "há 1h" : `há ${h}h`;
-
+    if (h < 24) return h === 1? "há 1h" : `há ${h}h`;
     if (d === 1) return "ontem";
     if (d < 7) return `há ${d}d`;
-
     return new Date(iso).toLocaleDateString('pt-AO', { day: '2-digit', month: 'short' });
 }
 
 function safeKz(v: any) {
-    const n = Number(v ?? 0);
-    return isNaN(n) ? "0" : n.toLocaleString('de-DE');
+    const n = Number(v?? 0);
+    return isNaN(n)? "0" : n.toLocaleString('de-DE');
 }
 
 export function PedidoCard({ p, onAtender, onRecusar, onDetalhe }: any) {
-    const total = p.total_estimado ?? p.total ?? p.valor_total ?? 0;
+    const total = p.total_estimado?? p.total?? p.valor_total?? 0;
     const itens = p.itens || [];
-    const firstImg = itens[0]?.imagem_url || itens[0]?.imagem;
+    const first = itens[0] || {};
+
+    // pega img do primeiro produto de TODOS os campos possíveis
+    const rawImg =
+        first.produto_imagem_url ||
+        first.imagem_url ||
+        first.imagem ||
+        first.produto_imagem ||
+        first.produto?.imagem_url ||
+        first.produto?.imagem ||
+        first.product?.imagem_url ||
+        p.produto_imagem_url ||
+        null;
+
+    const firstImg = getImgUrl(rawImg);
 
     return (
         <div className="group relative w-full min-h-[272px] rounded-[22px] overflow-hidden bg-[#FFFEFB] border border-[#F3E9DF] shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 flex flex-col">
 
             <div className="relative w-full h-[138px] bg-[#FFEAA6] overflow-hidden shrink-0">
                 <img
-                    src={getImgUrl(firstImg)}
-                    alt="pedido"
+                    src={firstImg}
+                    alt={first.produto_nome || first.nome || "pedido"}
                     className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
                     onError={(e) => (e.currentTarget.src = FALLBACK_IMG)}
                 />
@@ -71,9 +78,13 @@ export function PedidoCard({ p, onAtender, onRecusar, onDetalhe }: any) {
                         <FileText size={11} />
                     </button>
                 </div>
+                {itens.length > 1 && (
+                    <span className="absolute bottom-2 right-2 bg-white/90 backdrop-blur text-[9px] font-black px-2 py-0.5 rounded-full shadow">
+                        +{itens.length - 1}
+                    </span>
+                )}
             </div>
 
-            {/* padding bottom real aqui */}
             <div className="px-3.5 pt-3 pb-4 flex flex-col flex-1 bg-[#FFFEFB]">
                 <h3 className="font-black text-[13px] leading-[1.15] text-[#1E1E1E] line-clamp-1">
                     {p.cliente_nome || "Cliente"}
@@ -103,10 +114,10 @@ export function PedidoCard({ p, onAtender, onRecusar, onDetalhe }: any) {
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                        <button onClick={() => onRecusar(p)} className="w-[30px] h-[30px] rounded-full bg-red-50 border border-red-100 text-red-600 flex items-center justify-center">
+                        <button onClick={() => onRecusar(p)} className="w-[30px] h-[30px] rounded-full bg-red-50 border border-red-100 text-red-600 flex items-center justify-center hover:bg-red-100 transition-colors">
                             <X size={12} strokeWidth={3} />
                         </button>
-                        <button onClick={() => onAtender(p)} className="h-[30px] px-4 rounded-full bg-black text-white text-[11px] font-black flex items-center gap-1">
+                        <button onClick={() => onAtender(p)} className="h-[30px] px-4 rounded-full bg-black text-white text-[11px] font-black flex items-center gap-1 hover:bg-zinc-800 transition-colors">
                             <Check size={12} /> Atender
                         </button>
                     </div>

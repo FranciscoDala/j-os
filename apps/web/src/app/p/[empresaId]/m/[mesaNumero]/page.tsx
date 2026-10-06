@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef, Suspense, useCallback } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { AlertTriangle, Ban, ShoppingBag, X, Search, QrCode, Clock3, Hourglass } from "lucide-react";
+import { AlertTriangle, Ban, ShoppingBag, X, Search, QrCode, Clock3, Hourglass, Users } from "lucide-react";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const FALLBACK_IMG = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=200";
@@ -33,11 +33,10 @@ function PedirMesaInner() {
     const [query, setQuery] = useState("");
     const [expirado, setExpirado] = useState(false);
 
-    // NOVO: controle de bloqueio
     const [bloqueada, setBloqueada] = useState(false);
     const [clienteBloqueio, setClienteBloqueio] = useState("");
     const [mesaQrToken, setMesaQrToken] = useState(tokenParam);
-    const [mesaLabelState, setMesaLabelState] = useState("");
+    const [mesaData, setMesaData] = useState<any>(null);
 
     const [pos, setPos] = useState({ x: 20, y: 400 });
     const dragging = useRef(false);
@@ -78,26 +77,24 @@ function PedirMesaInner() {
             if (!r.ok) throw new Error(data.detail || "Cardápio não encontrado");
             if (data.mesa && data.mesa.token_valido === false) throw new Error("EXPIRADO");
 
-            // atualiza token se backend gerou novo (primeiro scan mesa LIVRE)
-            if (data.mesa?.qr_token &&!tokenParam) {
-                setMesaQrToken(data.mesa.qr_token);
-            }
+            // pega token que o backend tem (importante pro modo grupo)
             if (data.mesa?.qr_token) {
                 setMesaQrToken(data.mesa.qr_token);
             }
+            setMesaData(data.mesa || null);
 
             setProdutos(data.produtos || []);
             if (!isPolling) {
                 setCats(["All",...(data.categorias || [])]);
             }
 
-            // LOGICA DE BLOQUEIO
-            if (data.mesa?.bloqueada) {
+            if (data.mesa?.bloqueada &&!data.mesa?.venda_atual_id) {
+                // só trava se for primeiro pedido pendente
                 setBloqueada(true);
-                setClienteBloqueio(data.mesa.cliente_bloqueio || "alguém");
+                setClienteBloqueio(data.mesa.cliente_bloqueio || data.mesa.cliente_atual || "alguém");
             } else {
                 setBloqueada(false);
-                setClienteBloqueio("");
+                if (!data.mesa?.ocupada_por_outro) setClienteBloqueio("");
             }
 
             setLoading(false);
@@ -116,14 +113,16 @@ function PedirMesaInner() {
         fetchCardapio(false);
     }, [fetchCardapio]);
 
-    // POLLING quando bloqueada ou quando enviou pedido
     useEffect(() => {
         if (!bloqueada &&!enviado) return;
         const interval = setInterval(() => {
             fetchCardapio(true).then(d => {
-                // se liberou, tira tela de enviado e mostra cardapio
                 if (d &&!d.mesa?.bloqueada && enviado) {
                     setEnviado(false);
+                }
+                if (d && d.mesa?.ocupada_por_outro && d.mesa?.bloqueada === false) {
+                    // liberou pra grupo
+                    setBloqueada(false);
                 }
             });
         }, 4000);
@@ -177,11 +176,7 @@ function PedirMesaInner() {
             const txt = await r.text();
             if (r.status === 410) throw new Error("EXPIRADO");
             if (r.status === 423) {
-                // primeiro pedido pendente - trava
-                try {
-                    const j = JSON.parse(txt);
-                    setErroModal(j.detail);
-                } catch { setErroModal(txt); }
+                try { const j = JSON.parse(txt); setErroModal(j.detail); } catch { setErroModal(txt); }
                 setBloqueada(true);
                 await fetchCardapio(true);
                 return;
@@ -189,7 +184,6 @@ function PedirMesaInner() {
             if (!r.ok) { try { const j = JSON.parse(txt); throw new Error(j.detail || txt); } catch { throw new Error(txt); } }
             setEnviado(true);
             setCart([]);
-            // depois de enviar primeiro, já entra em modo bloqueada até aprovar
             setBloqueada(true);
             await fetchCardapio(true);
         } catch (e:any) {
@@ -214,7 +208,48 @@ function PedirMesaInner() {
         </div>
     );
 
-    // TELA DE BLOQUEIO - AGUARDANDO APROVACAO DO PRIMEIRO PEDIDO
+    // MESA OCUPADA POR OUTRO ANTES DE APROVAR - SUGERE MESAS LIVRES
+    if (mesaData?.ocupada_por_outro) return (
+        <div className="min-h-[100dvh] flex items-center justify-center bg-[#F0F9FF] p-6 text-center">
+            <div className="bg-white rounded-[24px] p-6 shadow-[0_20px_60px_rgba(14,165,233,0.15)] max-w-[360px] w-full border border-white">
+                <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-200">
+                    <Users size={22} className="text-orange-600"/>
+                </div>
+                <h1 className="font-black text-[13px] text-zinc-900 leading-tight">Mesa {mesaLabel} ocupada</h1>
+                <p className="text-[11px] text-zinc-600 mt-2 leading-[1.4]">Essa mesa está com pedido de <b>{mesaData.cliente_atual || clienteBloqueio}</b> aguardando aprovação do garçom.</p>
+                <p className="text-[10px] text-zinc-400 mt-2">Procure outra mesa livre ou aguarde liberar.</p>
+
+                {mesaData.mesas_livres && mesaData.mesas_livres.length > 0 && (
+                    <div className="mt-5 text-left">
+                        <p className="text-[10px] font-black text-zinc-700 mb-2">Mesas livres agora:</p>
+                        <div className="grid grid-cols-3 gap-2">
+                            {mesaData.mesas_livres.map((m:any) => (
+                                <button
+                                    key={m.numero}
+                                    onClick={() => router.push(`/pedir/${empresaId}/${m.numero}`)}
+                                    className="bg-[#F5F7FB] hover:bg-black hover:text-white border border-zinc-100 rounded-xl p-2.5 transition-all active:scale-[0.97]"
+                                >
+                                    <p className="font-black text-[12px]">{m.numero}</p>
+                                    <p className="text-[9px] opacity-70">{m.capacidade}p {m.zona? `• ${m.zona}` : ''}</p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <div className="mt-5 bg-orange-50 border border-orange-100 rounded-xl p-3 flex items-center gap-2.5 text-left">
+                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm">
+                        <Clock3 size={14} className="text-orange-600"/>
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-[11px] font-bold text-zinc-800">Dica</p>
+                        <p className="text-[10px] text-zinc-500">Se você é do mesmo grupo, aguarde o garçom aprovar que todos poderão pedir junto</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
     if (bloqueada) return (
         <div className="min-h-[100dvh] flex items-center justify-center bg-[#F0F9FF] p-6 text-center">
             <div className="bg-white rounded-[24px] p-6 shadow-[0_20px_60px_rgba(14,165,233,0.15)] max-w-[340px] w-full border border-white">
@@ -223,7 +258,7 @@ function PedirMesaInner() {
                 </div>
                 <h1 className="font-black text-[13px] text-zinc-900 leading-tight">Pedido em análise</h1>
                 <p className="text-[11px] text-zinc-600 mt-2 leading-[1.4]">Mesa <b>{mesaLabel}</b> aguardando garçom aprovar o pedido de <b>{clienteBloqueio || nome || "você"}</b>.</p>
-                <p className="text-[10px] text-zinc-400 mt-2">Aguarde o seu pedido ser aprovado para fazer outros pedidos.</p>
+                <p className="text-[10px] text-zinc-400 mt-2">Depois que aprovar, você e seus amigos poderão mandar vários pedidos juntos na mesma conta.</p>
                 <div className="mt-5 bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-center gap-2.5 text-left">
                     <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm">
                         <Clock3 size={14} className="text-amber-600"/>
@@ -234,7 +269,7 @@ function PedirMesaInner() {
                     </div>
                     <div className="w-5 h-5 border-2 border-amber-300 border-t-amber-600 rounded-full animate-spin"></div>
                 </div>
-                <p className="text-[9px] text-zinc-400 mt-4">Seu token: { (mesaQrToken || tokenParam || "").slice(0,8) }... válido para esta ocupação</p>
+                <p className="text-[9px] text-zinc-400 mt-4">Token: { (mesaQrToken || tokenParam || "").slice(0,8) }... válido para esta ocupação</p>
             </div>
         </div>
     );
@@ -255,13 +290,13 @@ function PedirMesaInner() {
     return (
         <div className="h-[100dvh] flex flex-col bg-[#F5F7FB] overflow-hidden">
             <style>{`
-        .hide-scrollbar::-webkit-scrollbar{display:none}
-        .hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+       .hide-scrollbar::-webkit-scrollbar{display:none}
+       .hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
           input, textarea, select {
             font-size: 16px!important;
             -webkit-text-size-adjust: 100%;
           }
-        .input-visual {
+       .input-visual {
             font-size: 11px!important;
           }
           @supports (-webkit-touch-callout: none) {
@@ -275,7 +310,7 @@ function PedirMesaInner() {
             <div className="bg-white border-b shrink-0 z-20">
                 <div className="p-3 pb-2">
                     <div className="flex items-center justify-between">
-                        <h1 className="font-black text-[12px]">MESA {mesaLabel}</h1>
+                        <h1 className="font-black text-[12px]">MESA {mesaLabel} {mesaData?.venda_atual_id? <span className="bg-emerald-100 text-emerald-700 text-[8px] px-2 py-0.5 rounded-full ml-1">ABERTA • GRUPO</span> : null}</h1>
                         <span className="bg-black text-white text-[8px] font-bold px-2.5 py-1 rounded-full">QR • PEDIDO NA MESA</span>
                     </div>
                     <div className="mt-2.5 flex gap-2 overflow-x-auto hide-scrollbar snap-x snap-mandatory">
