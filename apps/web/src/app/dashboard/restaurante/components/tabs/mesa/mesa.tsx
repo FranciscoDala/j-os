@@ -1,148 +1,119 @@
 "use client";
-import { Users, Clock, Receipt, MapPin, Ban } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Plus, QrCode } from "lucide-react";
+import { toast } from "sonner";
+import { useDashboard } from "@/components/dashboard/Tamplate";
+import { useGlobalSearch } from "@/hooks/useGlobalSearch";
+import { MesaCard } from "./cards/mesa";
+import { MesaModal } from "./modals/criar";
+import { MesaOcuparModal } from "./modals/ocupar";
+import { MesaComandaModal } from "./modals/comanda";
+import { CustomSelect } from "./cards/custom";
+import { QrMesaPrint } from "../../../../../../components/mesas/QrMesaPrint";
 
-const statusConfig: any = {
-  LIVRE: {
-    topBg: "bg-[#D6F0D6] from-[#E8F8E9] to-[#C8E6C9]",
-    badge: "bg-[#2E7D32] text-white",
-    price: "text-[#2E7D32]",
-    border: "border-[#C8E6C9]",
-    cardBg: "bg-[#F8FFF8]",
-    label: "LIVRE",
-  },
-  OCUPADA: {
-    topBg: "bg-[#FFEAA6] from-[#FFF3C0] to-[#FFD86A]",
-    badge: "bg-[#C62828] text-white",
-    price: "text-[#EBA500]",
-    border: "border-amber-200",
-    cardBg: "bg-[#FFFEFB]",
-    label: "OCUPADA",
-  },
-  RESERVADA: {
-    topBg: "bg-[#F5E6D3] from-[#FFF8F0] to-[#E8DCCF]",
-    badge: "bg-[#A67C52] text-white",
-    price: "text-[#A67C52]",
-    border: "border-[#E8DCCF]",
-    cardBg: "bg-[#FFFBF5]",
-    label: "RESERVADA",
-  },
-  SUJA: {
-    topBg: "bg-[#EEEEEE] from-[#F5F5F5] to-[#E0E0E0]",
-    badge: "bg-zinc-500 text-white",
-    price: "text-zinc-500",
-    border: "border-zinc-200",
-    cardBg: "bg-[#FAFAFA]",
-    label: "SUJA",
-  },
-};
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
+const STATUS_OPTS = ["", "LIVRE", "OCUPADA", "RESERVADA", "SUJA"] as const;
+const STATUS_LABELS: Record<string, string> = { "": "Todos status", LIVRE: "Livre", OCUPADA: "Ocupada", RESERVADA: "Reservada", SUJA: "Suja" };
 
-export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalhe }: any) {
-  const cfg = statusConfig[m.status] || statusConfig.LIVRE;
-  const min = m.aberta_em? Math.floor((Date.now() - new Date(m.aberta_em).getTime()) / 60000) : 0;
-  const total = Number(m.venda_total || m.total_consumo || 0);
-  const hasConsumo = total > 0;
+function getAuthHeaders() { const t = typeof window!== "undefined"? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null; const e = typeof window!== "undefined"? (localStorage.getItem("empresa_id") || localStorage.getItem("empresaId")) : null; const h: any = {}; if (t) h["Authorization"] = `Bearer ${t}`; if (e) h["X-Empresa-ID"] = e; return h; }
+function getEmpresaId() { return typeof window!== "undefined"? (localStorage.getItem("empresa_id") || localStorage.getItem("empresaId")) : null; }
 
-  return (
-    <div className={`group relative w-full h-[272px] rounded-[22px] overflow-hidden border shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 flex flex-col ${cfg.cardBg} ${cfg.border}`}>
+export function MesasTab() {
+    const { role } = useDashboard();
+    const { search: globalSearch } = useGlobalSearch();
+    const canManage = ["dono", "gerente", "gerente_restaurante", "admin", "owner"].includes((role || "").toLowerCase());
+    const [mesas, setMesas] = useState<any[]>([]); const [zonas, setZonas] = useState<string[]>([]); const [zona, setZona] = useState(""); const [status, setStatus] = useState("");
+    const [empresaId, setEmpresaId] = useState<string | null>(null); const [loading, setLoading] = useState(true);
+    const [showNew, setShowNew] = useState(false); const [numero, setNumero] = useState(""); const [capacidade, setCapacidade] = useState(4); const [zonaNew, setZonaNew] = useState("Salão"); const [saving, setSaving] = useState(false);
+    const [mesaAlvo, setMesaAlvo] = useState<any>(null); const [showOcupar, setShowOcupar] = useState(false); const [showComanda, setShowComanda] = useState(false);
+    const [showQr, setShowQr] = useState(false);
 
-      <div className={`relative w-full h-[138px] bg-gradient-to-br ${cfg.topBg} flex items-center justify-center overflow-hidden shrink-0`}>
-        <div className="flex flex-col items-center">
-          <span className="text-[44px] font-black tracking-tight text-[#1A1A1A] leading-none">{m.numero}</span>
-          <span className="mt-1 text-[11px] font-black tracking-widest opacity-60">MESA</span>
-          <div className="mt-2 flex items-center gap-1.5">
-            <span className="flex items-center gap-1 text-[10px] font-bold bg-white/80 backdrop-blur px-2 py-0.5 rounded-full">
-              <MapPin size={10} />{m.zona || "Salão"}
-            </span>
-            <span className="flex items-center gap-1 text-[10px] font-bold bg-white/80 backdrop-blur px-2 py-0.5 rounded-full">
-              <Users size={10} />{m.capacidade}
-            </span>
-          </div>
-        </div>
-        <span className={`absolute top-2.5 left-2.5 text-[8px] font-black px-2.5 py-1 rounded-full tracking-widest shadow-sm ${cfg.badge}`}>
-          {cfg.label}
-        </span>
-        {m.status === "OCUPADA" && (
-          <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-[#C62828] rounded-full animate-pulse border-2 border-white shadow" />
-        )}
-      </div>
+    useEffect(() => { setEmpresaId(getEmpresaId()); }, []);
+    const load = useCallback(async () => {
+        if (!empresaId) return; setLoading(true);
+        try {
+            const p = new URLSearchParams();
+            if (zona) p.append("zona", zona);
+            if (status) p.append("status", status);
+            if (globalSearch) p.append("search", globalSearch);
+            const res = await fetch(`${API_BASE}/mesas/${empresaId}?${p.toString()}`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, cache: "no-store" });
+            if (res.ok) setMesas(await res.json());
+        } finally { setLoading(false); }
+    }, [empresaId, zona, status, globalSearch]);
 
-      <div className="px-3.5 py-3 flex flex-col flex-1 overflow-hidden">
-        <h3 className="font-black text-[13px] leading-[1.1] text-[#1E1E1E] shrink-0">MESA {m.numero}</h3>
+    const loadZonas = useCallback(async () => { if (!empresaId) return; const r = await fetch(`${API_BASE}/mesas/${empresaId}/zonas`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any }); if (r.ok) setZonas(await r.json()); }, [empresaId]);
+    useEffect(() => { if (empresaId) { load(); loadZonas(); } }, [load, loadZonas]);
+    useEffect(() => { const t = setTimeout(load, 350); return () => clearTimeout(t); }, [globalSearch]);
 
-        <div className="mt-1.5 flex items-center gap-1 flex-wrap min-h-[18px] shrink-0">
-          {m.status === "OCUPADA"? (
-            <>
-              <span className="text-[9px] font-bold text-[#8A8A8A] bg-[#F5F0E9] px-2 py-0.5 rounded-full flex items-center gap-1">
-                <Clock size={10} />{min} min
-              </span>
-              <span className="text-[9px] font-bold text-[#8A8A8A] bg-[#F5F0E9] px-2 py-0.5 rounded-full">
-                {m.pessoas_atual || 1}p • {m.garcom_nome?.split(" ")[0] || "Garçom"}
-              </span>
-            </>
-          ) : m.status === "LIVRE"? (
-            <span className="text-[9px] font-bold text-[#8A8A8A] bg-[#F5F0E9] px-2 py-0.5 rounded-full">
-              Pronta • {m.capacidade} lugares
-            </span>
-          ) : m.status === "SUJA"? (
-            <span className="text-[9px] font-bold text-[#8A8A8A] bg-zinc-100 px-2 py-0.5 rounded-full">
-              Aguardando limpeza
-            </span>
-          ) : (
-            <span className="text-[9px] font-bold text-[#8C6A45] bg-[#A67C52]/15 px-2 py-0.5 rounded-full">
-              Reservada • {m.reserva_nome || "Cliente"}
-            </span>
-          )}
-        </div>
+    const criarMesa = async () => {
+        if (!numero.trim()) return toast.error("Número obrigatório");
+        if (!empresaId) return; setSaving(true);
+        try {
+            const res = await fetch(`${API_BASE}/mesas/${empresaId}`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, body: JSON.stringify({ numero: numero.trim().toUpperCase(), capacidade: Number(capacidade), zona: zonaNew }) });
+            const j = await res.json().catch(() => ({})); if (!res.ok) throw new Error(j.detail || "Erro");
+            toast.success(`Mesa ${j.numero} criada`); setShowNew(false); setNumero(""); load(); loadZonas();
+            window.dispatchEvent(new CustomEvent("mesa:update"));
+        } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+    };
 
-        <div className="mt-2 min-h-[26px] flex-1">
-          <p className="text-[10px] leading-[1.3] text-[#7A7A7A] line-clamp-2">
-            {m.status === "OCUPADA"
-             ? hasConsumo
-               ? `${total.toLocaleString("de-DE")} Kz em consumo`
-                : "Sem consumo ainda"
-              : `${m.zona || "Salão principal"} • ${m.capacidade} pessoas`}
-          </p>
-        </div>
+    const handleOcupar = async (pessoas: number) => {
+        if (!mesaAlvo ||!empresaId) return; setSaving(true);
+        try {
+            const res = await fetch(`${API_BASE}/mesas/${empresaId}/${mesaAlvo.id}/ocupar`, {
+                method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() } as any,
+                body: JSON.stringify({ pessoas })
+            });
+            const j = await res.json().catch(() => ({})); if (!res.ok) throw new Error(j.detail || "Erro ao ocupar");
+            setMesas(prev => prev.map(m => m.id === j.id? {...m, status: "OCUPADA", pessoas_atual: pessoas, aberta_em: new Date().toISOString() } : m));
+            toast.success(`Mesa ${j.numero} ocupada`); setShowOcupar(false); setMesaAlvo(null);
+            window.dispatchEvent(new CustomEvent("mesa:update"));
+            setTimeout(load, 300);
+        } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+    };
 
-        <div className="mt-auto flex items-end justify-between gap-2 shrink-0 pt-3">
-          <div className="leading-none">
-            <div className="w-4 h-0.5 bg-[#FFC91A] rounded-full mb-1" />
-            <p className={`text-[15px] font-black tracking-tight ${cfg.price}`}>
-              {hasConsumo? `${total.toLocaleString("de-DE")}` : "—"}
-              {hasConsumo && <span className="text-[10px]">Kz</span>}
-            </p>
-            <p className="text-[9px] font-bold text-[#9A9A9A] mt-1">
-              + {hasConsumo? "Consumo" : cfg.label}
-            </p>
-          </div>
+    const handleLimpar = async (m: any) => { try { const res = await fetch(`${API_BASE}/mesas/${empresaId}/${m.id}/limpar`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() } as any }); if (!res.ok) throw new Error("Erro"); toast.success("Mesa limpa"); setMesas(prev => prev.map(x => x.id === m.id? {...x, status: "LIVRE" } : x)); window.dispatchEvent(new CustomEvent("mesa:update")); load(); } catch (e: any) { toast.error(e.message); } };
+    const handleLiberar = async (m: any) => { try { const res = await fetch(`${API_BASE}/mesas/${empresaId}/${m.id}/liberar?limpar=true`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() } as any }); if (!res.ok) throw new Error("Erro"); toast.success("Mesa liberada"); setMesas(prev => prev.map(x => x.id === m.id? {...x, status: "LIVRE", venda_atual_id: null } : x)); window.dispatchEvent(new CustomEvent("mesa:update")); load(); } catch (e: any) { toast.error(e.message); } };
 
-          {m.status === "LIVRE" && (
-            <button onClick={() => onOcupar(m)} className="h-[30px] px-4 rounded-full bg-[#FFC91A] hover:bg-[#FFB800] text-black text-[11px] font-black shadow-sm shrink-0">
-              Ocupar
-            </button>
-          )}
-          {m.status === "OCUPADA" && hasConsumo && (
-            <button onClick={() => onComanda(m)} className="h-[30px] px-3.5 rounded-full bg-black text-white text-[10px] font-black flex items-center gap-1 hover:bg-zinc-800 shrink-0">
-              <Receipt size={11} /> Fechar
-            </button>
-          )}
-          {m.status === "OCUPADA" &&!hasConsumo && (
-            <button onClick={() => onComanda(m)} className="h-[30px] px-4 rounded-full bg-[#FFC91A] hover:bg-[#FFB800] text-black text-[11px] font-black shrink-0">
-              Comanda
-            </button>
-          )}
-          {m.status === "SUJA" && (
-            <button onClick={() => onLimpar(m)} className="h-[30px] px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black shrink-0">
-              Limpar
-            </button>
-          )}
-          {m.status === "RESERVADA" && (
-            <button onClick={() => onOcupar(m)} className="h-[30px] px-4 rounded-full bg-[#A67C52] hover:bg-[#8C6A45] text-white text-[10px] font-black shrink-0">
-              Check-in
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+    if (!empresaId) return <div className="p-6 text-[12px] font-bold opacity-60">Carregando empresa...</div>;
+
+    return (
+        <>
+            <div className="w-full space-y-4 relative">
+                <div className="w-full flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="w-[200px]"><CustomSelect value={zona} onChange={setZona} options={["",...zonas]} labelMap={{ "": "Todas zonas",...Object.fromEntries(zonas.map(z => [z, z])) }} /></div>
+                        <div className="w-[200px]"><CustomSelect value={status} onChange={setStatus} options={[...STATUS_OPTS]} labelMap={STATUS_LABELS} /></div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button onClick={() => setShowQr(true)} className="w-10 h-10 bg-white border border-black/10 text-black rounded-full flex items-center justify-center shadow-sm hover:bg-black hover:text-white active:scale-95 transition-all" title="Imprimir QRs">
+                            <QrCode size={18} />
+                        </button>
+                        {canManage && <button onClick={() => setShowNew(true)} className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-md hover:bg-zinc-800 active:scale-95 transition-all"><Plus size={18} strokeWidth={3} /></button>}
+                    </div>
+                </div>
+                {loading? <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">{[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => <div key={i} className="h-[272px] rounded-[22px] bg-zinc-100 animate-pulse" />)}</div> :
+                    <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                        {mesas.length === 0? <div className="col-span-full py-16 text-center border border-dashed border-[#E8DCCF] rounded-[22px]"><div className="text-[13px] font-black">Nenhuma mesa encontrada {globalSearch && `para "${globalSearch}"`}</div><div className="text-[11px] opacity-60 font-bold mt-1">Crie a primeira mesa ou limpe os filtros</div></div> : mesas.map(m => (
+                            <MesaCard key={m.id} m={m} onOcupar={(mm: any) => { setMesaAlvo(mm); setShowOcupar(true); }} onComanda={(mm: any) => { setMesaAlvo(mm); setShowComanda(true); }} onLimpar={handleLimpar} onLiberar={handleLiberar} onDetalhe={(mm: any) => { setMesaAlvo(mm); setShowComanda(true); }} />
+                        ))}
+                    </div>
+                }
+            </div>
+            <MesaModal open={showNew} onClose={() => setShowNew(false)} numero={numero} setNumero={setNumero} capacidade={capacidade} setCapacidade={setCapacidade} zonaNew={zonaNew} setZonaNew={setZonaNew} onCreate={criarMesa} saving={saving} />
+            <MesaOcuparModal open={showOcupar} mesa={mesaAlvo} onClose={() => { setShowOcupar(false); setMesaAlvo(null); }} onConfirm={handleOcupar} saving={saving} />
+            <MesaComandaModal open={showComanda} mesa={mesaAlvo} onClose={() => { setShowComanda(false); setMesaAlvo(null); }} />
+
+            {showQr && (
+                <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[24px] max-w-[800px] w-full max-h-[90vh] overflow-auto p-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="font-black text-[16px]">QR Codes - Mesas</h2>
+                            <button onClick={() => setShowQr(false)} className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center">✕</button>
+                        </div>
+                        <QrMesaPrint empresaId={empresaId} mesas={mesas} dominio={typeof window!== "undefined"? window.location.origin : ""} />
+                    </div>
+                </div>
+            )}
+        </>
+    );
 }
