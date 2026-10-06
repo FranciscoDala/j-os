@@ -29,10 +29,10 @@ function timeAgo(iso: string) {
 
     // até 6h mostra hora + min: há 1h 22min
     if (h < 6) {
-        if (m === 0) return h === 1 ? "-" : `há ${h}h`;
+        if (m === 0) return h === 1 ? "há 1h" : `há ${h}h`;
         return `há ${h}h ${m}min`;
     }
-    if (h < 24) return h === 1 ? "-" : `há ${h}h`;
+    if (h < 24) return h === 1 ? "há 1h" : `há ${h}h`;
 
     if (d === 1) return "ontem";
     if (d < 7) return `há ${d}d`;

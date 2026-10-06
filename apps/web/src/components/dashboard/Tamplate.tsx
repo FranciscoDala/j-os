@@ -96,7 +96,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                                 <h1 className="text-[16px] md:text-[20px] font-[900] text-[#1E1E1E] leading-[0.9] tracking-[-0.02em] capitalize">
                                     {headerTitle}
                                 </h1>
-                                <p className="text-[12px] md:text-[13px] text-[#8A8A8A] mt-2 font-medium">
+                                <p className="text-[12px] md:text-[13px] text-[#8A8A8A] mt-1 font-medium">
                                     {headerDesc}
                                 </p>
                             </div>
