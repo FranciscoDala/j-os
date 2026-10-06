@@ -38,33 +38,28 @@ export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, s
                 </>
             ) : (
                 <>
-                    {/* CATEGORIAS ESQUERDA - UM POUCO MAIORES + BUSCA DIREITA MAIOR */}
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                        <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden flex-1 min-w-0">
+                    {/* CATEGORIAS - UNICA LINHA, 100% RESPONSIVA, SEM DUPLICACAO */}
+                    <div className="flex items-center gap-2 mb-3 w-full">
+                        <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex-1 min-w-0">
                             {cats.map(c => (
-                                <button key={c} onClick={() => setActiveCat(c)} className={`whitespace-nowrap px-3.5 h-8 rounded-full text-[11px] border font-bold leading-none transition-all ${activeCat === c? "bg-black text-white border-black shadow-sm" : "bg-white text-zinc-700 border-[#E8DCCF] hover:border-black"}`}>{c}</button>
+                                <button key={c} onClick={() => setActiveCat(c)} className={`whitespace-nowrap shrink-0 px-3.5 h-8 rounded-full text-[11px] border font-bold leading-none transition-all ${activeCat === c? "bg-black text-white border-black shadow-sm" : "bg-white text-zinc-700 border-[#E8DCCF] hover:border-black"}`}>{c}</button>
                             ))}
-                            <button className="w-8 h-8 rounded-full bg-white border border-[#E8DCCF] flex items-center justify-center shrink-0"><SlidersHorizontal size={12} /></button>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                        <div className="flex items-center gap-2 shrink-0">
                             {pedidoQrAtivo && mostrarCatalogoExtra && (
-                                <button onClick={()=>setMostrarCatalogoExtra?.(false)} className="h-8 px-3 rounded-full bg-zinc-100 text-[11px] font-bold">Voltar</button>
+                                <button onClick={()=>setMostrarCatalogoExtra?.(false)} className="h-8 px-3 rounded-full bg-zinc-100 text-[11px] font-bold shrink-0">Voltar</button>
                             )}
                             {!showSearch? (
-                                <button onClick={handleOpenSearch} className="w-9 h-9 bg-white border border-[#E8DCCF] rounded-full flex items-center justify-center shadow-sm hover:border-black transition-all"><Search size={14} className="text-zinc-600" /></button>
+                                <button onClick={handleOpenSearch} className="w-8 h-8 bg-white border border-[#E8DCCF] rounded-full flex items-center justify-center shadow-sm hover:border-black transition-all shrink-0"><Search size={14} className="text-zinc-600" /></button>
                             ) : (
-                                <div className="relative w-[380px] max-w-[42vw]">
+                                <div className="relative w-[200px] sm:w-[260px] lg:w-[320px]">
                                     <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-                                    <input ref={searchRef} value={searchV} onChange={e => setSearchV(e.target.value)} placeholder="Buscar produto..." autoFocus className="w-full h-9 bg-white rounded-full pl-10 pr-9 text-[12px] font-bold outline-none border border-black shadow-sm focus:ring-2 focus:ring-black/10" />
-                                    <button onClick={() => { setSearchV(""); setShowSearch(false); }} className="absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 bg-zinc-100 hover:bg-black hover:text-white rounded-full flex items-center justify-center transition-colors"><X size={12} /></button>
+                                    <input ref={searchRef} value={searchV} onChange={e => setSearchV(e.target.value)} placeholder="Buscar..." autoFocus className="w-full h-8 bg-white rounded-full pl-9 pr-8 text-[11px] font-bold outline-none border border-black shadow-sm focus:ring-2 focus:ring-black/10" />
+                                    <button onClick={() => { setSearchV(""); setShowSearch(false); }} className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 bg-zinc-100 hover:bg-black hover:text-white rounded-full flex items-center justify-center transition-colors"><X size={12} /></button>
                                 </div>
                             )}
                         </div>
-                    </div>
-
-                    <div className="md:hidden flex items-center gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        {cats.map(c => <button key={c} onClick={() => setActiveCat(c)} className={`whitespace-nowrap px-3 h-8 rounded-full text-[11px] border font-bold shrink-0 ${activeCat === c? "bg-black text-white border-black" : "bg-white border-[#E8DCCF]"}`}>{c}</button>)}
                     </div>
 
                     {pedidoQrAtivo && mostrarCatalogoExtra && (

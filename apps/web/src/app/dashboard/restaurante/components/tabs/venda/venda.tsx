@@ -121,7 +121,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
     const cats = ["All",...catsDb];
     const getStockState = (p: any) => { if (!p.controlar_stock) return "ok"; const atual = Number(p.stock_atual?? 0); if (atual <= 0) return "zero"; if (atual <= 5) return "low"; return "ok"; };
-
     const add = (p: any) => {
         const state = getStockState(p);
         if (state === "zero") { pushToast(`Sem stock: "${p.nome}"`, "error"); return; }
@@ -129,12 +128,10 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         if (ex) setCart(cart.map((c) => (c.id === p.id? {...c, qtd: c.qtd + 1 } : c)));
         else setCart([...cart, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: p.imagem_url? `${API_URL}${p.imagem_url}` : "", qtd: 1, origem: pedidoQrAtivo? "extra" : "balcao" }]);
     };
-
     const removerDoCarrinho = (id: string) => {
         setCart(prev => prev.filter((c: any) => c.id!== id));
         pushToast("Item removido", "info");
     };
-
     const getQty = (id: string) => cart.find((c) => c.id === id)?.qtd || 0;
     const total = cart.reduce((s, i) => s + i.price * i.qtd, 0);
     const recebidoNum = recebido? parseFloat(recebido) : 0;
@@ -208,18 +205,20 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     return (
         <div className="h-full w-full flex flex-col bg-[#EDEBE6] overflow-hidden relative" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
             <Toasts toasts={toasts} setToasts={setToasts} />
-            <div className="h-[56px] px-4 flex items-center justify-between shrink-0 border-b-[1px] border-[#026135a0] bg-[#EDEBE6]">
+            {/* HEADER PADRAO */}
+            <div className="h-[56px] px-4 flex items-center justify-between shrink-0 border-b border-[#026135a0] bg-[#EDEBE6]">
                 <h1 className="text-[20px] font-black tracking-tight text-black leading-none">
                     {mesaSelecionada? `Mesa ${mesaSelecionada.numero}` : "Balcão"}
                 </h1>
                 <button onClick={onClose} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center shadow-sm active:scale-[0.96]"><X size={14} /></button>
             </div>
 
-            <div className="flex-1 flex flex-col lg:flex-row gap-[14px] p-[14px] pt-3 overflow-hidden min-h-0">
+            {/* CONTEUDO - AGORA SO PX-4 PADRAO, SEM P-[14px] */}
+            <div className="flex-1 flex flex-col lg:flex-row gap-4 px-4 pb-4 pt-3 overflow-hidden min-h-0">
                 <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                     <ProdutosSection dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd} cats={cats} activeCat={activeCat} setActiveCat={setActiveCat} searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef} getQty={getQty} getStockState={getStockState} add={add} modoMesa={false} mesasOcupadas={[]} loadingMesas={false} mesaSelecionada={null} onSelectMesa={()=>{}} fetchMesas={()=>{}} cart={cart} cartTotal={total} onFecharMesa={()=>{}} onImprimirConta={()=>{}} pedidoQrAtivo={pedidoQrAtivo} mostrarCatalogoExtra={mostrarCatalogoExtra} setMostrarCatalogoExtra={setMostrarCatalogoExtra} />
                 </div>
-                <div className="lg:w-[340px] shrink-0 overflow-hidden bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex flex-col">
+                <div className="w-full lg:w-[340px] shrink-0 overflow-hidden bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex flex-col h-[42dvh] lg:h-full">
                     <CarrinhoSection
                         cart={cart}
                         total={total}

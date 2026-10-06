@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 
-// MODAL BRABA - travada (não fecha fora)
 function RemoveItemModal({ item, onClose, onConfirm }: { item: any, onClose: () => void, onConfirm: () => void }) {
     if (!item) return null;
     return (
@@ -37,28 +36,18 @@ function FormaSelect({ value, onChange, disabled }: { value: string, onChange: (
         { id: "tpa", label: "TPA", icon: "💳" },
     ];
     const atual = ops.find(o => o.id === value) || ops[0];
-
     return (
         <div className="relative flex-1">
-            <button
-                disabled={disabled}
-                onClick={() =>!disabled && setOpen(!open)}
-                className="w-full bg-[#F5F7FB] border border-black/5 rounded-full px-4 py-3 text-[12px] font-bold flex items-center justify-between gap-2 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
-            >
+            <button disabled={disabled} onClick={() =>!disabled && setOpen(!open)} className="w-full bg-[#F5F7FB] border border-black/5 rounded-full px-4 py-3 text-[12px] font-bold flex items-center justify-between gap-2 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition-all">
                 <span className="flex items-center gap-2"><span>{atual.icon}</span>{atual.label}</span>
                 <span className={`text-[10px] transition-transform ${open? "rotate-180" : ""}`}>▼</span>
             </button>
-
             {open && (
                 <>
                     <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
-                    <div className="absolute bottom-[calc(100%+8px)] left-0 right-0 z-30 bg-white border border-black/10 rounded-[16px] shadow-[0_12px_32px_rgba(0,0,0,0.12)] p-1.5 overflow-hidden animate-in fade-in slide-in-from-bottom-1">
+                    <div className="absolute bottom-[calc(100%+8px)] left-0 right-0 z-30 bg-white border border-black/10 rounded-[16px] shadow-[0_12px_32px_rgba(0,0,0,0.12)] p-1.5 overflow-hidden">
                         {ops.map(op => (
-                            <button
-                                key={op.id}
-                                onClick={() => { onChange(op.id); setOpen(false); }}
-                                className={`w-full text-left px-4 py-2.5 rounded-full text-[12px] font-bold flex items-center gap-2 transition-colors ${value === op.id? "bg-black text-white" : "hover:bg-black/[0.06] text-black"}`}
-                            >
+                            <button key={op.id} onClick={() => { onChange(op.id); setOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full text-[12px] font-bold flex items-center gap-2 transition-colors ${value === op.id? "bg-black text-white" : "hover:bg-black/[0.06] text-black"}`}>
                                 <span>{op.icon}</span>{op.label}
                             </button>
                         ))}
@@ -74,10 +63,9 @@ export function CarrinhoSection({ cart, total, mesaSelecionada, onAddMesa, onLim
     const isQr =!!pedidoQrAtivo;
     const [itemParaRemover, setItemParaRemover] = useState<any>(null);
     const temItens = cart.length > 0;
-
     return (
         <>
-            <div className="w-full lg:w-[340px] bg-white flex flex-col h-[42dvh] lg:h-full shrink-0 overflow-hidden">
+            <div className="w-full h-full bg-white flex flex-col overflow-hidden">
                 <div className="p-3 flex justify-between items-start border-b shrink-0 bg-white">
                     <div>
                         <p className="font-black text-[13px]">{isMesa? "Cliente" : "Seu pedido"}</p>
@@ -85,7 +73,6 @@ export function CarrinhoSection({ cart, total, mesaSelecionada, onAddMesa, onLim
                     </div>
                     <span className="text-[11px] bg-black text-white px-3 py-1 rounded-full">{cart.length}</span>
                 </div>
-
                 <div className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden bg-white">
                     {cart.length > 0 && (
                         <div className="flex text-[10px] tracking-widest text-zinc-500 px-2 py-2 border-b border-black/10 sticky top-0 bg-white z-10">
@@ -97,12 +84,7 @@ export function CarrinhoSection({ cart, total, mesaSelecionada, onAddMesa, onLim
                     )}
                     {cart.length === 0 && <p className="text-center text-[12px] text-gray-400 mt-10 whitespace-pre-line">{isMesa? "Adicione produtos\npara somar na mesa" : "Dê 2 cliques no produto"}</p>}
                     {cart.map((i: any, idx: number) => (
-                        <div
-                            key={i.id}
-                            onDoubleClick={() => setItemParaRemover(i)}
-                            title="Duplo clique para remover"
-                            className="flex items-start px-2 py-2.5 border-b border-dashed border-black/10 text-[13px] leading-[16px] cursor-pointer hover:bg-black/[0.04] transition-colors select-none"
-                        >
+                        <div key={i.id} onDoubleClick={() => setItemParaRemover(i)} title="Duplo clique para remover" className="flex items-start px-2 py-2.5 border-b border-dashed border-black/10 text-[13px] leading-[16px] cursor-pointer hover:bg-black/[0.04] transition-colors select-none">
                             <span className="w-[28px] shrink-0">{idx + 1}</span>
                             <span className="flex-1 pr-2 break-words whitespace-normal">{i.name}</span>
                             <span className="w-[36px] shrink-0 text-center">{i.qtd}</span>
@@ -110,7 +92,6 @@ export function CarrinhoSection({ cart, total, mesaSelecionada, onAddMesa, onLim
                         </div>
                     ))}
                 </div>
-
                 <div className="shrink-0 p-3 border-t bg-white mt-auto">
                     <div className="flex justify-between items-center px-1 pb-2">
                         <span className="text-[13px]">Kz</span>
@@ -124,27 +105,13 @@ export function CarrinhoSection({ cart, total, mesaSelecionada, onAddMesa, onLim
                     ) : (
                         <div className="flex gap-2">
                             <FormaSelect value={forma} onChange={setForma} disabled={!temItens} />
-                            <button
-                                disabled={!temItens}
-                                onClick={() => { setRecebido(""); setShowPay(true); }}
-                                className="flex-1 bg-[#2F4A8A] text-white rounded-full py-3 text-[12px] font-bold active:scale-[0.97] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed"
-                            >
-                                Finalizar
-                            </button>
+                            <button disabled={!temItens} onClick={() => { setRecebido(""); setShowPay(true); }} className="flex-1 bg-[#2F4A8A] text-white rounded-full py-3 text-[12px] font-bold active:scale-[0.97] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed">Finalizar</button>
                         </div>
                     )}
                 </div>
             </div>
-
             {itemParaRemover && (
-                <RemoveItemModal
-                    item={itemParaRemover}
-                    onClose={() => setItemParaRemover(null)}
-                    onConfirm={() => {
-                        onRemoveItem(itemParaRemover.id);
-                        setItemParaRemover(null);
-                    }}
-                />
+                <RemoveItemModal item={itemParaRemover} onClose={() => setItemParaRemover(null)} onConfirm={() => { onRemoveItem(itemParaRemover.id); setItemParaRemover(null); }} />
             )}
         </>
     );
