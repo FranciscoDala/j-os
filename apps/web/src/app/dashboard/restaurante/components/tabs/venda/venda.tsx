@@ -204,15 +204,15 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     return (
         <div className="h-full w-full flex flex-col bg-[#EDEBE6] overflow-hidden relative" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
             <Toasts toasts={toasts} setToasts={setToasts} />
-            <div className="h-[52px] px-4 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2">
-                    {mesaSelecionada? (<div className="bg-white rounded-full px-4 h-9 flex items-center text-[11px] font-bold shadow-[0_1px_6px_rgba(0,0,0,0.05)]">Mesa {mesaSelecionada.numero} {pedidoQrAtivo? `• ${pedidoQrAtivo.cliente_nome||''}` : ''}</div>) : (<div className="bg-white rounded-full px-4 h-9 flex items-center text-[11px] font-bold shadow-[0_1px_6px_rgba(0,0,0,0.05)]">Venda Balcão</div>)}
-                </div>
+            {/* HEADER COM BORDER BOTTOM VERDE ESCURO E TITULO 20PX */}
+            <div className="h-[56px] px-4 flex items-center justify-between shrink-0 border-b-[2px] border-[#0F2D1F] bg-[#EDEBE6]">
+                <h1 className="text-[20px] font-black tracking-tight text-black leading-none">
+                    {mesaSelecionada? `Mesa ${mesaSelecionada.numero}` : "Balcão"}
+                </h1>
                 <button onClick={onClose} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center shadow-sm active:scale-[0.96]"><X size={14} /></button>
             </div>
 
-            <div className="flex-1 flex flex-col lg:flex-row gap-[14px] p-[14px] pt-0 overflow-hidden min-h-0">
-                {/* SEM BG E SEM PADDING - LIVRE */}
+            <div className="flex-1 flex flex-col lg:flex-row gap-[14px] p-[14px] pt-3 overflow-hidden min-h-0">
                 <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                     <ProdutosSection dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd} cats={cats} activeCat={activeCat} setActiveCat={setActiveCat} searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef} getQty={getQty} getStockState={getStockState} add={add} modoMesa={false} mesasOcupadas={[]} loadingMesas={false} mesaSelecionada={null} onSelectMesa={()=>{}} fetchMesas={()=>{}} cart={cart} cartTotal={total} onFecharMesa={()=>{}} onImprimirConta={()=>{}} pedidoQrAtivo={pedidoQrAtivo} mostrarCatalogoExtra={mostrarCatalogoExtra} setMostrarCatalogoExtra={setMostrarCatalogoExtra} />
                 </div>
