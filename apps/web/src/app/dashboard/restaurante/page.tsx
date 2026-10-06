@@ -15,5 +15,5 @@ export default function RestaurantePage() {
     if (activeTab === "funcionarios") return <EntidadesTab />;
     if (activeTab === "mesas") return <MesasTab />;
     if (activeTab === "pedidos") return <PedidosTab />;
-    return <div className="bg-white/70 backdrop-blur-xl rounded-[18px] p-8">Em breve: {activeTab}</div>;
+    return <div className="bg-white/70 backdrop-blur-xl rounded-[18px] p-8 text-[11px]">Em breve: {activeTab}</div>;
 }

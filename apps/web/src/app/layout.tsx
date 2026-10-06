@@ -1,6 +1,7 @@
 import "./globals.css";
 import { Toaster } from "sonner";
 import { RealtimeProvider } from "@/components/dashboard/RealtimeProvider";
+import { SearchProvider } from "@/features/search/context";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
@@ -11,9 +12,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <link href="https://fonts.googleapis.com/css2?family=Zalando+Sans+Expanded:ital,wght@0,200..900;1,200..900&display=swap" rel="stylesheet" />
             </head>
             <body style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
-                <RealtimeProvider>
-                    {children}
-                </RealtimeProvider>
+                <SearchProvider>
+                    <RealtimeProvider>
+                        {children}
+                    </RealtimeProvider>
+                </SearchProvider>
                 <Toaster
                     position="top-right"
                     richColors

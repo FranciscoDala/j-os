@@ -4,6 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { ModuleId } from "./menu_config";
 import { VendasTab } from "@/app/dashboard/restaurante/components/tabs/venda/venda";
+import { useGlobalSearch } from "@/features/search/context";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
 type Ctx = { activeTab: string; setActiveTab: (t: string) => void; user: any; moduleId: ModuleId; role: string; can: (p: string) => boolean; };
@@ -18,12 +19,15 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 function normalizeRole(raw: any) { return String(raw || "funcionario").toLowerCase(); }
 
 export function DashboardLayoutProvider({ children }: { children: React.ReactNode }) {
-    const router = useRouter(); const pathname = usePathname();
+    const router = useRouter();
+    const pathname = usePathname();
     const moduleId = (pathname.split("/")[2] as ModuleId) || "dashboard";
     const [activeTab, setActiveTab] = useState("home");
     const [user, setUser] = useState<any>(null);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const [role, setRole] = useState("funcionario");
+    const { search, setSearch, setActiveTab: setSearchTab } = useGlobalSearch();
+
     useEffect(() => {
         const token = localStorage.getItem("access_token");
         if (!token) { router.push("/login"); return; }
@@ -37,26 +41,28 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
             if (allowed.includes("*") || allowed.includes(saved)) setActiveTab(saved); else setActiveTab("home");
         } catch { setUser({}); }
     }, [moduleId, router]);
+
     useEffect(() => {
         localStorage.setItem(`${moduleId}_tab`, activeTab);
+        setSearchTab(activeTab);
+        // limpa busca ao trocar de tab pra não confundir
+        setSearch("");
         if (activeTab === "vendas") {
             const token = localStorage.getItem("access_token");
             fetch(`${API_BASE}/caixa/status`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).then(d => { if (!d.aberto) setActiveTab("caixa"); }).catch(() => setActiveTab("caixa"));
         }
-    }, [activeTab, moduleId]);
+    }, [activeTab, moduleId, setSearchTab, setSearch]);
+
     const can = useMemo(() => (tab: string) => { const a = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS["funcionario"]; return a.includes("*") || a.includes(tab); }, [role]);
-    useEffect(() => { if (role && !can(activeTab)) setActiveTab("home"); }, [role, activeTab, can]);
+    useEffect(() => { if (role &&!can(activeTab)) setActiveTab("home"); }, [role, activeTab, can]);
     const logout = () => { localStorage.clear(); router.push("/login"); };
     const isVendasOpen = activeTab === "vendas";
 
     return (
         <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId, role, can }}>
-            {/* FUNDO IGUAL PRINT #EDEBE6 */}
             <div className="h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-[14px] gap-[14px]" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
-                {/* SIDEBAR LADO - NÃO EM CIMA */}
                 <div className="hidden md:flex shrink-0"><Sidebar activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} /></div>
 
-                {/* MAIN - HEADER TRANSPARENTE */}
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                     <div className="flex items-center justify-between gap-3 px-2 md:px-3 py-2 shrink-0 bg-transparent">
                         <div className="flex items-center gap-3">
@@ -67,8 +73,14 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                             </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
+                            {/* UNICO INPUT DE BUSCA DO APP */}
                             <div className="bg-white rounded-full flex items-center pl-4 pr-1.5 py-1 w-[300px] h-9 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
-                                <input className="flex-1 outline-none text-[11px] bg-transparent placeholder:text-[#AAAAAA]" placeholder="Search..." />
+                                <input
+                                    value={search}
+                                    onChange={e=>setSearch(e.target.value)}
+                                    className="flex-1 outline-none text-[11px] bg-transparent placeholder:text-[#AAAAAA]"
+                                    placeholder={`Search in ${activeTab}...`}
+                                />
                                 <div className="w-7 h-7 bg-black rounded-full flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><circle cx="11" cy="11" r="6" /><path d="m21 21-4.3-4.3" /></svg></div>
                             </div>
                             <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)]">💬</div>
