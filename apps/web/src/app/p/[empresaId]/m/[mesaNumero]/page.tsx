@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState, useRef, Suspense } from "react";
-import { useParams, useSearchParams } from "next/navigation";
-import { AlertTriangle, Ban, ShoppingBag, X, Search, QrCode, Clock3 } from "lucide-react";
+import { useEffect, useState, useRef, Suspense, useCallback } from "react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { AlertTriangle, Ban, ShoppingBag, X, Search, QrCode, Clock3, Hourglass } from "lucide-react";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const FALLBACK_IMG = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=200";
@@ -16,7 +16,8 @@ const getImgUrl = (url?: string) => {
 function PedirMesaInner() {
     const { empresaId, mesaNumero } = useParams() as { empresaId: string, mesaNumero: string };
     const searchParams = useSearchParams();
-    const token = searchParams.get('t') || searchParams.get('token') || "";
+    const router = useRouter();
+    const tokenParam = searchParams.get('t') || searchParams.get('token') || "";
 
     const [produtos, setProdutos] = useState<any[]>([]);
     const [cats, setCats] = useState<string[]>([]);
@@ -31,6 +32,13 @@ function PedirMesaInner() {
     const [buscaOpen, setBuscaOpen] = useState(false);
     const [query, setQuery] = useState("");
     const [expirado, setExpirado] = useState(false);
+
+    // NOVO: controle de bloqueio
+    const [bloqueada, setBloqueada] = useState(false);
+    const [clienteBloqueio, setClienteBloqueio] = useState("");
+    const [mesaQrToken, setMesaQrToken] = useState(tokenParam);
+    const [mesaLabelState, setMesaLabelState] = useState("");
+
     const [pos, setPos] = useState({ x: 20, y: 400 });
     const dragging = useRef(false);
     const offset = useRef({ x: 0, y: 0 });
@@ -51,40 +59,76 @@ function PedirMesaInner() {
     const onTouchEnd = () => { dragging.current = false; };
 
     useEffect(() => {
-        // FIX ZOOM iOS: garante viewport sem zoom
         let viewport = document.querySelector('meta[name="viewport"]');
         if (viewport) {
             viewport.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0');
         }
     }, []);
 
-    useEffect(() => {
+    const fetchCardapio = useCallback(async (isPolling = false) => {
         if (!empresaId ||!mesaNumero) return;
-        const url = `${API_URL}/api/v1/public/${empresaId}/cardapio?mesa=${mesaNumero}&t=${token}`;
-        fetch(url)
-    .then(async r => {
+        const effectiveToken = mesaQrToken || tokenParam;
+        const url = `${API_URL}/api/v1/public/${empresaId}/cardapio?mesa=${mesaNumero}&t=${effectiveToken}`;
+        try {
+            const r = await fetch(url);
             const text = await r.text();
             let data: any = {};
             try { data = JSON.parse(text); } catch {}
             if (r.status === 410) throw new Error("EXPIRADO");
             if (!r.ok) throw new Error(data.detail || "Cardápio não encontrado");
-            return data;
-        })
-    .then(d => {
-            if (d.mesa && d.mesa.token_valido === false) throw new Error("EXPIRADO");
-            setProdutos(d.produtos || []);
-            setCats(["All",...(d.categorias || [])]);
+            if (data.mesa && data.mesa.token_valido === false) throw new Error("EXPIRADO");
+
+            // atualiza token se backend gerou novo (primeiro scan mesa LIVRE)
+            if (data.mesa?.qr_token &&!tokenParam) {
+                setMesaQrToken(data.mesa.qr_token);
+            }
+            if (data.mesa?.qr_token) {
+                setMesaQrToken(data.mesa.qr_token);
+            }
+
+            setProdutos(data.produtos || []);
+            if (!isPolling) {
+                setCats(["All",...(data.categorias || [])]);
+            }
+
+            // LOGICA DE BLOQUEIO
+            if (data.mesa?.bloqueada) {
+                setBloqueada(true);
+                setClienteBloqueio(data.mesa.cliente_bloqueio || "alguém");
+            } else {
+                setBloqueada(false);
+                setClienteBloqueio("");
+            }
+
             setLoading(false);
-        })
-    .catch(e => {
+            return data;
+        } catch (e: any) {
             if (e.message === "EXPIRADO" || e.message.toLowerCase().includes("expirou") || e.message.toLowerCase().includes("fechada")) {
                 setExpirado(true);
             } else {
-                setErroModal(e.message);
+                if (!isPolling) setErroModal(e.message);
             }
             setLoading(false);
-        });
-    }, [empresaId, mesaNumero, token]);
+        }
+    }, [empresaId, mesaNumero, tokenParam, mesaQrToken]);
+
+    useEffect(() => {
+        fetchCardapio(false);
+    }, [fetchCardapio]);
+
+    // POLLING quando bloqueada ou quando enviou pedido
+    useEffect(() => {
+        if (!bloqueada &&!enviado) return;
+        const interval = setInterval(() => {
+            fetchCardapio(true).then(d => {
+                // se liberou, tira tela de enviado e mostra cardapio
+                if (d &&!d.mesa?.bloqueada && enviado) {
+                    setEnviado(false);
+                }
+            });
+        }, 4000);
+        return () => clearInterval(interval);
+    }, [bloqueada, enviado, fetchCardapio]);
 
     const getStockState = (p: any) => {
         if (p.controlar_stock === false) return "ok";
@@ -125,14 +169,29 @@ function PedirMesaInner() {
         if (cart.length === 0) { setErroModal("Toque 2x nos pratos para adicionar"); return; }
         setEnviando(true);
         try {
+            const effectiveToken = mesaQrToken || tokenParam;
             const r = await fetch(`${API_URL}/api/v1/public/${empresaId}/pedido`, {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ mesa_numero: mesaLabel, qr_token: token, cliente_nome: nome.trim(), cliente_telefone: tel.trim() || null, itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })) })
+                body: JSON.stringify({ mesa_numero: mesaLabel, qr_token: effectiveToken, cliente_nome: nome.trim(), cliente_telefone: tel.trim() || null, itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })) })
             });
             const txt = await r.text();
             if (r.status === 410) throw new Error("EXPIRADO");
+            if (r.status === 423) {
+                // primeiro pedido pendente - trava
+                try {
+                    const j = JSON.parse(txt);
+                    setErroModal(j.detail);
+                } catch { setErroModal(txt); }
+                setBloqueada(true);
+                await fetchCardapio(true);
+                return;
+            }
             if (!r.ok) { try { const j = JSON.parse(txt); throw new Error(j.detail || txt); } catch { throw new Error(txt); } }
-            setEnviado(true); setCart([]);
+            setEnviado(true);
+            setCart([]);
+            // depois de enviar primeiro, já entra em modo bloqueada até aprovar
+            setBloqueada(true);
+            await fetchCardapio(true);
         } catch (e:any) {
             if (e.message === "EXPIRADO" || e.message.toLowerCase().includes("expirou")) setExpirado(true);
             else setErroModal(e.message);
@@ -155,9 +214,40 @@ function PedirMesaInner() {
         </div>
     );
 
+    // TELA DE BLOQUEIO - AGUARDANDO APROVACAO DO PRIMEIRO PEDIDO
+    if (bloqueada) return (
+        <div className="min-h-[100dvh] flex items-center justify-center bg-[#F0F9FF] p-6 text-center">
+            <div className="bg-white rounded-[24px] p-6 shadow-[0_20px_60px_rgba(14,165,233,0.15)] max-w-[340px] w-full border border-white">
+                <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-200 animate-pulse">
+                    <Hourglass size={22} className="text-amber-600"/>
+                </div>
+                <h1 className="font-black text-[13px] text-zinc-900 leading-tight">Pedido em análise</h1>
+                <p className="text-[11px] text-zinc-600 mt-2 leading-[1.4]">Mesa <b>{mesaLabel}</b> aguardando garçom aprovar o pedido de <b>{clienteBloqueio || nome || "você"}</b>.</p>
+                <p className="text-[10px] text-zinc-400 mt-2">Aguarde o seu pedido ser aprovado para fazer outros pedidos.</p>
+                <div className="mt-5 bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-center gap-2.5 text-left">
+                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm">
+                        <Clock3 size={14} className="text-amber-600"/>
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-[11px] font-bold text-zinc-800">Atualizando automaticamente</p>
+                        <p className="text-[10px] text-zinc-500">Vamos liberar assim que aprovar</p>
+                    </div>
+                    <div className="w-5 h-5 border-2 border-amber-300 border-t-amber-600 rounded-full animate-spin"></div>
+                </div>
+                <p className="text-[9px] text-zinc-400 mt-4">Seu token: { (mesaQrToken || tokenParam || "").slice(0,8) }... válido para esta ocupação</p>
+            </div>
+        </div>
+    );
+
     if (enviado) return (
         <div className="min-h-screen flex items-center justify-center bg-[#F0F9FF] p-6 text-center">
-            <div className="bg-white rounded-[16px] p-6 shadow-xl max-w-[320px] w-full border border-sky-100"><div className="w-12 h-12 bg-sky-100 rounded-full flex items-center justify-center mx-auto mb-3 text-[14px]">✓</div><h1 className="font-black text-[12px]">Pedido enviado!</h1><p className="text-[11px] text-zinc-500 mt-1">Mesa {mesaLabel} - o garçom já recebeu</p><button onClick={() => setEnviado(false)} className="mt-4 w-full bg-black text-white rounded-full h-9 text-[11px] font-bold">Fazer outro</button></div>
+            <div className="bg-white rounded-[16px] p-6 shadow-xl max-w-[320px] w-full border border-sky-100">
+                <div className="w-12 h-12 bg-sky-100 rounded-full flex items-center justify-center mx-auto mb-3 text-[14px]">✓</div>
+                <h1 className="font-black text-[12px]">Pedido enviado!</h1>
+                <p className="text-[11px] text-zinc-500 mt-1">Mesa {mesaLabel} - o garçom já recebeu</p>
+                <p className="text-[9px] text-zinc-400 mt-2">Aguardando aprovação para liberar novos pedidos...</p>
+                <button onClick={() => { setEnviado(false); fetchCardapio(true); }} className="mt-4 w-full bg-black text-white rounded-full h-9 text-[11px] font-bold">Atualizar status</button>
+            </div>
         </div>
     );
     if (loading) return <div className="p-8 text-center text-[11px] font-bold">Carregando cardápio...</div>;
@@ -165,14 +255,13 @@ function PedirMesaInner() {
     return (
         <div className="h-[100dvh] flex flex-col bg-[#F5F7FB] overflow-hidden">
             <style>{`
-         .hide-scrollbar::-webkit-scrollbar{display:none}
-         .hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
-          /* FIX ZOOM iOS - input precisa ter 16px no DOM, mas visual continua 11px */
+        .hide-scrollbar::-webkit-scrollbar{display:none}
+        .hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
           input, textarea, select {
             font-size: 16px!important;
             -webkit-text-size-adjust: 100%;
           }
-         .input-visual {
+        .input-visual {
             font-size: 11px!important;
           }
           @supports (-webkit-touch-callout: none) {

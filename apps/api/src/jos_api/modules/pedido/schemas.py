@@ -14,7 +14,7 @@ class PedidoQrPublicCreate(BaseModel):
     cliente_nome: str
     cliente_telefone: Optional[str] = None
     itens: List[ItemQrCreate]
-    qr_token: Optional[str] = None # FIX: faltava
+    qr_token: Optional[str] = None
 
 class PedidoQrResponse(BaseModel):
     id: UUID
