@@ -1,5 +1,5 @@
 "use client";
-import { Search, SlidersHorizontal, X, Clock, Users, Receipt, Plus } from "lucide-react";
+import { Search, SlidersHorizontal, X, Plus } from "lucide-react";
 import { RefObject } from "react";
 import { ProdutoCard } from "../../produto/cards/produto";
 
@@ -14,102 +14,61 @@ type Props = {
     setMostrarCatalogoExtra?: (v: boolean) => void;
 };
 
-function minutesSince(iso?: string) {
-    if (!iso) return "-";
-    const diff = Date.now() - new Date(iso).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 60) return `${m}min`;
-    const h = Math.floor(m / 60);
-    return `${h}h ${m % 60}min`;
-}
-
-export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, setActiveCat, searchV, setSearchV, showSearch, setShowSearch, searchRef, getQty, getStockState, add, mesasOcupadas, loadingMesas, mesaSelecionada, onSelectMesa, cart, cartTotal, onImprimirConta, pedidoQrAtivo, mostrarCatalogoExtra, setMostrarCatalogoExtra }: Props) {
-    const isMesasCat = activeCat === "Mesas";
-    const isQrMode =!!pedidoQrAtivo;
+export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, setActiveCat, searchV, setSearchV, showSearch, setShowSearch, searchRef, getQty, add, pedidoQrAtivo, mostrarCatalogoExtra, setMostrarCatalogoExtra }: Props) {
+    const isQrOnly =!!pedidoQrAtivo &&!mostrarCatalogoExtra;
 
     return (
-        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#F5F7FB] p-3 md:p-5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {/* HEADER QR - SEM DIV PRETA, COM BOTÃO ADICIONAR MAIS */}
-            {isQrMode &&!isMesasCat &&!mostrarCatalogoExtra && (
-                <div className="mb-4 px-4 py-3 flex items-center justify-between border border-[#F0E8DD] bg-[#FFFBF5] rounded-[14px]">
-                    <div>
-                        <p className="font-black text-[12px]">Pedido da Mesa {pedidoQrAtivo.mesa_numero} • {pedidoQrAtivo.cliente_nome}</p>
-                        <p className="text-[11px] text-zinc-500">{filteredByCat.length} itens do cliente para adicionar</p>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {/* MODO QR PURO - SEM CATEGORIAS, SEM HEADER GRANDE, SÓ PRODUTOS + BOTÃO FINO */}
+            {isQrOnly? (
+                <>
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-[10px] font-black tracking-widest text-zinc-400">{filteredByCat.length} ITENS</span>
+                        <button onClick={()=>setMostrarCatalogoExtra?.(true)} className="h-7 px-3 rounded-full bg-black text-white text-[10px] font-black flex items-center gap-1"><Plus size={10}/> Adicionar produto</button>
                     </div>
-                    <button onClick={()=>setMostrarCatalogoExtra?.(true)} className="h-9 px-4 rounded-full bg-black text-white text-[11px] font-black flex items-center gap-1.5"><Plus size={12}/> Adicionar mais</button>
-                </div>
-            )}
-            {isQrMode && mostrarCatalogoExtra &&!isMesasCat && (
-                <div className="mb-4 px-4 py-3 flex items-center justify-between border bg-white rounded-[14px]">
-                    <p className="font-black text-[12px]">Adicionar extra na Mesa {pedidoQrAtivo.mesa_numero} • {pedidoQrAtivo.cliente_nome}</p>
-                    <button onClick={()=>setMostrarCatalogoExtra?.(false)} className="h-8 px-3 rounded-full bg-zinc-100 text-[11px] font-bold">Voltar ao pedido</button>
-                </div>
-            )}
-
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <div className="flex items-center shrink-0">
-                        {!showSearch? (
-                            <button onClick={() => setShowSearch(true)} className="w-10 h-10 bg-white border border-[#E8DCCF] rounded-full flex items-center justify-center shadow-sm hover:border-black transition-all"><Search size={16} className="text-zinc-500" /></button>
-                        ) : (
-                            <div className="relative w-[300px]">
-                                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-                                <input ref={searchRef} value={searchV} onChange={e => setSearchV(e.target.value)} onBlur={() => { if (!searchV) setShowSearch(false) }} placeholder="Buscar produto..." className="w-full h-10 bg-white rounded-full pl-9 pr-9 text-[12px] font-bold outline-none border border-[#E8DCCF] shadow-sm focus:border-black" />
-                                <button onClick={() => { setSearchV(""); setShowSearch(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 bg-zinc-100 rounded-full flex items-center justify-center"><X size={12} /></button>
-                            </div>
-                        )}
-                    </div>
-                    <div className="hidden md:flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        {cats.map(c => <button key={c} onClick={() => setActiveCat(c)} className={`whitespace-nowrap px-4 h-10 rounded-full text-[11px] border font-black tracking-wide transition-all ${activeCat === c? "bg-black text-white border-black shadow-md" : "bg-white text-zinc-600 border-[#E8DCCF] hover:border-black"}`}>{c === "Mesas"? `🍽️ Mesas (${mesasOcupadas.length})` : c}</button>)}
-                        <button className="w-10 h-10 rounded-full bg-white border border-[#E8DCCF] flex items-center justify-center shrink-0"><SlidersHorizontal size={14} /></button>
-                    </div>
-                </div>
-                <span className="text-[11px] text-zinc-500 font-black tracking-widest whitespace-nowrap">{isMesasCat? `${mesasOcupadas.length} OCUPADAS` : isQrMode &&!mostrarCatalogoExtra? `${filteredByCat.length} ITENS DO PEDIDO` : `${filteredByCat.length} PRODUTOS`}</span>
-            </div>
-
-            <div className="md:hidden flex items-center gap-2 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {cats.map(c => <button key={c} onClick={() => setActiveCat(c)} className={`whitespace-nowrap px-4 h-9 rounded-full text-[11px] border font-black shrink-0 ${activeCat === c? "bg-black text-white border-black" : "bg-white border-[#E8DCCF]"}`}>{c === "Mesas"? `Mesas (${mesasOcupadas.length})` : c}</button>)}
-            </div>
-
-            {isMesasCat? (
-                loadingMesas? <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{[...Array(6)].map((_, i) => <div key={i} className="bg-white rounded-[24px] h-[184px] animate-pulse border" />)}</div> :
-                mesasOcupadas.length === 0? <div className="py-20 text-center border border-dashed border-[#E8DCCF] rounded-[24px] bg-white"><p className="font-black text-[13px]">Nenhuma mesa ocupada</p></div> :
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {mesasOcupadas.map((m: any) => {
-                        const isSelected = mesaSelecionada?.id === m.id;
-                        const consumoAtual = Number(m.venda_total || m.total_consumo || m.total || 0);
-                        const pendente = isSelected? cartTotal : 0;
-                        const totalPreview = consumoAtual + pendente;
-                        return (
-                            <div key={m.id} className={`group relative rounded-[24px] border p-4 shadow-sm hover:shadow-[0_12px_32px_rgba(0,0,0,0.12)] hover:-translate-y-[2px] transition-all duration-300 ${isSelected? "bg-black text-white border-black" : "bg-white border-[#E8DCCF] hover:bg-[#FFFBF5]"}`}>
-                                <div className="flex justify-between items-start">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-[13px] shadow-md ${isSelected? "bg-white text-black" : "bg-black text-white"}`}>{m.numero}</div>
-                                        <div><h3 className="font-black text-[15px] leading-none">MESA {m.numero}</h3><p className={`text-[10px] font-bold mt-1 flex items-center gap-1.5 ${isSelected? "text-white/60" : "text-zinc-500"}`}><span>{m.zona || "Salão"}</span>• <Users size={11} />{m.pessoas_atual} • <Clock size={11} />{minutesSince(m.aberta_em || m.ocupada_em)}</p></div>
-                                    </div>
-                                    <span className={`text-[9px] font-black px-2.5 py-1 rounded-full ${isSelected? "bg-white text-black" : "bg-[#C62828] text-white"}`}>OCUPADA</span>
-                                </div>
-                                <div className={`mt-4 rounded-[16px] p-3 border ${isSelected? "bg-white/10 border-white/10" : "bg-[#FFFBF7] border-[#F5E6D3]"}`}>
-                                    <div className="flex justify-between text-[10px] font-black opacity-60"><span>CONSUMO</span><span>Kz {consumoAtual.toLocaleString("de-DE")}</span></div>
-                                    {isSelected && pendente > 0 && <div className="flex justify-between text-[10px] font-black text-amber-400 mt-1.5"><span>+ PENDENTE</span><span>Kz {pendente.toLocaleString("de-DE")}</span></div>}
-                                    <div className="flex justify-between items-center mt-2.5 pt-2.5 border-t border-dashed border-black/10"><span className="text-[11px] font-black">TOTAL</span><span className="text-[18px] font-black">Kz {totalPreview.toLocaleString("de-DE")}</span></div>
-                                </div>
-                                <div className="mt-4 grid grid-cols-2 gap-2">
-                                    <button onClick={() => onImprimirConta(m)} className={`h-10 rounded-full flex items-center justify-center gap-1.5 text-[11px] font-bold border ${isSelected? "bg-white/10 border-white/20 text-white" : "bg-white border-black/10"}`}><Receipt size={14} /> Conta</button>
-                                    <button onClick={() => onSelectMesa(m)} className={`h-10 rounded-full text-[11px] font-black ${isSelected? "bg-white text-black" : "bg-black text-white"}`}>{isSelected? "SELECIONADA" : "SELECIONAR"}</button>
-                                </div>
-                                {/* FECHAR REMOVIDO DAQUI - AGORA SÓ NA ABA MESAS */}
-                            </div>
-                        )
-                    })}
-                </div>
+                    {loadingProd? <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">{[...Array(4)].map((_, i) => <div key={i} className="bg-white rounded-[14px] h-[140px] animate-pulse border" />)}</div> :
+                        <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                            {filteredByCat.map((p: any) => (<ProdutoCard key={p.id} p={p} cartQty={getQty(p.id)} onAdd={add} />))}
+                        </div>
+                    }
+                </>
             ) : (
-                loadingProd? <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">{[...Array(8)].map((_, i) => <div key={i} className="bg-white rounded-[24px] h-[210px] animate-pulse border" />)}</div> :
-                <div className="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-                    {filteredByCat.map((p: any) => (
-                        <ProdutoCard key={p.id} p={p} cartQty={getQty(p.id)} onAdd={add} />
-                    ))}
-                </div>
+                <>
+                    {/* MODO BALCÃO OU ADD EXTRA - COM CATEGORIAS FINAS */}
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                            {!showSearch? (
+                                <button onClick={() => setShowSearch(true)} className="w-7 h-7 bg-white border border-[#E8DCCF] rounded-full flex items-center justify-center"><Search size={11} className="text-zinc-500" /></button>
+                            ) : (
+                                <div className="relative w-[200px]">
+                                    <Search size={10} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                                    <input ref={searchRef} value={searchV} onChange={e => setSearchV(e.target.value)} onBlur={() => { if (!searchV) setShowSearch(false) }} placeholder="Buscar..." className="w-full h-7 bg-white rounded-full pl-7 pr-6 text-[11px] font-bold outline-none border border-[#E8DCCF]" />
+                                    <button onClick={() => { setSearchV(""); setShowSearch(false); }} className="absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 bg-zinc-100 rounded-full flex items-center justify-center"><X size={8} /></button>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                {cats.map(c => <button key={c} onClick={() => setActiveCat(c)} className={`whitespace-nowrap px-2.5 h-7 rounded-full text-[10px] border font-bold leading-none ${activeCat === c? "bg-black text-white border-black" : "bg-white text-zinc-600 border-[#E8DCCF]"}`}>{c}</button>)}
+                                <button className="w-7 h-7 rounded-full bg-white border border-[#E8DCCF] flex items-center justify-center shrink-0"><SlidersHorizontal size={10} /></button>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                            {pedidoQrAtivo && mostrarCatalogoExtra && (
+                                <button onClick={()=>setMostrarCatalogoExtra?.(false)} className="h-7 px-2.5 rounded-full bg-zinc-100 text-[10px] font-bold">Voltar</button>
+                            )}
+                            <span className="text-[10px] text-zinc-400 font-bold whitespace-nowrap">{filteredByCat.length}</span>
+                        </div>
+                    </div>
+
+                    {pedidoQrAtivo && mostrarCatalogoExtra && (
+                        <div className="mb-2 text-[11px] font-bold">Adicionando extra na Mesa {pedidoQrAtivo.mesa_numero}</div>
+                    )}
+
+                    {loadingProd? <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">{[...Array(8)].map((_, i) => <div key={i} className="bg-white rounded-[14px] h-[140px] animate-pulse border" />)}</div> :
+                        <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                            {filteredByCat.map((p: any) => (<ProdutoCard key={p.id} p={p} cartQty={getQty(p.id)} onAdd={add} />))}
+                        </div>
+                    }
+                </>
             )}
         </div>
     );
