@@ -1,12 +1,12 @@
 "use client";
 import { useState } from "react";
 
-// MODAL BRABA - estilo Tab Venda
+// MODAL BRABA - travada (não fecha fora)
 function RemoveItemModal({ item, onClose, onConfirm }: { item: any, onClose: () => void, onConfirm: () => void }) {
     if (!item) return null;
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" onClick={onClose} />
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" />
             <div className="relative w-full max-w-[360px] bg-[#EDEBE6] border border-black/10 rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden">
                 <div className="bg-white m-[6px] rounded-[18px] p-5">
                     <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center text-[16px] mb-3">✕</div>
@@ -29,10 +29,51 @@ function RemoveItemModal({ item, onClose, onConfirm }: { item: any, onClose: () 
     );
 }
 
+function FormaSelect({ value, onChange, disabled }: { value: string, onChange: (v: any) => void, disabled?: boolean }) {
+    const [open, setOpen] = useState(false);
+    const ops = [
+        { id: "dinheiro", label: "Dinheiro", icon: "💵" },
+        { id: "transferencia", label: "Transferência", icon: "🏦" },
+        { id: "tpa", label: "TPA", icon: "💳" },
+    ];
+    const atual = ops.find(o => o.id === value) || ops[0];
+
+    return (
+        <div className="relative flex-1">
+            <button
+                disabled={disabled}
+                onClick={() =>!disabled && setOpen(!open)}
+                className="w-full bg-[#F5F7FB] border border-black/5 rounded-full px-4 py-3 text-[12px] font-bold flex items-center justify-between gap-2 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
+            >
+                <span className="flex items-center gap-2"><span>{atual.icon}</span>{atual.label}</span>
+                <span className={`text-[10px] transition-transform ${open? "rotate-180" : ""}`}>▼</span>
+            </button>
+
+            {open && (
+                <>
+                    <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
+                    <div className="absolute bottom-[calc(100%+8px)] left-0 right-0 z-30 bg-white border border-black/10 rounded-[16px] shadow-[0_12px_32px_rgba(0,0,0,0.12)] p-1.5 overflow-hidden animate-in fade-in slide-in-from-bottom-1">
+                        {ops.map(op => (
+                            <button
+                                key={op.id}
+                                onClick={() => { onChange(op.id); setOpen(false); }}
+                                className={`w-full text-left px-4 py-2.5 rounded-full text-[12px] font-bold flex items-center gap-2 transition-colors ${value === op.id? "bg-black text-white" : "hover:bg-black/[0.06] text-black"}`}
+                            >
+                                <span>{op.icon}</span>{op.label}
+                            </button>
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
 export function CarrinhoSection({ cart, total, mesaSelecionada, onAddMesa, onLimparMesa, forma, setForma, setShowPay, setRecebido, finalizando, pedidoQrAtivo, onRemoveItem }: any) {
     const isMesa =!!mesaSelecionada;
     const isQr =!!pedidoQrAtivo;
     const [itemParaRemover, setItemParaRemover] = useState<any>(null);
+    const temItens = cart.length > 0;
 
     return (
         <>
@@ -77,15 +118,19 @@ export function CarrinhoSection({ cart, total, mesaSelecionada, onAddMesa, onLim
                     </div>
                     {isMesa? (
                         <div className="flex gap-2">
-                            <button onClick={onLimparMesa} className="flex-1 bg-zinc-100 rounded-full py-3 text-[12px] font-bold active:scale-[0.97]">Cancelar</button>
-                            <button disabled={cart.length === 0 || finalizando} onClick={onAddMesa} className="flex-1 bg-[#A67C52] disabled:bg-gray-300 text-white rounded-full py-3 text-[12px] font-bold active:scale-[0.97]">{finalizando? "..." : "Adicionar"}</button>
+                            <button disabled={!temItens} onClick={onLimparMesa} className="flex-1 bg-zinc-100 rounded-full py-3 text-[12px] font-bold active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed">Cancelar</button>
+                            <button disabled={!temItens || finalizando} onClick={onAddMesa} className="flex-1 bg-[#A67C52] text-white rounded-full py-3 text-[12px] font-bold active:scale-[0.97] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed">{finalizando? "..." : "Adicionar"}</button>
                         </div>
                     ) : (
                         <div className="flex gap-2">
-                            <div className="flex-1 bg-[#F5F7FB] border rounded-full px-2">
-                                <select value={forma} onChange={(e) => setForma(e.target.value)} className="w-full bg-transparent rounded-full py-3 text-[12px] font-bold outline-none"><option value="dinheiro">Dinheiro</option><option value="transferencia">Transferência</option><option value="tpa">TPA</option></select>
-                            </div>
-                            <button disabled={cart.length === 0} onClick={() => { setRecebido(""); setShowPay(true); }} className="flex-1 bg-[#2F4A8A] text-white rounded-full py-3 text-[12px] font-bold active:scale-[0.97]">Finalizar</button>
+                            <FormaSelect value={forma} onChange={setForma} disabled={!temItens} />
+                            <button
+                                disabled={!temItens}
+                                onClick={() => { setRecebido(""); setShowPay(true); }}
+                                className="flex-1 bg-[#2F4A8A] text-white rounded-full py-3 text-[12px] font-bold active:scale-[0.97] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed"
+                            >
+                                Finalizar
+                            </button>
                         </div>
                     )}
                 </div>
