@@ -1,5 +1,5 @@
 "use client";
-import { Search, SlidersHorizontal, X, Clock, Users, Printer, Receipt } from "lucide-react";
+import { Search, SlidersHorizontal, X, Clock, Users, Receipt, Plus } from "lucide-react";
 import { RefObject } from "react";
 import { ProdutoCard } from "../../produto/cards/produto";
 
@@ -10,6 +10,8 @@ type Props = {
     modoMesa: boolean; mesasOcupadas: any[]; loadingMesas: boolean; mesaSelecionada: any; onSelectMesa: (m: any) => void; fetchMesas: () => void;
     cart: any[]; cartTotal: number; onFecharMesa: (mesa: any) => void; onImprimirConta: (mesa: any) => void;
     pedidoQrAtivo?: any;
+    mostrarCatalogoExtra?: boolean;
+    setMostrarCatalogoExtra?: (v: boolean) => void;
 };
 
 function minutesSince(iso?: string) {
@@ -21,21 +23,29 @@ function minutesSince(iso?: string) {
     return `${h}h ${m % 60}min`;
 }
 
-export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, setActiveCat, searchV, setSearchV, showSearch, setShowSearch, searchRef, getQty, getStockState, add, mesasOcupadas, loadingMesas, mesaSelecionada, onSelectMesa, cart, cartTotal, onFecharMesa, onImprimirConta, pedidoQrAtivo }: Props) {
+export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, setActiveCat, searchV, setSearchV, showSearch, setShowSearch, searchRef, getQty, getStockState, add, mesasOcupadas, loadingMesas, mesaSelecionada, onSelectMesa, cart, cartTotal, onImprimirConta, pedidoQrAtivo, mostrarCatalogoExtra, setMostrarCatalogoExtra }: Props) {
     const isMesasCat = activeCat === "Mesas";
-    const isModoQr =!!pedidoQrAtivo &&!isMesasCat;
+    const isQrMode =!!pedidoQrAtivo;
 
     return (
         <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#F5F7FB] p-3 md:p-5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {isModoQr && (
-                <div className="mb-4 bg-black text-white rounded-[14px] px-4 py-2.5 flex items-center justify-between">
+            {/* HEADER QR - SEM DIV PRETA, COM BOTÃO ADICIONAR MAIS */}
+            {isQrMode &&!isMesasCat &&!mostrarCatalogoExtra && (
+                <div className="mb-4 px-4 py-3 flex items-center justify-between border border-[#F0E8DD] bg-[#FFFBF5] rounded-[14px]">
                     <div>
-                        <p className="font-black text-[12px]">Pedido QR • Mesa {pedidoQrAtivo.mesa_numero} • {pedidoQrAtivo.cliente_nome}</p>
-                        <p className="text-[10px] opacity-70">{pedidoQrAtivo.itens?.length} itens para adicionar na mesa</p>
+                        <p className="font-black text-[12px]">Pedido da Mesa {pedidoQrAtivo.mesa_numero} • {pedidoQrAtivo.cliente_nome}</p>
+                        <p className="text-[11px] text-zinc-500">{filteredByCat.length} itens do cliente para adicionar</p>
                     </div>
-                    <span className="text-[10px] bg-white text-black px-2.5 py-1 rounded-full font-black">MODO QR</span>
+                    <button onClick={()=>setMostrarCatalogoExtra?.(true)} className="h-9 px-4 rounded-full bg-black text-white text-[11px] font-black flex items-center gap-1.5"><Plus size={12}/> Adicionar mais</button>
                 </div>
             )}
+            {isQrMode && mostrarCatalogoExtra &&!isMesasCat && (
+                <div className="mb-4 px-4 py-3 flex items-center justify-between border bg-white rounded-[14px]">
+                    <p className="font-black text-[12px]">Adicionar extra na Mesa {pedidoQrAtivo.mesa_numero} • {pedidoQrAtivo.cliente_nome}</p>
+                    <button onClick={()=>setMostrarCatalogoExtra?.(false)} className="h-8 px-3 rounded-full bg-zinc-100 text-[11px] font-bold">Voltar ao pedido</button>
+                </div>
+            )}
+
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                     <div className="flex items-center shrink-0">
@@ -54,7 +64,7 @@ export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, s
                         <button className="w-10 h-10 rounded-full bg-white border border-[#E8DCCF] flex items-center justify-center shrink-0"><SlidersHorizontal size={14} /></button>
                     </div>
                 </div>
-                <span className="text-[11px] text-zinc-500 font-black tracking-widest whitespace-nowrap">{isMesasCat? `${mesasOcupadas.length} OCUPADAS` : isModoQr? `${filteredByCat.length} ITENS DO PEDIDO` : `${filteredByCat.length} PRODUTOS`}</span>
+                <span className="text-[11px] text-zinc-500 font-black tracking-widest whitespace-nowrap">{isMesasCat? `${mesasOcupadas.length} OCUPADAS` : isQrMode &&!mostrarCatalogoExtra? `${filteredByCat.length} ITENS DO PEDIDO` : `${filteredByCat.length} PRODUTOS`}</span>
             </div>
 
             <div className="md:hidden flex items-center gap-2 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -88,7 +98,7 @@ export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, s
                                     <button onClick={() => onImprimirConta(m)} className={`h-10 rounded-full flex items-center justify-center gap-1.5 text-[11px] font-bold border ${isSelected? "bg-white/10 border-white/20 text-white" : "bg-white border-black/10"}`}><Receipt size={14} /> Conta</button>
                                     <button onClick={() => onSelectMesa(m)} className={`h-10 rounded-full text-[11px] font-black ${isSelected? "bg-white text-black" : "bg-black text-white"}`}>{isSelected? "SELECIONADA" : "SELECIONAR"}</button>
                                 </div>
-                                <button onClick={() => onFecharMesa(m)} className="w-full mt-2 h-11 rounded-full bg-[#16A34A] text-white font-black text-[11px] flex items-center justify-center gap-2"><Printer size={14} /> FECHAR • Kz {totalPreview.toLocaleString("de-DE")}</button>
+                                {/* FECHAR REMOVIDO DAQUI - AGORA SÓ NA ABA MESAS */}
                             </div>
                         )
                     })}
@@ -97,7 +107,7 @@ export function ProdutosSection({ filteredByCat, loadingProd, cats, activeCat, s
                 loadingProd? <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">{[...Array(8)].map((_, i) => <div key={i} className="bg-white rounded-[24px] h-[210px] animate-pulse border" />)}</div> :
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
                     {filteredByCat.map((p: any) => (
-                        <ProdutoCard key={p.id} p={p} cartQty={getQty(p.id)} onAdd={pedidoQrAtivo? undefined : add} />
+                        <ProdutoCard key={p.id} p={p} cartQty={getQty(p.id)} onAdd={add} />
                     ))}
                 </div>
             )}
