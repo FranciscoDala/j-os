@@ -69,7 +69,6 @@ export function EntidadesTab() {
     const handleSave = async () => { if (!empresaId) return; if (!canManage) return; setSaving(true); try { const clean=(v:any)=>v===""||v===undefined?null:typeof v==='string'?(v.trim()||null):v; const payload:any={ tipo:form.tipo, nome:form.nome.trim(), telefone:clean(form.telefone), email:clean(form.email)?.toLowerCase()||null, documento:clean(form.documento), endereco:clean(form.endereco), cargo:clean(form.cargo), departamento:clean(form.departamento), empresa_fornecedora:clean(form.empresa_fornecedora), categoria_fornecedor:clean(form.categoria_fornecedor), tem_acesso_app:!!form.tem_acesso_app, perfil_id:clean(form.perfil_id), data_admissao:clean(form.data_admissao), salario:form.salario?Number(form.salario):null, carga_horaria:form.carga_horaria?Number(form.carga_horaria):null, }; if(form.senha?.trim().length>=6) payload.senha=form.senha.trim(); if(!payload.tem_acesso_app) payload.perfil_id=null; const url=form.id?`${API_BASE}/entidades/${empresaId}/${form.id}`:`${API_BASE}/entidades/${empresaId}`; const method=form.id?"PUT":"POST"; const res=await fetch(url,{method,headers:{"Content-Type":"application/json",...getAuthHeaders()} as any,body:JSON.stringify(payload)}); const json=await res.json().catch(()=>({})); if(!res.ok) throw new Error(json.detail||"Erro"); if(form.id){ setLista(p=>p.map(x=>x.id===json.id?json:x)); toast.success("Atualizado"); } else { setLista(p=>[json,...p]); toast.success("Criado"); } setOpen(false); } catch(e:any){ toast.error(e.message); } finally { setSaving(false); } };
     const confirmDelete = async () => { if(!selected||!empresaId) return; setDeleting(true); const backup=lista; setLista(p=>p.filter(x=>x.id!==selected.id)); try { const res=await fetch(`${API_BASE}/entidades/${empresaId}/${selected.id}`,{method:"DELETE",headers:{"Content-Type":"application/json",...getAuthHeaders()} as any}); if(!res.ok) throw new Error(); toast.success("Apagado"); setOpenDelete(false); } catch { setLista(backup); toast.error("Erro"); } finally { setDeleting(false); } };
 
-    // USA BUSCA GLOBAL DO HEADER
     const filtered = lista.filter(l => {
         const s = globalSearch.toLowerCase();
         return l.nome.toLowerCase().includes(s) || (l.telefone||"").includes(s) || (l.email||"").toLowerCase().includes(s);
@@ -79,19 +78,18 @@ export function EntidadesTab() {
 
     return (
         <>
-            <div className="space-y-4 w-full">
-                {/* FILTROS - AGORA SÓ SELECT + BTN + */}
+            <div className="w-full space-y-4 relative">
                 <div className="w-full flex items-center justify-between gap-3">
-                    <div className="w-[180px]">
+                    <div className="w-[200px]">
                         <CustomSelect value={tipoFiltro} onChange={(v) => setTipoFiltro(v as any)} options={[...TIPOS]} labelMap={TIPO_LABELS} />
                     </div>
                     <div className="flex-1" />
                     {canManage && (
-                        <button onClick={() => { setForm({ id: null, tipo: tipoFiltro, nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" }); setOpen(true); }} className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-md hover:bg-zinc-800 shrink-0"><Plus size={18} /></button>
+                        <button onClick={() => { setForm({ id: null, tipo: tipoFiltro, nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" }); setOpen(true); }} className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-md hover:bg-zinc-800 active:scale-95 transition-all shrink-0"><Plus size={18} strokeWidth={3} /></button>
                     )}
                 </div>
 
-                <div className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                     {filtered.length === 0? <div className="col-span-full text-center py-10 text-[12px] opacity-50 font-bold">Nenhum {TIPO_LABELS[tipoFiltro]} {globalSearch && `para "${globalSearch}"`}</div> : filtered.map(ent => <EntidadeCard key={ent.id} ent={ent} onEdit={handleEdit} onDelete={handleDeleteClick} canManage={canManage} />)}
                 </div>
             </div>
