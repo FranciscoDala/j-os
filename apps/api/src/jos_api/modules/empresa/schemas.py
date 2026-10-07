@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, field_validator
 from uuid import UUID
 from typing import Optional
 from datetime import datetime
@@ -49,6 +49,13 @@ class UpdateEmpresaRequest(BaseModel):
     residente_fiscal: Optional[str] = None
     nif_agt_name: Optional[str] = None
     nif_verified: Optional[bool] = None
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def empty_to_none(cls, v):
+        if v == "" or v == " ":
+            return None
+        return v
 
 class EmpresaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
