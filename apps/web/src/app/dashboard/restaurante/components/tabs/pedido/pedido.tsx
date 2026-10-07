@@ -29,7 +29,7 @@ export function PedidosTab() {
         const id = setInterval(load, 4000);
         const onAprovado = (e: any) => {
             const idAprovado = e.detail?.id;
-            if (idAprovado) setPedidos(s => s.filter(x => x.id!== idAprovado));
+            if (idAprovado) setPedidos(s => s.filter(x => x.id !== idAprovado));
         };
         window.addEventListener("pedido-qr:aprovado" as any, onAprovado);
         return () => {
@@ -52,7 +52,7 @@ export function PedidosTab() {
             method: "POST",
             headers: { Authorization: `Bearer ${token}`, "X-Empresa-ID": emp }
         });
-        setPedidos(s => s.filter(x => x.id!== p.id));
+        setPedidos(s => s.filter(x => x.id !== p.id));
         setSel(null);
     };
 
@@ -86,7 +86,7 @@ export function PedidosTab() {
                 </div>
             </div>
 
-            {pedidos.length === 0? (
+            {pedidos.length === 0 ? (
                 <div className="w-full py-12 md:py-16 text-center border border-dashed border-[#E8DCCF] rounded-[18px] md:rounded-[22px] bg-white">
                     <ShoppingBag className="mx-auto opacity-30 mb-2" size={28} />
                     <p className="font-black text-[13px]">Nenhum pedido QR</p>
@@ -101,7 +101,13 @@ export function PedidosTab() {
             )}
 
             {sel && (
-                <PedidoDetalheModal pedido={sel} onClose={() => setSel(null)} onAtender={(pr) => { setSel(null); atender(pr); }} onRecusar={recusar} />
+                
+                <PedidoDetalheModal
+                    pedido={sel}
+                    onClose={() => setSel(null)}
+                    onAtender={(pr) => { setSel(null); atender(pr); }}
+                    onRecusar={recusar}
+                />
             )}
         </div>
     )

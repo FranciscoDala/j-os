@@ -1,25 +1,29 @@
 "use client";
-import { X } from "lucide-react";
+import { X, Check } from "lucide-react";
 
 function safeKz(v: any) {
-    const n = Number(v ?? 0);
-    return isNaN(n) ? "0" : n.toLocaleString("de-DE");
+    const n = Number(v?? 0);
+    return isNaN(n)? "0" : n.toLocaleString("de-DE");
 }
 
 export function PedidoDetalheModal({
     pedido,
     onClose,
+    onAtender,
+    onRecusar,
 }: {
     pedido: any;
     onClose: () => void;
+    onAtender?: (p: any) => void;
+    onRecusar?: (p: any) => void;
 }) {
     if (!pedido) return null;
-    const total = pedido.total ?? pedido.valor_total ?? pedido.total_estimado ?? 0;
+    const total = pedido.total?? pedido.valor_total?? pedido.total_estimado?? 0;
     const itens = pedido.itens || [];
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" />
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" onClick={onClose} />
             <div className="relative w-full max-w-[420px] bg-[#EDEBE6] border border-black/10 rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden flex flex-col max-h-[92dvh] md:max-h-[90vh]">
 
                 <div className="bg-white m-[6px] rounded-[18px] p-3 flex justify-between items-start border border-black/5 shrink-0">
@@ -54,7 +58,7 @@ export function PedidoDetalheModal({
                         {itens.map((it: any, idx: number) => {
                             const nome = it.produto_nome || it.nome || "Produto";
                             const qtd = Number(it.quantidade || 1);
-                            const unit = Number(it.preco_unit || it.preco || it.subtotal / qtd || 0);
+                            const unit = Number(it.preco_unit || it.preco || (it.subtotal / qtd) || 0);
                             return (
                                 <div
                                     key={idx}
@@ -78,12 +82,31 @@ export function PedidoDetalheModal({
                                 {safeKz(total)}
                             </span>
                         </div>
-                        <button
-                            onClick={onClose}
-                            className="w-full bg-black text-white rounded-full py-3.5 text-[12px] font-bold active:scale-[0.97] hover:bg-zinc-800"
-                        >
-                            Fechar
-                        </button>
+                        <div className="flex gap-2">
+                            {onRecusar && (
+                                <button
+                                    onClick={() => onRecusar(pedido)}
+                                    className="flex-1 bg-white border border-red-200 text-red-600 rounded-full py-3.5 text-[12px] font-bold active:scale-[0.97] hover:bg-red-50"
+                                >
+                                    Recusar
+                                </button>
+                            )}
+                            {onAtender? (
+                                <button
+                                    onClick={() => onAtender(pedido)}
+                                    className="flex-1 bg-black text-white rounded-full py-3.5 text-[12px] font-black flex items-center justify-center gap-1.5 active:scale-[0.97] hover:bg-zinc-800"
+                                >
+                                    <Check size={14} /> Atender
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={onClose}
+                                    className="flex-1 bg-black text-white rounded-full py-3.5 text-[12px] font-bold active:scale-[0.97] hover:bg-zinc-800"
+                                >
+                                    Fechar
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
