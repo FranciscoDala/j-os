@@ -1,5 +1,5 @@
 "use client";
-import { Pencil, Trash2, Plus, Ban, AlertTriangle } from "lucide-react";
+import { Pencil, Trash2, Ban, AlertTriangle } from "lucide-react";
 
 const FALLBACK_IMG = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=200";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
@@ -17,9 +17,10 @@ type Props = {
     onDelete?: (p: any) => void;
     onAdd?: (p: any) => void;
     cartQty?: number;
+    canManage?: boolean;
 }
 
-export function ProdutoCard({ p, onEdit, onDelete, onAdd, cartQty = 0 }: Props) {
+export function ProdutoCard({ p, onEdit, onDelete, onAdd, cartQty = 0, canManage = false }: Props) {
     const getStockState = () => {
         if (!p.controlar_stock) return "ok";
         const atual = Number(p.stock_atual?? 0);
@@ -51,10 +52,16 @@ export function ProdutoCard({ p, onEdit, onDelete, onAdd, cartQty = 0 }: Props) 
                     {cartQty}
                 </div>
             )}
-            {!isPDV && (
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                    <button onClick={(e) => { e.stopPropagation(); onEdit?.(p); }} className="w-7 h-7 bg-black/80 text-white rounded-full flex items-center justify-center hover:bg-black shadow"><Pencil size={11} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); onDelete?.(p); }} className="w-7 h-7 bg-white border rounded-full flex items-center justify-center hover:bg-red-50 shadow"><Trash2 size={11} /></button>
+
+            {/* SÓ APARECE SE canManage = admin/gerente/dono */}
+            {!isPDV && canManage && (
+                <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    <button onClick={(e) => { e.stopPropagation(); onEdit?.(p); }} className="w-9 h-9 bg-black/90 text-white rounded-full flex items-center justify-center hover:bg-black shadow-[0_4px_12px_rgba(0,0,0,0.25)] border border-white/10 active:scale-95">
+                        <Pencil size={14} />
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete?.(p); }} className="w-9 h-9 bg-white border border-black/10 rounded-full flex items-center justify-center hover:bg-red-50 text-black hover:text-red-600 shadow-[0_4px_12px_rgba(0,0,0,0.15)] active:scale-95">
+                        <Trash2 size={14} />
+                    </button>
                 </div>
             )}
 
@@ -111,7 +118,7 @@ export function ProdutoCard({ p, onEdit, onDelete, onAdd, cartQty = 0 }: Props) 
                         <button
                             disabled={isZero}
                             onClick={(e) => { e.stopPropagation(); onAdd?.(p); }}
-                            className={`h-[30px] md:h-[30px] px-4 rounded-full text-[11px] font-black shadow-sm transition-all shrink-0 active:scale-95 ${isZero? "bg-zinc-200 text-zinc-400 cursor-not-allowed" : "bg-[#FFC91A] hover:bg-[#FFB800] text-black"}`}
+                            className={`h-[30px] px-4 rounded-full text-[11px] font-black shadow-sm transition-all shrink-0 active:scale-95 ${isZero? "bg-zinc-200 text-zinc-400 cursor-not-allowed" : "bg-[#FFC91A] hover:bg-[#FFB800] text-black"}`}
                         >
                             Add
                         </button>

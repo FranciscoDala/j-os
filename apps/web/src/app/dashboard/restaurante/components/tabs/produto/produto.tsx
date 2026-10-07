@@ -103,15 +103,22 @@ export function ProdutosTab() {
 
     const genCode = () => `P-${Date.now().toString().slice(-6)}`;
     const resetForm = () => { setForm({ nome: "", codigo: genCode(), preco_venda: "", preco_custo: "0", tipo: "RESTAURANT_DISH", unidade: "UNIT", categoria: "", descricao: "", codigo_barras: "", codigo_qr: "", iva: "0", tem_iva: false, peso: "", ativo: true, controlar_stock: true, allow_negative: false, stock_atual: "0", stock_minimo: "0", prep_time: "", kitchen_station: "", is_modifiable: false, service_duration: "", imagem_url: "" }); setImgFile(null); setPreview(""); setEditId(null); setTab("Geral"); };
-    const openEdit = (p: any) => { setEditId(p.id); setForm({ nome: p.nome, codigo: p.codigo, preco_venda: p.preco_venda, preco_custo: p.preco_custo || 0, tipo: p.tipo, unidade: "UNIT", categoria: p.categoria || "", descricao: p.descricao || "", codigo_barras: p.codigo_barras || "", codigo_qr: p.codigo_qr || "", iva: p.iva || 0, tem_iva: p.tem_iva || false, peso: p.peso || "", ativo: p.ativo, controlar_stock: p.controlar_stock, allow_negative: p.allow_negative || false, stock_atual: p.stock_atual, stock_minimo: p.stock_minimo || 0, prep_time: p.prep_time || "", kitchen_station: p.kitchen_station || "", is_modifiable: p.is_modifiable || false, service_duration: p.service_duration || "", imagem_url: p.imagem_url || "" }); setPreview(p.imagem_url || ""); setOpen(true); };
+    const openEdit = (p: any) => {
+        if(!canManage) return pushToast("Sem permissão para editar", "error");
+        setEditId(p.id); setForm({ nome: p.nome, codigo: p.codigo, preco_venda: p.preco_venda, preco_custo: p.preco_custo || 0, tipo: p.tipo, unidade: "UNIT", categoria: p.categoria || "", descricao: p.descricao || "", codigo_barras: p.codigo_barras || "", codigo_qr: p.codigo_qr || "", iva: p.iva || 0, tem_iva: p.tem_iva || false, peso: p.peso || "", ativo: p.ativo, controlar_stock: p.controlar_stock, allow_negative: p.allow_negative || false, stock_atual: p.stock_atual, stock_minimo: p.stock_minimo || 0, prep_time: p.prep_time || "", kitchen_station: p.kitchen_station || "", is_modifiable: p.is_modifiable || false, service_duration: p.service_duration || "", imagem_url: p.imagem_url || "" }); setPreview(p.imagem_url || ""); setOpen(true);
+    };
     const handleSave = async () => {
+        if(!canManage) return pushToast("Sem permissão", "error");
         if (saving) return; setSaving(true);
         const allowed = ["nome","codigo","preco_venda","preco_custo","tipo","unidade","categoria","descricao","codigo_barras","codigo_qr","iva","tem_iva","peso","ativo","controlar_stock","allow_negative","stock_atual","stock_minimo","prep_time","kitchen_station","is_modifiable","service_duration"];
         const fd = new FormData(); allowed.forEach(k => { const v = form[k]; if (v!== "" && v!== null && v!== undefined) fd.append(k, String(v)); }); if (imgFile) fd.append("imagem", imgFile);
         const url = editId? `${API_BASE}/${editId}` : `${API_BASE}/`; const method = editId? "PUT" : "POST";
         try { const r = await fetch(url, { method, headers: getAuthHeaders() as any, body: fd }); const data = await r.json().catch(async () => ({ detail: await r.text() })); if (r.ok) { pushToast(editId? "Produto atualizado!" : `Produto ${form.nome} criado!`, "success"); setOpen(false); resetForm(); fetchProds(); fetchCats(); } else { pushToast(data.detail || "Erro ao salvar", "error"); } } catch { pushToast("Erro de rede ao salvar", "error"); } finally { setSaving(false); }
     };
-    const confirmDelete = async () => { if (!deleteModal) return; const r = await fetch(`${API_BASE}/${deleteModal.id}`, { method: "DELETE", headers: getAuthHeaders() as any }); if (r.ok) { pushToast("Produto apagado", "success"); fetchProds(); setDeleteModal(null); } else pushToast("Erro ao apagar", "error"); };
+    const confirmDelete = async () => {
+        if(!canManage) return pushToast("Sem permissão", "error");
+        if (!deleteModal) return; const r = await fetch(`${API_BASE}/${deleteModal.id}`, { method: "DELETE", headers: getAuthHeaders() as any }); if (r.ok) { pushToast("Produto apagado", "success"); fetchProds(); setDeleteModal(null); } else pushToast("Erro ao apagar", "error");
+    };
 
     return (
         <div className="w-full space-y-3 md:space-y-4 relative">
@@ -124,7 +131,6 @@ export function ProdutosTab() {
                 ))}
             </div>
 
-            {/* HEADER - RESPONSIVO */}
             <div className="w-full flex items-center justify-between gap-2.5 md:gap-3">
                 <div className="flex-1 sm:flex-none sm:w-[180px] md:w-[200px]">
                     <FilterSelect value={cat} onChange={setCat} options={["",...cats]} placeholder="Todas categorias" />
@@ -137,10 +143,9 @@ export function ProdutosTab() {
                 )}
             </div>
 
-            {/* CARDS - GRID RESPONSIVO */}
             <div className="grid gap-2.5 md:gap-3 grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {items.map(p => (
-                    <ProdutoCard key={p.id} p={p} onEdit={openEdit} onDelete={(prod) => setDeleteModal({ id: prod.id, nome: prod.nome, img: prod.imagem_url })} />
+                    <ProdutoCard key={p.id} p={p} canManage={canManage} onEdit={openEdit} onDelete={(prod) => { if(!canManage) return pushToast("Sem permissão", "error"); setDeleteModal({ id: prod.id, nome: prod.nome, img: prod.imagem_url }); }} />
                 ))}
             </div>
 
