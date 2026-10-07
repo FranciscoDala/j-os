@@ -13,12 +13,18 @@ const TAB_ROLES: Record<string, string[]> = {
     cardapio: ["dono", "gerente_restaurante", "operador_caixa"],
     pedidos: ["dono", "gerente_restaurante", "operador_caixa", "garcom"],
     mesas: ["dono", "gerente_restaurante", "operador_caixa", "garcom"],
-    financas: ["dono", "gerente_restaurante"], relatorios: ["dono", "gerente_restaurante"],
 };
 const CAN_CONFIG = ["dono", "gerente_restaurante"];
+const HIDDEN_TABS = ["financas", "relatorios", "financeiro", "relatorio"];
 
 function normalizeRole(r: any) { return String(r || "funcionario").toLowerCase() }
-function canViewTab(id: string, role: string) { const a = TAB_ROLES[id]; if (!a) return true; if (a.includes("*")) return true; return a.includes(role); }
+function canViewTab(id: string, role: string) {
+    if (HIDDEN_TABS.includes(id)) return false;
+    const a = TAB_ROLES[id];
+    if (!a) return true;
+    if (a.includes("*")) return true;
+    return a.includes(role);
+}
 
 export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile = false, onOpenConfig }: any) {
     const pathname = usePathname();
@@ -36,6 +42,7 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile
     useEffect(() => { if (caixaAberto === false && activeTab === 'vendas') setActiveTab('caixa'); }, [caixaAberto, activeTab, setActiveTab]);
 
     const filteredTabs = tabs.filter((t: any) => {
+        if (HIDDEN_TABS.includes(t.id)) return false;
         if (t.id === 'vendas' && caixaAberto === false) return false;
         if (!canViewTab(t.id, userRole)) return false;
         if (can && typeof can === 'function' &&!can(t.id)) return false;

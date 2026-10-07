@@ -5,11 +5,13 @@ import { Sidebar } from "./Sidebar";
 import { ModuleId } from "./menu_config";
 import { VendasTab } from "@/app/dashboard/restaurante/components/tabs/venda/venda";
 import { useGlobalSearch } from "@/features/search/context";
-import { Menu, X, Check } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import ModalEmpresa from "./modal_empresa";
+import { Toasts } from "@/app/dashboard/restaurante/components/tabs/venda/modals/venda";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
+type Toast = { id: string; msg: string; type: "success" | "error" | "info" | "warning" };
 type Ctx = { activeTab: string; setActiveTab: (t: string) => void; user: any; moduleId: ModuleId; role: string; can: (p: string) => boolean; pedidosCount: number; setPedidosCount: (n: number) => void; };
 const DashboardCtx = createContext<Ctx>(null as any);
 export const useDashboard = () => useContext(DashboardCtx);
@@ -29,17 +31,18 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     const [showConfig, setShowConfig] = useState(false);
     const [empresaData, setEmpresaData] = useState<any>(null);
     const [savingEmpresa, setSavingEmpresa] = useState(false);
-    const [toast, setToast] = useState<{ show: boolean; msg: string; type: 'success' | 'error' }>({ show: false, msg: "", type: "success" });
+    const [toasts, setToasts] = useState<Toast[]>([]);
     const { search, setSearch, setActiveTab: setSearchTab } = useGlobalSearch();
     const [pedidosCount, setPedidosCount] = useState(0);
     const prevCountRef = useRef(0);
     const isFirstLoad = useRef(true);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
-    const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-        setToast({ show: true, msg, type });
-        setTimeout(() => setToast({ show: false, msg: "", type: "success" }), 3500);
-    }
+    const pushToast = (msg: string, type: Toast["type"] = "info") => {
+        const id = Date.now().toString() + Math.random().toString().slice(2);
+        setToasts(t => [...t, { id, msg, type }]);
+        setTimeout(() => setToasts(t => t.filter(x => x.id!== id)), 4000);
+    };
 
     useEffect(() => { const token = localStorage.getItem("access_token"); if (!token) { router.push("/login"); return; } try { const u = JSON.parse(localStorage.getItem("user") || "{}"); setUser(u); const r = normalizeRole(u?.role || u?.role_equivalente || u?.perfil_slug || "funcionario"); setRole(r); const saved = localStorage.getItem(`${moduleId}_tab`) || "home"; const allowed = ROLE_PERMISSIONS[r] || ROLE_PERMISSIONS["funcionario"]; if (allowed.includes("*") || allowed.includes(saved)) setActiveTab(saved); else setActiveTab("home"); } catch { setUser({}); } }, [moduleId, router]);
     useEffect(() => { if (!user?.nome) return; setShowWelcome(true); const t = setTimeout(() => setShowWelcome(false), 3200); return () => clearTimeout(t); }, [user]);
@@ -82,7 +85,6 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
         try {
             const token = localStorage.getItem("access_token");
             const fd = new FormData();
-            // TODOS editáveis agora - inclusive nome e nif
             ["nome_fantasia","nif","email","phone","address","city","province","iban","iban2","banco1","banco2"].forEach(k=>{
                 const val = k === "nome_fantasia"? (data.companyName || data.nome_fantasia) : data[k];
                 if (val && String(val).trim()!== "") fd.append(k, String(val).trim())
@@ -93,9 +95,9 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
             const updated = await res.json();
             setEmpresaData((prev:any) => ({...prev,...updated, companyName: updated.nome_fantasia }));
             setShowConfig(false);
-            showToast(`Empresa ${updated.nome_fantasia || data.companyName} atualizada com sucesso!`, 'success');
+            pushToast(`Empresa ${updated.nome_fantasia || data.companyName} atualizada com sucesso!`, 'success');
         } catch (e: any) {
-            showToast("Erro ao atualizar empresa: " + (e.message?.slice(0,120) || "tente novamente"), 'error');
+            pushToast("Erro ao atualizar: " + (e.message?.slice(0,120) || "tente novamente"), 'error');
         } finally { setSavingEmpresa(false) }
     }
 
@@ -119,6 +121,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     return (
         <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId, role, can, pedidosCount, setPedidosCount }}>
             <div className="h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-0 md:p-[14px] md:gap-[14px]" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
+                <Toasts toasts={toasts} setToasts={setToasts} />
                 <div className="hidden md:flex shrink-0"><Sidebar activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} onOpenConfig={() => setShowConfig(true)} /></div>
                 {!isVendasOpen && (<div className={`fixed inset-0 z-[300] md:hidden transition ${isMobileOpen? "visible" : "invisible"}`}><div className={`absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity ${isMobileOpen? "opacity-100" : "opacity-0"}`} onClick={() => setIsMobileOpen(false)} /><div className={`absolute left-0 top-0 h-full w-[84%] max-w-[330px] bg-[#EDEBE6] p-4 shadow-[8px_0_30px_rgba(0,0,0,0.15)] transition-transform duration-300 overflow-y-auto no-scrollbar ${isMobileOpen? "translate-x-0" : "-translate-x-full"}`}><div className="flex justify-between items-center mb-6"><div className="flex items-center gap-2"><div className="w-8 h-8 bg-black text-white rounded-full grid place-items-center text-[10px] font-black">JD</div><div className="leading-none"><p className="text-[12px] font-black">Menu</p><p className="text-[10px] text-[#8A8A8A] capitalize">{role.replace('_', ' ')}</p></div></div><button onClick={() => setIsMobileOpen(false)} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center active:scale-95"><X size={16} /></button></div><Sidebar isMobile={true} activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} onOpenConfig={() => { setIsMobileOpen(false); setShowConfig(true) }} /></div></div>)}
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -127,22 +130,8 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                 </div>
                 {isVendasOpen && <div className="absolute inset-0 z-[100] bg-[#EDEBE6] flex flex-col overflow-hidden"><div className="flex-1 overflow-hidden p-0 md:p-[14px]"><VendasTab onClose={() => setActiveTab("home")} /></div></div>}
             </div>
-
             {empresaData && <ModalEmpresa open={showConfig} initialData={empresaData} saving={savingEmpresa} onClose={() => setShowConfig(false)} onSave={handleSaveEmpresa} />}
-
-            {/* TOAST - ESTILO MESA */}
-            {toast.show && (
-                <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[999] pointer-events-none">
-                    <div className={`flex items-center gap-2 px-4 py-3 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.15)] border text-[12px] font-bold animate-[slideUp_0.3s_ease] ${toast.type === 'success'? 'bg-black text-white border-black' : 'bg-white text-red-600 border-red-100'}`}>
-                        <span className={`w-6 h-6 rounded-full flex items-center justify-center ${toast.type === 'success'? 'bg-white/15' : 'bg-red-50'}`}>
-                            {toast.type === 'success'? <Check size={14} /> : <X size={14} />}
-                        </span>
-                        {toast.msg}
-                    </div>
-                </div>
-            )}
-
-            <style jsx global>{`@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}} html,body{height:100%;overflow:hidden;background:#EDEBE6;scrollbar-width:none}::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
+            <style jsx global>{`html,body{height:100%;overflow:hidden;background:#EDEBE6;scrollbar-width:none}::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
         </DashboardCtx.Provider>
     );
 }
