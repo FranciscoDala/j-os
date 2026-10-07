@@ -8,11 +8,12 @@ export function ProdutoDetalheModal({ produto, open, onClose, canManage, onEdit 
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-4">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-[4px]" onClick={onClose} />
+            {/* TRAVADO: sem onClick aqui */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-[4px]" />
             <div className="relative w-full max-w-[420px] bg-white rounded-[28px] shadow-[0_30px_80px_rgba(0,0,0,0.4)] overflow-hidden flex flex-col max-h-[92dvh] md:max-h-[90vh] animate-in fade-in zoom-in-95">
 
-                {/* IMAGEM - SEM ZOOM */}
-                <div className="relative w-full h-[200px] md:h-[230px] bg-white border-b border-zinc-100 overflow-hidden shrink-0 flex items-center justify-center p-3">
+                {/* IMAGEM MAIOR - 260px */}
+                <div className="relative w-full h-[260px] md:h-[300px] bg-white border-b border-zinc-100 overflow-hidden shrink-0 flex items-center justify-center p-4">
                     <img
                         src={getImgUrl(p.imagem_url)}
                         alt={p.nome}
