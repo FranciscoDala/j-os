@@ -45,6 +45,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const [mostrarCatalogoExtra, setMostrarCatalogoExtra] = useState(false);
     const PEDIDOS_QR_API = `${API_URL}/api/v1/pedidos-qr`;
     const qrProcessadoRef = useRef<string | null>(null);
+    const adicionandoRef = useRef(false);
 
     const pushToast = (msg: string, type: Toast["type"] = "info") => {
         const id = Date.now().toString() + Math.random().toString().slice(2);
@@ -52,7 +53,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         setTimeout(() => setToasts(t => t.filter(x => x.id!== id)), 4000);
     };
 
-    // MODO QR - EXISTENTE
     useEffect(() => {
         const raw = localStorage.getItem("atender_mesa_qr");
         if (!raw) return;
@@ -64,6 +64,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             setPedidoQrAtivo(dados);
             setFecharMesaAtiva(null);
             setMostrarCatalogoExtra(false);
+            setCart([]); // LIMPA ANTES PRA NÃO ACUMULAR
             (async () => {
                 const empresaId = getEmpresaId();
                 if (!empresaId) return;
@@ -79,7 +80,9 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                                 id: it.produto_id || it.produto?.id || it.id,
                                 name: it.produto_nome || it.nome,
                                 price: Number(it.preco_unit || it.preco || it.preco_venda || 0),
-                                img: "", qtd: Number(it.quantidade || 1), origem: "qr" as const
+                                img: "",
+                                qtd: Number(it.quantidade || 1),
+                                origem: "qr" as const
                             }));
                             setCart(cartItens);
                             pushToast(`MESA ${mesa.numero} - ${dados.cliente_nome} • ${cartItens.length} itens`, "success");
@@ -90,7 +93,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         } catch { }
     }, []);
 
-    // NOVO MODO FECHAR MESA
     useEffect(() => {
         const raw = localStorage.getItem("fechar_mesa");
         if (!raw) return;
@@ -100,6 +102,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             setPedidoQrAtivo(null);
             setMesaSelecionada({ id: dados.mesa_id, numero: dados.mesa_numero, venda_atual_id: dados.venda_id });
             setMostrarCatalogoExtra(false);
+            setCart([]);
             (async () => {
                 try {
                     const r = await fetch(`${VENDAS_API}/${dados.venda_id}`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
@@ -117,11 +120,11 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                     }));
                     setCart(cartItens);
                     pushToast(`Fechando MESA ${dados.mesa_numero} • ${cartItens.length} itens • Kz ${Number(venda.total || 0).toLocaleString("de-DE")}`, "success");
-                } catch (e:any) {
+                } catch (e: any) {
                     pushToast(e.message || "Erro ao carregar mesa", "error");
                 }
             })();
-        } catch {}
+        } catch { }
     }, []);
 
     useEffect(() => {
@@ -135,7 +138,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         return () => window.removeEventListener("keydown", onKey);
     }, [showSearch]);
 
-    useEffect(() => { if (showSearch) { setTimeout(()=>searchRef.current?.focus(), 50); } }, [showSearch]);
+    useEffect(() => { if (showSearch) { setTimeout(() => searchRef.current?.focus(), 50); } }, [showSearch]);
 
     useEffect(() => {
         const fetchReal = async () => {
@@ -160,13 +163,16 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const getStockState = (p: any) => { if (!p.controlar_stock) return "ok"; const atual = Number(p.stock_atual?? 0); if (atual <= 0) return "zero"; if (atual <= 5) return "low"; return "ok"; };
 
     const add = (p: any) => {
-        if (fecharMesaAtiva) return; // TRAVA NO MODO FECHAR
+        if (fecharMesaAtiva) return;
         const state = getStockState(p);
         if (state === "zero") { pushToast(`Sem stock: "${p.nome}"`, "error"); return; }
-        const ex = cart.find((c) => c.id === p.id);
-        if (ex) setCart(cart.map((c) => (c.id === p.id? {...c, qtd: c.qtd + 1 } : c)));
-        else setCart([...cart, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: p.imagem_url? `${API_URL}${p.imagem_url}` : "", qtd: 1, origem: pedidoQrAtivo? "extra" : "balcao" }]);
+        setCart(prev => {
+            const ex = prev.find((c) => c.id === p.id);
+            if (ex) return prev.map((c) => (c.id === p.id? {...c, qtd: c.qtd + 1 } : c));
+            return [...prev, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: p.imagem_url? `${API_URL}${p.imagem_url}` : "", qtd: 1, origem: pedidoQrAtivo? "extra" : "balcao" }];
+        });
     };
+
     const removerDoCarrinho = (id: string) => {
         if (fecharMesaAtiva) return;
         setCart(prev => prev.filter((c: any) => c.id!== id));
@@ -183,12 +189,29 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     };
 
     const adicionarNaMesa = async () => {
-        if (!mesaSelecionada || cart.length === 0 || finalizando) return;
-        const vendaId = mesaSelecionada.venda_atual_id || vendaMesa?.id;
+        if (!mesaSelecionada || cart.length === 0 || finalizando || adicionandoRef.current) return;
+        adicionandoRef.current = true;
         setFinalizando(true);
         try {
+            const vendaId = mesaSelecionada.venda_atual_id || vendaMesa?.id;
+
+            // FILTRA DUPLICADO SEM SOMAR - mantém exatamente o que veio do QR
+            const seen = new Set<string>();
+            const itensUnicos = cart
+               .filter((c: any) => {
+                    if (seen.has(c.id)) return false;
+                    seen.add(c.id);
+                    return true;
+                })
+               .map((c: any) => ({
+                    produto_id: c.id,
+                    quantidade: Number(c.qtd || 1) // 1 água = 1, 2 águas = 2
+                }));
+
+            if (itensUnicos.length === 0) return;
+
             if (!vendaId) {
-                const rCreate = await fetch(`${VENDAS_API}/`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() as any }, body: JSON.stringify({ mesa_id: mesaSelecionada.id, itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })), dinheiro_recebido: 0, forma_pagamento: "DINHEIRO", pessoas: mesaSelecionada.pessoas_atual || 1, modo: "mesa" }) });
+                const rCreate = await fetch(`${VENDAS_API}/`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() as any }, body: JSON.stringify({ mesa_id: mesaSelecionada.id, itens: itensUnicos, dinheiro_recebido: 0, forma_pagamento: "DINHEIRO", pessoas: mesaSelecionada.pessoas_atual || 1, modo: "mesa" }) });
                 const txt = await rCreate.text(); let data: any = {}; try { data = JSON.parse(txt); } catch { data = { detail: txt }; }
                 if (!rCreate.ok) throw new Error(data.detail || "Erro ao criar comanda");
                 if (pedidoQrAtivo) {
@@ -200,7 +223,8 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                 pushToast(`Mesa ${mesaSelecionada.numero} +Kz ${total.toLocaleString("de-DE")}`, "success");
                 setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("All"); return;
             }
-            const r = await fetch(`${VENDAS_API}/${vendaId}/itens`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() as any }, body: JSON.stringify({ itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })) }) });
+
+            const r = await fetch(`${VENDAS_API}/${vendaId}/itens`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() as any }, body: JSON.stringify({ itens: itensUnicos }) });
             const txt = await r.text(); let data: any = {}; try { data = JSON.parse(txt); } catch { data = { detail: txt }; }
             if (!r.ok) throw new Error(data.detail || "Erro ao adicionar na mesa");
             if (pedidoQrAtivo) {
@@ -211,19 +235,28 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             }
             pushToast(`Mesa ${mesaSelecionada.numero} +Kz ${total.toLocaleString("de-DE")}`, "success");
             setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("All");
-        } catch (e: any) { pushToast(e.message, "error"); } finally { setFinalizando(false); }
+        } catch (e: any) { pushToast(e.message, "error"); } finally {
+            setFinalizando(false);
+            setTimeout(() => { adicionandoRef.current = false; }, 1000);
+        }
     };
 
     const finalizarBalcao = async () => {
         if (cart.length === 0) return;
         if (forma === "dinheiro" && recebidoNum < total) { pushToast("Valor insuficiente", "error"); return; }
+        if (adicionandoRef.current) return;
+        adicionandoRef.current = true;
         setFinalizando(true);
         try {
-            const payload = { itens: cart.map(c => ({ produto_id: c.id, quantidade: c.qtd })), forma_pagamento: forma.toUpperCase(), dinheiro_recebido: forma === "dinheiro"? recebidoNum : total, mesa_id: null, modo: "balcao" };
+            const seen = new Set<string>();
+            const itensUnicos = cart
+               .filter((c: any) => { if (seen.has(c.id)) return false; seen.add(c.id); return true; })
+               .map(c => ({ produto_id: c.id, quantidade: c.qtd }));
+            const payload = { itens: itensUnicos, forma_pagamento: forma.toUpperCase(), dinheiro_recebido: forma === "dinheiro"? recebidoNum : total, mesa_id: null, modo: "balcao" };
             const r = await fetch(`${VENDAS_API}/`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() as any }, body: JSON.stringify(payload) });
             const txt = await r.text(); let data: any = {}; try { data = JSON.parse(txt) } catch { data = { detail: txt } }; if (!r.ok) throw new Error(data.detail || "Erro");
             setUltimaVenda(data); setShowPay(false); setShowConfirm(true);
-        } catch (e: any) { pushToast(e.message, "error"); } finally { setFinalizando(false); }
+        } catch (e: any) { pushToast(e.message, "error"); } finally { setFinalizando(false); setTimeout(() => { adicionandoRef.current = false; }, 1000); }
     };
 
     const fecharMesaFinal = async () => {
@@ -240,14 +273,14 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                     dinheiro_recebido: forma === "dinheiro"? recebidoNum : total
                 })
             });
-            const txt = await r.text(); let data:any={}; try{ data=JSON.parse(txt) }catch{ data={detail:txt} }
+            const txt = await r.text(); let data: any = {}; try { data = JSON.parse(txt) } catch { data = { detail: txt } }
             if (!r.ok) throw new Error(data.detail || "Erro ao fechar mesa");
             setUltimaVenda({...data, mesa_numero: fecharMesaAtiva.mesa_numero });
             setShowPay(false);
             setShowConfirm(true);
             localStorage.removeItem("fechar_mesa");
             window.dispatchEvent(new CustomEvent("mesa:update"));
-        } catch (e:any) { pushToast(e.message, "error"); } finally { setFinalizando(false); }
+        } catch (e: any) { pushToast(e.message, "error"); } finally { setFinalizando(false); }
     };
 
     const imprimirFaturaFinal = () => {
@@ -267,6 +300,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         localStorage.removeItem("atender_mesa_qr");
         localStorage.removeItem("fechar_mesa");
         qrProcessadoRef.current = null;
+        adicionandoRef.current = false;
     };
 
     const cancelarTudo = () => {
@@ -283,10 +317,11 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         setMesaSelecionada(null);
         setCart([]);
         setVendaMesa(null);
+        adicionandoRef.current = false;
     };
 
-    const produtosDoPedidoIds = pedidoQrAtivo?.itens?.map((it:any)=> it.produto_id || it.produto?.id) || [];
-    const produtosFiltradosQr = pedidoQrAtivo? dbProducts.filter((p:any)=> produtosDoPedidoIds.includes(p.id)).length > 0? dbProducts.filter((p:any)=> produtosDoPedidoIds.includes(p.id)) : pedidoQrAtivo.itens.map((it:any)=>({ id: it.produto_id || it.id, nome: it.produto_nome || it.nome, preco_venda: it.preco_unit || it.preco || 0, categoria: "Pedido QR", imagem_url: it.produto_imagem_url || null, controlar_stock: false, _qtd_pedido: it.quantidade })) : [];
+    const produtosDoPedidoIds = pedidoQrAtivo?.itens?.map((it: any) => it.produto_id || it.produto?.id) || [];
+    const produtosFiltradosQr = pedidoQrAtivo? dbProducts.filter((p: any) => produtosDoPedidoIds.includes(p.id)).length > 0? dbProducts.filter((p: any) => produtosDoPedidoIds.includes(p.id)) : pedidoQrAtivo.itens.map((it: any) => ({ id: it.produto_id || it.id, nome: it.produto_nome || it.nome, preco_venda: it.preco_unit || it.preco || 0, categoria: "Pedido QR", imagem_url: it.produto_imagem_url || null, controlar_stock: false, _qtd_pedido: it.quantidade })) : [];
     const filteredByCatBase = activeCat === "All"? dbProducts : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
     const filteredByCat = fecharMesaAtiva? [] : (pedidoQrAtivo &&!mostrarCatalogoExtra? produtosFiltradosQr : filteredByCatBase);
 
@@ -312,7 +347,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                             <p className="text-[30px] font-black text-[#2F4A8A] mt-4">Kz {total.toLocaleString("de-DE")}</p>
                         </div>
                     ) : (
-                        <ProdutosSection dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd} cats={cats} activeCat={activeCat} setActiveCat={setActiveCat} searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef} getQty={getQty} getStockState={getStockState} add={add} modoMesa={false} mesasOcupadas={[]} loadingMesas={false} mesaSelecionada={null} onSelectMesa={()=>{}} fetchMesas={()=>{}} cart={cart} cartTotal={total} onFecharMesa={()=>{}} onImprimirConta={()=>{}} pedidoQrAtivo={pedidoQrAtivo} mostrarCatalogoExtra={mostrarCatalogoExtra} setMostrarCatalogoExtra={setMostrarCatalogoExtra} />
+                        <ProdutosSection dbProducts={dbProducts} filteredByCat={filteredByCat} loadingProd={loadingProd} cats={cats} activeCat={activeCat} setActiveCat={setActiveCat} searchV={searchV} setSearchV={setSearchV} showSearch={showSearch} setShowSearch={setShowSearch} searchRef={searchRef} getQty={getQty} getStockState={getStockState} add={add} modoMesa={false} mesasOcupadas={[]} loadingMesas={false} mesaSelecionada={null} onSelectMesa={() => { }} fetchMesas={() => { }} cart={cart} cartTotal={total} onFecharMesa={() => { }} onImprimirConta={() => { }} pedidoQrAtivo={pedidoQrAtivo} mostrarCatalogoExtra={mostrarCatalogoExtra} setMostrarCatalogoExtra={setMostrarCatalogoExtra} />
                     )}
                 </div>
                 <div className="w-full lg:w-[340px] shrink-0 overflow-hidden bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex flex-col h-[42dvh] lg:h-full">
