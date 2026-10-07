@@ -4,6 +4,7 @@ import { X, Plus, CheckCircle, AlertTriangle, Info, ChevronDown } from "lucide-r
 import { ProdutoCard } from "./cards/produto";
 import { ProdutoDeleteModal } from "./modals/apagar";
 import { ProdutoModal } from "./modals/criar";
+import { ProdutoDetalheModal } from "./modals/detalhe";
 import { useDashboard } from "@/components/dashboard/Tamplate";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 
@@ -23,11 +24,7 @@ function getAuthHeaders() {
 function FilterSelect({ value, onChange, options, placeholder }: { value: string, onChange: (v: string) => void, options: string[], placeholder?: string }) {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
-    useEffect(() => {
-        const h = (e: MouseEvent) => { if (ref.current &&!ref.current.contains(e.target as Node)) setOpen(false); };
-        document.addEventListener("mousedown", h);
-        return () => document.removeEventListener("mousedown", h);
-    }, []);
+    useEffect(() => { const h = (e: MouseEvent) => { if (ref.current &&!ref.current.contains(e.target as Node)) setOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
     return (
         <div ref={ref} className={`relative w-full ${open? "z-[60]" : "z-0"}`}>
             <button type="button" onClick={() => setOpen(!open)} className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 h-10 text-[11px] font-black flex items-center justify-between shadow-sm hover:border-[#A67C52] focus:ring-2 focus:ring-[#A67C52]/20 transition-all outline-none">
@@ -37,11 +34,7 @@ function FilterSelect({ value, onChange, options, placeholder }: { value: string
             {open && (
                 <div className="absolute top-full left-0 right-0 mt-2 min-w-[160px] bg-white rounded-[18px] border border-[#E8DCCF] shadow-[0_12px_32px_rgba(0,0,0,0.18)] z-[100] overflow-hidden p-1.5">
                     <div className="max-h-[220px] overflow-y-auto no-scrollbar space-y-0.5">
-                        {options.map(opt => (
-                            <button key={opt || "todas"} type="button" onClick={() => { onChange(opt); setOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full text-[11px] font-bold transition-all ${value === opt? "bg-[#A67C52] text-white" : "bg-white text-black hover:bg-[#F5E6D3]"}`}>
-                                {opt === ""? "Todas" : opt}
-                            </button>
-                        ))}
+                        {options.map(opt => (<button key={opt || "todas"} type="button" onClick={() => { onChange(opt); setOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full text-[11px] font-bold transition-all ${value === opt? "bg-[#A67C52] text-white" : "bg-white text-black hover:bg-[#F5E6D3]"}`}>{opt === ""? "Todas" : opt}</button>))}
                     </div>
                 </div>
             )}
@@ -66,6 +59,7 @@ export function ProdutosTab() {
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [saving, setSaving] = useState(false);
     const [deleteModal, setDeleteModal] = useState<{ id: string, nome: string, img: string } | null>(null);
+    const [viewProduto, setViewProduto] = useState<any>(null);
 
     const pushToast = (msg: string, type: Toast["type"] = "info") => {
         const id = Date.now().toString() + Math.random().toString().slice(2);
@@ -145,7 +139,7 @@ export function ProdutosTab() {
 
             <div className="grid gap-2.5 md:gap-3 grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {items.map(p => (
-                    <ProdutoCard key={p.id} p={p} canManage={canManage} onEdit={openEdit} onDelete={(prod) => { if(!canManage) return pushToast("Sem permissão", "error"); setDeleteModal({ id: prod.id, nome: prod.nome, img: prod.imagem_url }); }} />
+                    <ProdutoCard key={p.id} p={p} canManage={canManage} onView={setViewProduto} onEdit={openEdit} onDelete={(prod) => { if(!canManage) return pushToast("Sem permissão", "error"); setDeleteModal({ id: prod.id, nome: prod.nome, img: prod.imagem_url }); }} />
                 ))}
             </div>
 
@@ -158,6 +152,7 @@ export function ProdutosTab() {
 
             <ProdutoDeleteModal data={deleteModal} onClose={() => setDeleteModal(null)} onConfirm={confirmDelete} />
             <ProdutoModal open={open} editId={editId} tab={tab} setTab={setTab} form={form} setForm={setForm} preview={preview} setPreview={setPreview} setImgFile={setImgFile} cats={cats} saving={saving} onClose={() => setOpen(false)} onSave={handleSave} />
+            <ProdutoDetalheModal produto={viewProduto} open={!!viewProduto} onClose={() => setViewProduto(null)} canManage={canManage} onEdit={openEdit} />
         </div>
     )
 }
