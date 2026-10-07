@@ -7,7 +7,35 @@ from.models import RoleEnum
 class EmpresaResumo(BaseModel):
     id: UUID
     nome: Optional[str] = "Loja"
+    nome_fantasia: Optional[str] = None
+    nif: Optional[str] = None
     role: RoleEnum
+    logo_url: Optional[str] = None
+
+class EmpresaCompleta(BaseModel):
+    id: UUID
+    nome_fantasia: str
+    cnpj: Optional[str] = None
+    tipo: Optional[str] = None
+    nif: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    province: Optional[str] = None
+    iban: Optional[str] = None
+    iban2: Optional[str] = None
+    banco1: Optional[str] = None
+    banco2: Optional[str] = None
+    logo_url: Optional[str] = None
+    image_url: Optional[str] = None
+    nif_verified: bool = False
+    nif_agt_name: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
 
 class UserCreate(BaseModel):
     nome: str
@@ -40,5 +68,6 @@ class LoginResponse(BaseModel):
     temp_token: Optional[str] = None
     token_type: str = "bearer"
     empresas: Optional[List[EmpresaResumo]] = None
+    empresa: Optional[EmpresaCompleta] = None # <-- todas as infos
     user: UserOut
     empresa_id: Optional[str] = None

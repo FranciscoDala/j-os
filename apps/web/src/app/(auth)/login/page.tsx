@@ -25,10 +25,10 @@ export default function LoginPage() {
         setLoading(true);
         try {
             const data = await loginApi(email, senha);
-            // loginApi já salvou access_token, user, empresas, empresa_id
             if (data.access_token) {
-                setToast({ msg: `Bem-vindo, ${data.user?.nome || "Dr."}!`, type: "success" });
-                setTimeout(() => { window.location.href = "/dashboard"; }, 600);
+                const nomeEmp = data.empresa?.nome_fantasia || data.user?.nome || "Dr.";
+                setToast({ msg: `Bem-vindo, ${nomeEmp}!`, type: "success" });
+                setTimeout(() => { window.location.href = "/dashboard/restaurante"; }, 600);
                 return;
             }
             if (data.temp_token) {

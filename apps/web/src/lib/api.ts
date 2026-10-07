@@ -1,6 +1,7 @@
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const BASE = `${API_URL}/api/v1`;
 export const WS_URL = API_URL.replace(/^http/, "ws") + "/api/v1/realtime/ws";
+import type { Empresa } from "./types";
 
 function getAuthHeaders(): Record<string, string> {
     if (typeof window === 'undefined') return {};
@@ -42,10 +43,22 @@ export const getAtividades = (params?: any) => apiFetch(`/atividade/${params? `?
 export const login = (payload: any) => apiFetch("/auth/login", { method: "POST", body: JSON.stringify(payload) });
 export const selectEmpresa = (payload: any) => apiFetch("/auth/select-empresa", { method: "POST", body: JSON.stringify(payload) });
 export const getMe = () => apiFetch("/auth/me");
+export const getEmpresa = (id: string): Promise<Empresa> => apiFetch(`/empresas/${id}`);
 
-// ENTIDADES - NOVO PROFISSIONAL
+// ENTIDADES
 export const getEntidades = (empresa_id: string, tipo?: string) => apiFetch(`/entidades/${empresa_id}${tipo? `?tipo=${tipo}` : ''}`);
 export const getPerfis = (empresa_id: string) => apiFetch(`/entidades/${empresa_id}/perfis`);
+
+// STORAGE TIPADO
+export const getEmpresaData = (): Empresa | null => {
+    if (typeof window === 'undefined') return null;
+    try { return JSON.parse(localStorage.getItem("empresa_data") || "null"); } catch { return null; }
+};
+export const setEmpresaData = (empresa: Empresa) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem("empresa_data", JSON.stringify(empresa));
+    window.dispatchEvent(new CustomEvent("empresa:updated", { detail: empresa }));
+};
 
 export const loginApi = async (email: string, senha: string) => {
     const data = await login({ email: email.toLowerCase().trim(), senha });
@@ -54,7 +67,8 @@ export const loginApi = async (email: string, senha: string) => {
         if (data.temp_token) localStorage.setItem("temp_token", data.temp_token);
         if (data.user) localStorage.setItem("user", JSON.stringify(data.user));
         if (data.empresas) localStorage.setItem("empresas", JSON.stringify(data.empresas));
-        const empresaId = data.empresa_id || data.empresas?.[0]?.id || data.user?.empresa_id;
+        if (data.empresa) setEmpresaData(data.empresa as Empresa);
+        const empresaId = data.empresa_id || data.empresa?.id || data.empresas?.[0]?.id || data.user?.empresa_id;
         if (empresaId) localStorage.setItem("empresa_id", String(empresaId));
         if (data.access_token) localStorage.removeItem("temp_token");
     }
@@ -70,6 +84,7 @@ export const selectEmpresaApi = async (empresa_id: string) => {
         localStorage.setItem("token", data.access_token);
         localStorage.setItem("empresa_id", String(empresa_id));
         if (data.user) localStorage.setItem("user", JSON.stringify(data.user));
+        if (data.empresa) setEmpresaData(data.empresa as Empresa);
         localStorage.removeItem("temp_token");
         localStorage.removeItem("empresas");
     }

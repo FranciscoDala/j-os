@@ -4,6 +4,8 @@ import { X } from "lucide-react";
 import { ProdutosSection } from "./cards/produto";
 import { CarrinhoSection } from "./carrinho/carrinho";
 import { Toasts, PayModal, ConfirmModal } from "./modals/venda";
+import { useEmpresa } from "@/components/dashboard/empresaContext";
+import { imprimirRecibo } from "./recibo/ReciboVenda";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const API_BASE = `${API_URL}/api/v1/produtos`;
@@ -13,16 +15,18 @@ const MESAS_API = `${API_URL}/api/v1/mesas`;
 type Toast = { id: string; msg: string; type: "success" | "error" | "info" | "warning" };
 
 function getAuthHeaders() {
-    const token = typeof window!== "undefined"? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null;
-    const empresa_id = typeof window!== "undefined"? localStorage.getItem("empresa_id") : null;
+    const token = typeof window !== "undefined" ? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null;
+    const empresa_id = typeof window !== "undefined" ? localStorage.getItem("empresa_id") : null;
     const h: Record<string, string> = {};
     if (token) h["Authorization"] = `Bearer ${token}`;
     if (empresa_id) h["X-Empresa-ID"] = empresa_id;
     return h;
 }
-function getEmpresaId() { return typeof window!== "undefined"? localStorage.getItem("empresa_id") : null; }
+function getEmpresaId() { return typeof window !== "undefined" ? localStorage.getItem("empresa_id") : null; }
 
 export function VendasTab({ onClose }: { onClose: () => void }) {
+    const { empresa } = useEmpresa();
+
     const [activeCat, setActiveCat] = useState("All");
     const [searchV, setSearchV] = useState("");
     const [showSearch, setShowSearch] = useState(false);
@@ -50,7 +54,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const pushToast = (msg: string, type: Toast["type"] = "info") => {
         const id = Date.now().toString() + Math.random().toString().slice(2);
         setToasts(t => [...t, { id, msg, type }]);
-        setTimeout(() => setToasts(t => t.filter(x => x.id!== id)), 4000);
+        setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000);
     };
 
     useEffect(() => {
@@ -74,7 +78,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                     const mesa = mesas.find((m: any) => m.id === dados.mesa_id || m.numero === dados.mesa_numero);
                     if (mesa) {
                         setMesaSelecionada(mesa);
-                        setVendaMesa(mesa.venda_atual_id? { id: mesa.venda_atual_id } : null);
+                        setVendaMesa(mesa.venda_atual_id ? { id: mesa.venda_atual_id } : null);
                         if (dados.itens?.length) {
                             const cartItens = dados.itens.map((it: any) => ({
                                 id: it.produto_id || it.produto?.id || it.id,
@@ -124,7 +128,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if ((e.key === "/" &&!(e.target instanceof HTMLInputElement)) || (e.ctrlKey && e.key.toLowerCase() === "k")) {
+            if ((e.key === "/" && !(e.target instanceof HTMLInputElement)) || (e.ctrlKey && e.key.toLowerCase() === "k")) {
                 e.preventDefault(); setShowSearch(true); setTimeout(() => searchRef.current?.focus(), 80);
             }
             if (e.key === "Escape" && showSearch) { setShowSearch(false); setSearchV(""); }
@@ -142,7 +146,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                 const qs = new URLSearchParams({ skip: "0", limit: "100", search: searchV });
                 const r = await fetch(`${API_BASE}/?${qs}`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
                 const data = await r.json();
-                if (r.ok) setDbProducts((data.items || []).filter((p: any) => p.ativo!== false));
+                if (r.ok) setDbProducts((data.items || []).filter((p: any) => p.ativo !== false));
             } catch { } setLoadingProd(false);
         };
         fetchReal();
@@ -154,8 +158,8 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         }; fetchCats();
     }, []);
 
-    const cats = ["All",...catsDb];
-    const getStockState = (p: any) => { if (!p.controlar_stock) return "ok"; const atual = Number(p.stock_atual?? 0); if (atual <= 0) return "zero"; if (atual <= 5) return "low"; return "ok"; };
+    const cats = ["All", ...catsDb];
+    const getStockState = (p: any) => { if (!p.controlar_stock) return "ok"; const atual = Number(p.stock_atual ?? 0); if (atual <= 0) return "zero"; if (atual <= 5) return "low"; return "ok"; };
 
     const add = (p: any) => {
         if (fecharMesaAtiva) return;
@@ -163,14 +167,14 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         if (state === "zero") { pushToast(`Sem stock: "${p.nome}"`, "error"); return; }
         setCart(prev => {
             const ex = prev.find((c) => c.id === p.id);
-            if (ex) return prev.map((c) => (c.id === p.id? {...c, qtd: Number(c.qtd) + 1 } : c));
-            return [...prev, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: p.imagem_url? `${API_URL}${p.imagem_url}` : "", qtd: 1, origem: pedidoQrAtivo? "extra" : "balcao" }];
+            if (ex) return prev.map((c) => (c.id === p.id ? { ...c, qtd: Number(c.qtd) + 1 } : c));
+            return [...prev, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: p.imagem_url ? `${API_URL}${p.imagem_url}` : "", qtd: 1, origem: pedidoQrAtivo ? "extra" : "balcao" }];
         });
     };
 
     const removerDoCarrinho = (id: string) => {
         if (fecharMesaAtiva) return;
-        setCart(prev => prev.filter((c: any) => c.id!== id));
+        setCart(prev => prev.filter((c: any) => c.id !== id));
     };
     const getQty = (id: string) => cart.find((c) => c.id === id)?.qtd || 0;
 
@@ -179,16 +183,16 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         for (const c of cart) {
             const key = String(c.id);
             if (map.has(key)) map.get(key).qtd = Number(map.get(key).qtd) + Number(c.qtd);
-            else map.set(key, {...c});
+            else map.set(key, { ...c });
         }
         return Array.from(map.values()).reduce((s, i) => s + Number(i.price) * Number(i.qtd), 0);
     }, [cart]);
 
-    const recebidoNum = recebido? parseFloat(recebido) : 0;
+    const recebidoNum = recebido ? parseFloat(recebido) : 0;
     const handleCalc = (val: string) => {
         if (val === "C") setRecebido(""); else if (val === "DEL") setRecebido((s) => s.slice(0, -1));
-        else if (val === "00") { if (recebido!== "") setRecebido((s) => s + "00"); }
-        else if (val === ".") { if (!recebido.includes(".")) setRecebido((s) => (s === ""? "0." : s + ".")); }
+        else if (val === "00") { if (recebido !== "") setRecebido((s) => s + "00"); }
+        else if (val === ".") { if (!recebido.includes(".")) setRecebido((s) => (s === "" ? "0." : s + ".")); }
         else { setRecebido((s) => (s + val).slice(0, 10)); }
     };
 
@@ -199,44 +203,43 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         try {
             if (pedidoQrAtivo) {
                 const idQr = pedidoQrAtivo.id || pedidoQrAtivo.pedido_id;
-                const itensQr = cart.filter((c:any)=> c.origem === "qr");
-                const itensExtra = cart.filter((c:any)=> c.origem === "extra");
+                const itensExtra = cart.filter((c: any) => c.origem === "extra");
                 const rAprovar = await fetch(`${PEDIDOS_QR_API}/${idQr}/aprovar`, { method: "POST", headers: getAuthHeaders() as any });
-                const txtA = await rAprovar.text(); let dataA:any={}; try{ dataA=JSON.parse(txtA);}catch{ dataA={detail:txtA};}
+                const txtA = await rAprovar.text(); let dataA: any = {}; try { dataA = JSON.parse(txtA); } catch { dataA = { detail: txtA }; }
                 if (!rAprovar.ok) throw new Error(dataA.detail || "Erro ao aprovar pedido QR");
                 const vendaId = dataA.venda_id || mesaSelecionada.venda_atual_id || vendaMesa?.id;
                 if (itensExtra.length > 0 && vendaId) {
                     const mapExtra = new Map<string, any>();
                     for (const c of itensExtra) {
-                        if (mapExtra.has(c.id)) mapExtra.get(c.id).qtd += Number(c.qtd||1);
-                        else mapExtra.set(c.id, { id: c.id, qtd: Number(c.qtd||1) });
+                        if (mapExtra.has(c.id)) mapExtra.get(c.id).qtd += Number(c.qtd || 1);
+                        else mapExtra.set(c.id, { id: c.id, qtd: Number(c.qtd || 1) });
                     }
-                    const itensUnicosExtra = Array.from(mapExtra.values()).map((c:any)=>({ produto_id: c.id, quantidade: c.qtd }));
+                    const itensUnicosExtra = Array.from(mapExtra.values()).map((c: any) => ({ produto_id: c.id, quantidade: c.qtd }));
                     if (itensUnicosExtra.length > 0) {
-                        await fetch(`${VENDAS_API}/${vendaId}/itens`, { method:"POST", headers:{"Content-Type":"application/json",...getAuthHeaders() as any}, body: JSON.stringify({ itens: itensUnicosExtra }) });
+                        await fetch(`${VENDAS_API}/${vendaId}/itens`, { method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeaders() as any }, body: JSON.stringify({ itens: itensUnicosExtra }) });
                     }
                 }
                 window.dispatchEvent(new CustomEvent("pedido-qr:aprovado", { detail: { id: idQr } }));
                 localStorage.removeItem("atender_mesa_qr");
                 pushToast(`Mesa ${mesaSelecionada.numero} • Pedido aprovado`, "success");
-                setCart([]); setMesaSelecionada(null); setVendaMesa(null); setPedidoQrAtivo(null); qrProcessadoRef.current=null; setActiveCat("All");
+                setCart([]); setMesaSelecionada(null); setVendaMesa(null); setPedidoQrAtivo(null); qrProcessadoRef.current = null; setActiveCat("All");
                 return;
             }
             const vendaId = mesaSelecionada.venda_atual_id || vendaMesa?.id;
             const mapCart = new Map<string, any>();
             for (const c of cart) {
-                if (mapCart.has(c.id)) mapCart.get(c.id).qtd += Number(c.qtd||1);
-                else mapCart.set(c.id, { id: c.id, qtd: Number(c.qtd||1) });
+                if (mapCart.has(c.id)) mapCart.get(c.id).qtd += Number(c.qtd || 1);
+                else mapCart.set(c.id, { id: c.id, qtd: Number(c.qtd || 1) });
             }
-            const itensUnicos = Array.from(mapCart.values()).map((c:any)=>({ produto_id: c.id, quantidade: c.qtd }));
+            const itensUnicos = Array.from(mapCart.values()).map((c: any) => ({ produto_id: c.id, quantidade: c.qtd }));
             if (!vendaId) {
-                const rCreate = await fetch(`${VENDAS_API}/`, { method:"POST", headers:{"Content-Type":"application/json",...getAuthHeaders() as any}, body: JSON.stringify({ mesa_id: mesaSelecionada.id, itens: itensUnicos, dinheiro_recebido:0, forma_pagamento:"DINHEIRO", pessoas: mesaSelecionada.pessoas_atual||1, modo:"mesa" }) });
+                const rCreate = await fetch(`${VENDAS_API}/`, { method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeaders() as any }, body: JSON.stringify({ mesa_id: mesaSelecionada.id, itens: itensUnicos, dinheiro_recebido: 0, forma_pagamento: "DINHEIRO", pessoas: mesaSelecionada.pessoas_atual || 1, modo: "mesa" }) });
                 if (!rCreate.ok) throw new Error(await rCreate.text());
                 pushToast(`Mesa ${mesaSelecionada.numero} • ${itensUnicos.length} tipos`, "success");
                 setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("All");
                 return;
             }
-            const r = await fetch(`${VENDAS_API}/${vendaId}/itens`, { method:"POST", headers:{"Content-Type":"application/json",...getAuthHeaders() as any}, body: JSON.stringify({ itens: itensUnicos }) });
+            const r = await fetch(`${VENDAS_API}/${vendaId}/itens`, { method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeaders() as any }, body: JSON.stringify({ itens: itensUnicos }) });
             if (!r.ok) throw new Error(await r.text());
             pushToast(`Mesa ${mesaSelecionada.numero} • ${itensUnicos.length} tipos`, "success");
             setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("All");
@@ -254,12 +257,12 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         try {
             const mapCart = new Map<string, any>();
             for (const c of cart) {
-                if (mapCart.has(c.id)) mapCart.get(c.id).qtd += Number(c.qtd||1);
-                else mapCart.set(c.id, { id: c.id, qtd: Number(c.qtd||1) });
+                if (mapCart.has(c.id)) mapCart.get(c.id).qtd += Number(c.qtd || 1);
+                else mapCart.set(c.id, { id: c.id, qtd: Number(c.qtd || 1) });
             }
-            const itensUnicos = Array.from(mapCart.values()).map((c:any)=>({ produto_id: c.id, quantidade: c.qtd }));
-            const payload = { itens: itensUnicos, forma_pagamento: forma.toUpperCase(), dinheiro_recebido: forma === "dinheiro"? recebidoNum : total, mesa_id: null, modo: "balcao" };
-            const r = await fetch(`${VENDAS_API}/`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() as any }, body: JSON.stringify(payload) });
+            const itensUnicos = Array.from(mapCart.values()).map((c: any) => ({ produto_id: c.id, quantidade: c.qtd }));
+            const payload = { itens: itensUnicos, forma_pagamento: forma.toUpperCase(), dinheiro_recebido: forma === "dinheiro" ? recebidoNum : total, mesa_id: null, modo: "balcao" };
+            const r = await fetch(`${VENDAS_API}/`, { method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeaders() as any }, body: JSON.stringify(payload) });
             const txt = await r.text(); let data: any = {}; try { data = JSON.parse(txt) } catch { data = { detail: txt } }; if (!r.ok) throw new Error(data.detail || "Erro");
             setUltimaVenda(data); setShowPay(false); setShowConfirm(true);
         } catch (e: any) { pushToast(e.message, "error"); } finally { setFinalizando(false); setTimeout(() => { adicionandoRef.current = false; }, 1000); }
@@ -271,22 +274,36 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         setFinalizando(true);
         try {
             const vendaId = fecharMesaAtiva.venda_id;
-            const r = await fetch(`${VENDAS_API}/${vendaId}/fechar`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() as any }, body: JSON.stringify({ forma_pagamento: forma.toUpperCase(), dinheiro_recebido: forma === "dinheiro"? recebidoNum : total }) });
+            const r = await fetch(`${VENDAS_API}/${vendaId}/fechar`, { method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeaders() as any }, body: JSON.stringify({ forma_pagamento: forma.toUpperCase(), dinheiro_recebido: forma === "dinheiro" ? recebidoNum : total }) });
             const txt = await r.text(); let data: any = {}; try { data = JSON.parse(txt) } catch { data = { detail: txt } }
             if (!r.ok) throw new Error(data.detail || "Erro ao fechar mesa");
-            setUltimaVenda({...data, mesa_numero: fecharMesaAtiva.mesa_numero }); setShowPay(false); setShowConfirm(true); localStorage.removeItem("fechar_mesa"); window.dispatchEvent(new CustomEvent("mesa:update"));
+            setUltimaVenda({ ...data, mesa_numero: fecharMesaAtiva.mesa_numero }); setShowPay(false); setShowConfirm(true); localStorage.removeItem("fechar_mesa"); window.dispatchEvent(new CustomEvent("mesa:update"));
         } catch (e: any) { pushToast(e.message, "error"); } finally { setFinalizando(false); }
     };
 
     const imprimirFaturaFinal = () => {
         const v = ultimaVenda; if (!v) return;
-        const win = window.open("", "_blank", "width=320,height=600"); if (!win) return;
-        const itens = v.itens || cart;
-        const itensHtml = itens.map((i: any) => { const nome = i.nome_produto || i.produto_nome || i.nome || i.name; const qtd = i.quantidade || i.qtd; const unit = Number(i.preco_unit || i.price || 0); const tot = Number(i.total || i.subtotal || unit * qtd || 0); return `<tr><td>${nome} x${qtd}</td><td style="text-align:right">Kz ${Number(tot).toLocaleString("de-DE")}</td></tr>`; }).join("");
-        const totalFinal = Number(v.total || total).toLocaleString("de-DE");
-        win.document.write(`<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}</style></head><body><div class="center bold">FATURA #${v.numero || ""}<br/>MESA ${v.mesa_numero || fecharMesaAtiva?.mesa_numero || ""}</div><div class="line"></div><table>${itensHtml}</table><div class="line"></div><table><tr><td class="bold">TOTAL</td><td style="text-align:right" class="bold">Kz ${totalFinal}</td></tr></table><script>window.print();</script></body></html>`);
-        win.document.close();
+        const itensNorm = (v.itens || cart).map((i: any) => ({
+            nome: i.nome_produto || i.produto_nome || i.nome || i.name,
+            qtd: Number(i.quantidade || i.qtd || 1),
+            preco_unit: Number(i.preco_unit || i.price || 0),
+            total: Number(i.total || i.subtotal || (i.preco_unit || i.price || 0) * (i.quantidade || i.qtd || 1))
+        }));
+        imprimirRecibo({
+            empresa: empresa as any,
+            venda: {
+                numero: v.numero,
+                total: Number(v.total || total),
+                forma_pagamento: v.forma_pagamento || forma.toUpperCase(),
+                dinheiro_recebido: recebidoNum,
+                troco: recebidoNum - total,
+                created_at: v.created_at || new Date().toISOString(),
+                mesa_numero: v.mesa_numero || fecharMesaAtiva?.mesa_numero || mesaSelecionada?.numero
+            },
+            itens: itensNorm
+        });
     };
+
     const aposVenda = (comRecibo: boolean) => {
         if (comRecibo) imprimirFaturaFinal();
         setShowConfirm(false); setShowPay(false); setCart([]); setRecebido(""); setUltimaVenda(null); setMesaSelecionada(null); setVendaMesa(null); setPedidoQrAtivo(null); setFecharMesaAtiva(null); localStorage.removeItem("atender_mesa_qr"); localStorage.removeItem("fechar_mesa"); qrProcessadoRef.current = null; adicionandoRef.current = false;
@@ -297,22 +314,28 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     };
 
     const produtosDoPedidoIds = pedidoQrAtivo?.itens?.map((it: any) => it.produto_id || it.produto?.id) || [];
-    const produtosFiltradosQr = pedidoQrAtivo? dbProducts.filter((p: any) => produtosDoPedidoIds.includes(p.id)).length > 0? dbProducts.filter((p: any) => produtosDoPedidoIds.includes(p.id)) : pedidoQrAtivo.itens.map((it: any) => ({ id: it.produto_id || it.id, nome: it.produto_nome || it.nome, preco_venda: it.preco_unit || it.preco || 0, categoria: "Pedido QR", imagem_url: it.produto_imagem_url || null, controlar_stock: false })) : [];
-    const filteredByCatBase = activeCat === "All"? dbProducts : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
-    const filteredByCat = fecharMesaAtiva? [] : (pedidoQrAtivo &&!mostrarCatalogoExtra? produtosFiltradosQr : filteredByCatBase);
-    const modoFecharMesa =!!fecharMesaAtiva;
-    const isMesa =!!mesaSelecionada;
+    const produtosFiltradosQr = pedidoQrAtivo ? dbProducts.filter((p: any) => produtosDoPedidoIds.includes(p.id)).length > 0 ? dbProducts.filter((p: any) => produtosDoPedidoIds.includes(p.id)) : pedidoQrAtivo.itens.map((it: any) => ({ id: it.produto_id || it.id, nome: it.produto_nome || it.nome, preco_venda: it.preco_unit || it.preco || 0, categoria: "Pedido QR", imagem_url: it.produto_imagem_url || null, controlar_stock: false })) : [];
+    const filteredByCatBase = activeCat === "All" ? dbProducts : dbProducts.filter((p) => (p.categoria || "").toLowerCase() === activeCat.toLowerCase());
+    const filteredByCat = fecharMesaAtiva ? [] : (pedidoQrAtivo && !mostrarCatalogoExtra ? produtosFiltradosQr : filteredByCatBase);
+    const modoFecharMesa = !!fecharMesaAtiva;
+    const isMesa = !!mesaSelecionada;
 
     return (
         <div className="h-full w-full flex flex-col bg-[#EDEBE6] overflow-hidden relative" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
             <Toasts toasts={toasts} setToasts={setToasts} />
             <div className="h-[56px] px-4 flex items-center justify-between shrink-0 border-b border-[#026135a0] bg-[#EDEBE6]">
-                <h1 className="text-[20px] font-black tracking-tight text-black leading-none">{fecharMesaAtiva? `Fechar Mesa ${fecharMesaAtiva.mesa_numero}` : mesaSelecionada? `Mesa ${mesaSelecionada.numero}` : "Balcão"}</h1>
+                <div className="flex items-center gap-2">
+                    {empresa?.logo_url && <img src={empresa.logo_url} className="w-8 h-8 rounded-full object-cover border" />}
+                    <div>
+                        <h1 className="text-[14px] font-black tracking-tight text-black leading-none">{fecharMesaAtiva ? `Fechar Mesa ${fecharMesaAtiva.mesa_numero}` : mesaSelecionada ? `Mesa ${mesaSelecionada.numero}` : "Balcão"}</h1>
+                        <p className="text-[10px] font-bold text-zinc-500">{empresa?.nome_fantasia || ""} • {empresa?.nif || ""}</p>
+                    </div>
+                </div>
                 <button onClick={onClose} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center shadow-sm active:scale-[0.96]"><X size={14} /></button>
             </div>
             <div className="flex-1 flex flex-col lg:flex-row gap-4 px-4 pb-4 pt-3 overflow-hidden min-h-0">
                 <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                    {modoFecharMesa? (
+                    {modoFecharMesa ? (
                         <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center p-8 text-center bg-white rounded-[18px] border border-dashed">
                             <p className="font-black text-[14px]">Mesa {fecharMesaAtiva.mesa_numero} • {cart.length} itens</p>
                             <p className="text-[12px] text-zinc-500 mt-1 font-bold">Conferindo consumo • Não é permitido adicionar produtos</p>
@@ -326,7 +349,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
                     <CarrinhoSection cart={cart} total={total} forma={forma} setForma={setForma} setShowPay={setShowPay} setRecebido={setRecebido} mesaSelecionada={mesaSelecionada} onAddMesa={adicionarNaMesa} onLimparMesa={cancelarTudo} finalizando={finalizando} pedidoQrAtivo={pedidoQrAtivo} fecharMesaAtiva={fecharMesaAtiva} onRemoveItem={removerDoCarrinho} />
                 </div>
             </div>
-            <PayModal showPay={showPay} setShowPay={setShowPay} total={total} forma={forma} recebido={recebido} recebidoNum={recebidoNum} troco={recebidoNum - total} handleCalc={handleCalc} setShowConfirm={modoFecharMesa? fecharMesaFinal : finalizarBalcao} loading={finalizando} isMesa={isMesa || modoFecharMesa} mesaNumero={fecharMesaAtiva?.mesa_numero || mesaSelecionada?.numero || null} />
+            <PayModal showPay={showPay} setShowPay={setShowPay} total={total} forma={forma} recebido={recebido} recebidoNum={recebidoNum} troco={recebidoNum - total} handleCalc={handleCalc} setShowConfirm={modoFecharMesa ? fecharMesaFinal : finalizarBalcao} loading={finalizando} isMesa={isMesa || modoFecharMesa} mesaNumero={fecharMesaAtiva?.mesa_numero || mesaSelecionada?.numero || null} />
             <ConfirmModal showConfirm={showConfirm} setShowConfirm={setShowConfirm} total={total} forma={forma} troco={recebidoNum - total} imprimirFatura={() => aposVenda(true)} onSemRecibo={() => aposVenda(false)} vendaNumero={ultimaVenda?.numero} isMesa={!!fecharMesaAtiva || isMesa} mesaNumero={ultimaVenda?.mesa_numero || fecharMesaAtiva?.mesa_numero || mesaSelecionada?.numero || null} />
         </div>
     );

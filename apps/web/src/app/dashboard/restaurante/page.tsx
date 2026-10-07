@@ -9,11 +9,14 @@ import { PedidosTab } from "./components/tabs/pedido/pedido";
 
 export default function RestaurantePage() {
     const { activeTab, user } = useDashboard();
-    if (activeTab === "home") return <HomeTab user={user} />;
-    if (activeTab === "caixa") return <CaixaTab />;
-    if (activeTab === "produtos") return <ProdutosTab />;
-    if (activeTab === "funcionarios") return <EntidadesTab />;
-    if (activeTab === "mesas") return <MesasTab />;
-    if (activeTab === "pedidos") return <PedidosTab />;
-    return <div className="bg-white/70 backdrop-blur-xl rounded-[18px] p-8 text-[11px]">Em breve: {activeTab}</div>;
+
+    switch (activeTab) {
+        case "home": return <HomeTab user={user} />;
+        case "caixa": return <CaixaTab />;
+        case "produtos": return <ProdutosTab />;
+        case "funcionarios": return <EntidadesTab />;
+        case "mesas": return <MesasTab />;
+        case "pedidos": return <PedidosTab />;
+        default: return <div className="bg-white/70 backdrop-blur-xl rounded-[18px] p-8 text-[11px]">Em breve: {activeTab}</div>;
+    }
 }
