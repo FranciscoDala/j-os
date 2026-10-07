@@ -45,14 +45,14 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
     return (
         <div className={`group relative w-full h-[250px] sm:h-[265px] md:h-[272px] rounded-[18px] md:rounded-[22px] overflow-hidden border shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] md:hover:-translate-y-0.5 transition-all duration-300 flex flex-col ${cfg.cardBg} ${cfg.border}`}>
 
-            {/* BOTÕES EDITAR / APAGAR - IGUAL ProdutoCard */}
+            {/* FIX: sempre visível no mobile, hover só no desktop */}
             {canManage && (
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                    <button onClick={(e) => { e.stopPropagation(); onEdit?.(m); }} className="w-7 h-7 bg-black/80 text-white rounded-full flex items-center justify-center hover:bg-black shadow">
-                        <Pencil size={11} />
+                <div className="absolute top-2 right-2 flex gap-1 z-[20] opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    <button onClick={(e) => { e.stopPropagation(); onEdit?.(m); }} className="w-7 h-7 bg-black/80 backdrop-blur text-white rounded-full flex items-center justify-center hover:bg-black shadow-md active:scale-95">
+                        <Pencil size={12} />
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); onDelete?.(m); }} className="w-7 h-7 bg-white border rounded-full flex items-center justify-center hover:bg-red-50 shadow">
-                        <Trash2 size={11} />
+                    <button onClick={(e) => { e.stopPropagation(); onDelete?.(m); }} className="w-7 h-7 bg-white border border-black/10 rounded-full flex items-center justify-center hover:bg-red-50 shadow-md active:scale-95">
+                        <Trash2 size={12} />
                     </button>
                 </div>
             )}
@@ -74,7 +74,7 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
                     {cfg.label}
                 </span>
                 {m.status === "OCUPADA" && (
-                    <span className="absolute top-2.5 right-2.5 md:top-2 md:right-2 group-hover:opacity-0 transition-opacity w-2.5 h-2.5 bg-[#C62828] rounded-full animate-pulse border-2 border-white shadow" />
+                    <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-[#C62828] rounded-full animate-pulse border-2 border-white shadow pointer-events-none" />
                 )}
             </div>
 
@@ -124,27 +124,27 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
                     </div>
 
                     {m.status === "LIVRE" && (
-                        <button onClick={() => onOcupar(m)} className="h-[30px] px-4 rounded-full bg-[#FFC91A] hover:bg-[#FFB800] text-black text-[11px] font-black shadow-sm transition-colors shrink-0 active:scale-95">
+                        <button onClick={() => onOcupar(m)} className="h-[30px] px-4 rounded-full bg-[#FFC91A] hover:bg-[#FFB800] text-black text-[11px] font-black shadow-sm active:scale-95">
                             Ocupar
                         </button>
                     )}
                     {m.status === "OCUPADA" && hasConsumo && (
-                        <button onClick={() => onComanda(m)} className="h-[32px] px-3.5 rounded-full bg-black text-white text-[10px] font-black flex items-center gap-1 hover:bg-zinc-800 shrink-0 active:scale-95">
+                        <button onClick={() => onComanda(m)} className="h-[32px] px-3.5 rounded-full bg-black text-white text-[10px] font-black flex items-center gap-1 hover:bg-zinc-800 active:scale-95">
                             <Receipt size={11} /> Fechar
                         </button>
                     )}
                     {m.status === "OCUPADA" &&!hasConsumo && (
-                        <button onClick={() => onComanda(m)} className="h-[30px] px-4 rounded-full bg-[#FFC91A] hover:bg-[#FFB800] text-black text-[11px] font-black shrink-0 active:scale-95">
+                        <button onClick={() => onComanda(m)} className="h-[30px] px-4 rounded-full bg-[#FFC91A] hover:bg-[#FFB800] text-black text-[11px] font-black active:scale-95">
                             Comanda
                         </button>
                     )}
                     {m.status === "SUJA" && (
-                        <button onClick={() => onLimpar(m)} className="h-[30px] px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black shrink-0 active:scale-95">
+                        <button onClick={() => onLimpar(m)} className="h-[30px] px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black active:scale-95">
                             Limpar
                         </button>
                     )}
                     {m.status === "RESERVADA" && (
-                        <button onClick={() => onOcupar(m)} className="h-[30px] px-4 rounded-full bg-[#A67C52] hover:bg-[#8C6A45] text-white text-[10px] font-black shrink-0 active:scale-95">
+                        <button onClick={() => onOcupar(m)} className="h-[30px] px-4 rounded-full bg-[#A67C52] hover:bg-[#8C6A45] text-white text-[10px] font-black active:scale-95">
                             Check-in
                         </button>
                     )}
