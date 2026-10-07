@@ -1,9 +1,9 @@
 "use client";
-import { Users, Clock, Receipt, MapPin } from "lucide-react";
+import { Users, Clock, Receipt, MapPin, Pencil, Trash2 } from "lucide-react";
 
 const statusConfig: any = {
     LIVRE: {
-        topBg: "bg-[#D6F0D6] from-[#E8F8E9] to-[#C8E6C9]",
+        topBg: "bg-[#D6F0D6]",
         badge: "bg-[#2E7D32] text-white",
         price: "text-[#2E7D32]",
         border: "border-[#C8E6C9]",
@@ -11,7 +11,7 @@ const statusConfig: any = {
         label: "LIVRE",
     },
     OCUPADA: {
-        topBg: "bg-[#FFEAA6] from-[#FFF3C0] to-[#FFD86A]",
+        topBg: "bg-[#FFEAA6]",
         badge: "bg-[#C62828] text-white",
         price: "text-[#EBA500]",
         border: "border-amber-200",
@@ -19,7 +19,7 @@ const statusConfig: any = {
         label: "OCUPADA",
     },
     RESERVADA: {
-        topBg: "bg-[#F5E6D3] from-[#FFF8F0] to-[#E8DCCF]",
+        topBg: "bg-[#F5E6D3]",
         badge: "bg-[#A67C52] text-white",
         price: "text-[#A67C52]",
         border: "border-[#E8DCCF]",
@@ -27,7 +27,7 @@ const statusConfig: any = {
         label: "RESERVADA",
     },
     SUJA: {
-        topBg: "bg-[#EEEEEE] from-[#F5F5F5] to-[#E0E0E0]",
+        topBg: "bg-[#EEEEEE]",
         badge: "bg-zinc-500 text-white",
         price: "text-zinc-500",
         border: "border-zinc-200",
@@ -36,7 +36,7 @@ const statusConfig: any = {
     },
 };
 
-export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalhe }: any) {
+export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalhe, onEdit, onDelete, canManage }: any) {
     const cfg = statusConfig[m.status] || statusConfig.LIVRE;
     const min = m.aberta_em? Math.floor((Date.now() - new Date(m.aberta_em).getTime()) / 60000) : 0;
     const total = Number(m.venda_total || m.total_consumo || 0);
@@ -44,6 +44,18 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
 
     return (
         <div className={`group relative w-full h-[250px] sm:h-[265px] md:h-[272px] rounded-[18px] md:rounded-[22px] overflow-hidden border shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] md:hover:-translate-y-0.5 transition-all duration-300 flex flex-col ${cfg.cardBg} ${cfg.border}`}>
+
+            {/* BOTÕES EDITAR / APAGAR - IGUAL ProdutoCard */}
+            {canManage && (
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    <button onClick={(e) => { e.stopPropagation(); onEdit?.(m); }} className="w-7 h-7 bg-black/80 text-white rounded-full flex items-center justify-center hover:bg-black shadow">
+                        <Pencil size={11} />
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete?.(m); }} className="w-7 h-7 bg-white border rounded-full flex items-center justify-center hover:bg-red-50 shadow">
+                        <Trash2 size={11} />
+                    </button>
+                </div>
+            )}
 
             <div className={`relative w-full h-[118px] sm:h-[128px] md:h-[138px] overflow-hidden flex items-center justify-center ${cfg.topBg} shrink-0`}>
                 <div className="flex flex-col items-center">
@@ -62,7 +74,7 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
                     {cfg.label}
                 </span>
                 {m.status === "OCUPADA" && (
-                    <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-[#C62828] rounded-full animate-pulse border-2 border-white shadow" />
+                    <span className="absolute top-2.5 right-2.5 md:top-2 md:right-2 group-hover:opacity-0 transition-opacity w-2.5 h-2.5 bg-[#C62828] rounded-full animate-pulse border-2 border-white shadow" />
                 )}
             </div>
 
@@ -97,11 +109,7 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
                 </div>
 
                 <p className="mt-2 text-[10px] leading-[1.3] text-[#7A7A7A] line-clamp-2 min-h-[26px] hidden sm:block">
-                    {m.status === "OCUPADA"
-                       ? hasConsumo
-                           ? `${total.toLocaleString("de-DE")} Kz em consumo`
-                            : "Sem consumo ainda"
-                        : `${m.zona || "Salão principal"} • ${m.capacidade} pessoas`}
+                    {m.status === "OCUPADA"? hasConsumo? `${total.toLocaleString("de-DE")} Kz em consumo` : "Sem consumo ainda" : `${m.zona || "Salão principal"} • ${m.capacidade} pessoas`}
                 </p>
 
                 <div className="mt-auto pt-2 md:pt-3 flex items-end justify-between gap-2">
@@ -110,13 +118,13 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
                             {hasConsumo? total.toLocaleString("de-DE") : "—"}
                             {hasConsumo && <span className="text-[10px]">Kz</span>}
                         </p>
-                        <p className="text-[8px] md:text-[9px] font-bold text-[#9A9A9A] mt-1 flex items-center gap-1">
+                        <p className="text-[8px] md:text-[9px] font-bold text-[#9A9A9A] mt-1">
                             + {hasConsumo? "Consumo" : cfg.label}
                         </p>
                     </div>
 
                     {m.status === "LIVRE" && (
-                        <button onClick={() => onOcupar(m)} className="h-[30px] md:h-[30px] px-4 rounded-full bg-[#FFC91A] hover:bg-[#FFB800] text-black text-[11px] font-black shadow-sm transition-colors shrink-0 active:scale-95">
+                        <button onClick={() => onOcupar(m)} className="h-[30px] px-4 rounded-full bg-[#FFC91A] hover:bg-[#FFB800] text-black text-[11px] font-black shadow-sm transition-colors shrink-0 active:scale-95">
                             Ocupar
                         </button>
                     )}
