@@ -15,7 +15,7 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onEdit, 
     const hasConsumo = total > 0;
 
     return (
-        <div className={`relative w-full h-[250px] sm:h-[265px] md:h-[272px] rounded-[18px] md:rounded-[22px] overflow-hidden border shadow-[0_4px_16px_rgba(0,0,0,0.05)] flex flex-col ${cfg.cardBg} ${cfg.border}`}>
+        <div className={`group relative w-full h-[250px] sm:h-[265px] md:h-[272px] rounded-[18px] md:rounded-[22px] overflow-hidden border shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] md:hover:-translate-y-0.5 transition-all duration-300 flex flex-col ${cfg.cardBg} ${cfg.border}`}>
 
             <div className={`relative w-full h-[118px] sm:h-[128px] md:h-[138px] overflow-hidden flex items-center justify-center ${cfg.topBg} shrink-0`}>
 
@@ -23,24 +23,29 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onEdit, 
                     {cfg.label}
                 </span>
 
-                {/* AGORA SEMPRE VISIVEL, SEM group-hover */}
-                <div className="absolute top-2 right-2 flex gap-1.5 z-[30]">
-                    <button onClick={(e) => { e.stopPropagation(); onEdit?.(m); }} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center shadow-lg border border-white/20 active:scale-90 hover:bg-zinc-800">
-                        <Pencil size={14} />
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); onDelete?.(m); }} className="w-9 h-9 bg-white text-black rounded-full flex items-center justify-center shadow-lg border border-black/10 active:scale-90 hover:bg-red-50 hover:text-red-600">
-                        <Trash2 size={14} />
-                    </button>
-                </div>
+                {canManage && (
+                    <div className="absolute top-2 right-2 flex gap-1.5 z-[30] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <button onClick={(e) => { e.stopPropagation(); onEdit?.(m); }} className="w-9 h-9 bg-black/90 text-white rounded-full flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.25)] border border-white/10 active:scale-90 hover:bg-black">
+                            <Pencil size={14} />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); onDelete?.(m); }} className="w-9 h-9 bg-white text-black rounded-full flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.15)] border border-black/10 active:scale-90 hover:bg-red-50 hover:text-red-600">
+                            <Trash2 size={14} />
+                        </button>
+                    </div>
+                )}
 
                 <div className="flex flex-col items-center pointer-events-none">
                     <span className="text-[36px] sm:text-[40px] md:text-[44px] font-black tracking-tight text-[#1A1A1A] leading-none">{m.numero}</span>
                     <span className="mt-1 text-[10px] md:text-[11px] font-black tracking-widest opacity-60">MESA</span>
                     <div className="mt-2 flex items-center gap-1.5">
-                        <span className="flex items-center gap-1 text-[9px] md:text-[10px] font-bold bg-white/80 px-2 py-0.5 rounded-full"><MapPin size={10} />{m.zona || "Salão"}</span>
-                        <span className="flex items-center gap-1 text-[9px] md:text-[10px] font-bold bg-white/80 px-2 py-0.5 rounded-full"><Users size={10} />{m.capacidade}</span>
+                        <span className="flex items-center gap-1 text-[9px] md:text-[10px] font-bold bg-white/80 backdrop-blur px-2 py-0.5 rounded-full"><MapPin size={10} />{m.zona || "Salão"}</span>
+                        <span className="flex items-center gap-1 text-[9px] md:text-[10px] font-bold bg-white/80 backdrop-blur px-2 py-0.5 rounded-full"><Users size={10} />{m.capacidade}</span>
                     </div>
                 </div>
+
+                {m.status === "OCUPADA" && (
+                    <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-[#C62828] rounded-full animate-pulse border-2 border-white shadow pointer-events-none group-hover:opacity-0 transition-opacity" />
+                )}
             </div>
 
             <div className="px-3 md:px-3.5 py-2.5 md:py-3 flex flex-col flex-1">
