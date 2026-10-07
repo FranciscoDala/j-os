@@ -10,12 +10,11 @@ const TAB_ROLES: Record<string, string[]> = {
     vendas: ["dono", "gerente_restaurante", "operador_caixa", "caixa", "garcom", "funcionario"],
     produtos: ["dono", "gerente_restaurante", "operador_caixa", "funcionario"],
     funcionarios: ["dono", "gerente_restaurante", "operador_caixa", "rh"],
-    cardapio: ["dono", "gerente_restaurante", "operador_caixa"],
     pedidos: ["dono", "gerente_restaurante", "operador_caixa", "garcom"],
     mesas: ["dono", "gerente_restaurante", "operador_caixa", "garcom"],
 };
 const CAN_CONFIG = ["dono", "gerente_restaurante"];
-const HIDDEN_TABS = ["financas", "relatorios", "financeiro", "relatorio"];
+const HIDDEN_TABS = ["financas", "relatorios", "financeiro", "relatorio", "cardapio"];
 
 function normalizeRole(r: any) { return String(r || "funcionario").toLowerCase() }
 function canViewTab(id: string, role: string) {
