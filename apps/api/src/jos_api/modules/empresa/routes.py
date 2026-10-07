@@ -3,9 +3,8 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 from jos_api.db.session import get_db
 from jos_api.core.deps import get_current_user
-from jos_api.modules.auth.models import User, UserEmpresa, RoleEnum
-from . import models, schemas
-from .seed import seed_perfis_por_tipo
+from jos_api.modules.auth.models import User
+from . import schemas, service
 from jos_api.core.events import emit
 
 router = APIRouter(prefix="/empresas", tags=["empresas"])
@@ -16,24 +15,8 @@ def criar_empresa(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    emp = models.Empresa(
-        nome_fantasia=dados.nome_fantasia,
-        cnpj=dados.cnpj,
-        tipo=dados.tipo
-    )
-    db.add(emp)
-    db.flush()
-
-    vinc = UserEmpresa(user_id=current_user.id, empresa_id=emp.id, role=RoleEnum.DONO)
-    db.add(vinc)
-    db.flush()
-
-    seed_perfis_por_tipo(db, emp.id, emp.tipo)
-
-    db.commit()
-    db.refresh(emp)
-
-    emit(str(emp.id), "empresa:created", data={"id": str(emp.id), "nome_fantasia": emp.nome_fantasia, "tipo": str(emp.tipo)})
+    emp = service.criar_empresa(db, dados, current_user)
+    emit(str(emp.id), "empresa:created", data={"id": str(emp.id), "nome_fantasia": emp.nome_fantasia, "tipo": str(emp.tipo), "nif": emp.nif})
     return emp
 
 @router.get("", response_model=list[schemas.EmpresaOut])
@@ -41,40 +24,51 @@ def listar_minhas_empresas(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    vinc = db.query(UserEmpresa).filter(UserEmpresa.user_id == current_user.id).all()
-    ids = [v.empresa_id for v in vinc]
-    return db.query(models.Empresa).filter(models.Empresa.id.in_(ids)).all() if ids else []
+    return service.listar_empresas_user(db, current_user.id)
+
+@router.get("/{empresa_id}", response_model=schemas.EmpresaOut)
+def get_empresa(
+    empresa_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return service.get_empresa(db, empresa_id)
+
+@router.put("/{empresa_id}", response_model=schemas.EmpresaOut)
+def atualizar_empresa(
+    empresa_id: UUID,
+    dados: schemas.UpdateEmpresaRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    emp = service.atualizar_empresa(db, empresa_id, dados)
+    emit(str(empresa_id), "empresa:update", data={"id": str(emp.id), "nome_fantasia": emp.nome_fantasia})
+    return emp
+
+@router.delete("/{empresa_id}")
+def deletar_empresa(
+    empresa_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return service.deletar_empresa(db, empresa_id)
 
 @router.post("/{empresa_id}/vincular-usuario")
 def vincular_usuario(
     empresa_id: UUID,
-    dados: schemas.VincularUsuarioSchema,
+    dados: schemas.VincularUsuarioRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    dono = db.query(UserEmpresa).filter(
-        UserEmpresa.user_id == current_user.id,
-        UserEmpresa.empresa_id == empresa_id,
-        UserEmpresa.role == RoleEnum.DONO
-    ).first()
-    if not dono:
-        raise HTTPException(403, "Só DONO pode vincular")
+    res = service.vincular_usuario(db, empresa_id, dados, current_user)
+    emit(str(empresa_id), "usuario:vinculado", data=res)
+    return res
 
-    user_alvo = db.query(User).filter(User.email == dados.email).first()
-    if not user_alvo:
-        raise HTTPException(404, "Usuário não existe, cadastre primeiro")
-
-    if db.query(UserEmpresa).filter_by(user_id=user_alvo.id, empresa_id=empresa_id).first():
-        raise HTTPException(400, "Já vinculado")
-
-    try:
-        role_enum = RoleEnum[dados.role.upper()]
-    except:
-        role_enum = RoleEnum.FUNCIONARIO
-
-    vinc = UserEmpresa(user_id=user_alvo.id, empresa_id=empresa_id, role=role_enum)
-    db.add(vinc)
-    db.commit()
-
-    emit(str(empresa_id), "usuario:vinculado", data={"user_id": str(user_alvo.id), "role": str(role_enum)})
-    return {"ok": True}
+@router.patch("/{empresa_id}/agt", response_model=schemas.EmpresaOut)
+def atualizar_agt(
+    empresa_id: UUID,
+    dados: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return service.atualizar_agt_info(db, empresa_id, dados)
