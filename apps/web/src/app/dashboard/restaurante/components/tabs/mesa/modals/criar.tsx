@@ -1,22 +1,65 @@
 "use client";
+import { useState, useRef, useEffect } from "react";
+import { ChevronDown } from "lucide-react";
+
+const ZONAS = ["Salão", "Varanda", "VIP", "Bar", "Terraço"];
+
+function CustomSelect({ value, onChange }: { value: string, onChange: (v: string) => void }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const h = (e: MouseEvent) => { if (ref.current &&!ref.current.contains(e.target as Node)) setOpen(false); };
+        document.addEventListener("mousedown", h);
+        return () => document.removeEventListener("mousedown", h);
+    }, []);
+    return (
+        <div ref={ref} className="relative w-full">
+            <button type="button" onClick={() => setOpen(!open)} className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 h-9 text-[11px] font-bold flex items-center justify-between hover:border-black focus:border-black focus:ring-1 focus:ring-black outline-none transition-all">
+                <span>{value}</span>
+                <ChevronDown size={14} className={`ml-2 transition-transform ${open? "rotate-180" : ""}`} />
+            </button>
+            {open && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[16px] border border-[#E8DCCF] shadow-[0_12px_24px_rgba(0,0,0,0.12)] z-20 overflow-hidden p-1">
+                    {ZONAS.map(z => (
+                        <button key={z} type="button" onClick={() => { onChange(z); setOpen(false); }} className={`w-full text-left px-3 py-2 rounded-full text-[11px] font-bold transition-all ${value === z? "bg-black text-white" : "hover:bg-[#F5E6D3]"}`}>{z}</button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export function MesaModal({ open, onClose, numero, setNumero, capacidade, setCapacidade, zonaNew, setZonaNew, onCreate, saving, isEditing }: any) {
     if (!open) return null;
     return (
-        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-[24px] w-full max-w-[380px] p-6 border border-[#E8DCCF] shadow-[0_20px_60px_rgba(0,0,0,0.3)] animate-in fade-in zoom-in-95">
-                <h3 className="font-black text-[15px]">{isEditing? `Editar Mesa ${numero}` : "Nova Mesa"}</h3>
-                <div className="space-y-3 mt-4">
-                    <input value={numero} onChange={e => setNumero(e.target.value.toUpperCase())} placeholder="M01" className="w-full h-11 rounded-full border border-[#E8DCCF] px-4 text-[12px] font-bold outline-none focus:border-black" />
-                    <div className="grid grid-cols-2 gap-3">
-                        <input type="number" value={capacidade} onChange={e => setCapacidade(Number(e.target.value))} className="w-full h-11 rounded-full border border-[#E8DCCF] px-4 text-[12px] font-bold" />
-                        <select value={zonaNew} onChange={e => setZonaNew(e.target.value)} className="w-full h-11 rounded-full border border-[#E8DCCF] px-4 text-[12px] font-bold bg-white">
-                            <option>Salão</option><option>Varanda</option><option>VIP</option><option>Bar</option><option>Terraço</option>
-                        </select>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" />
+            <div className="relative w-full max-w-[380px] bg-[#EDEBE6] border border-black/10 rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden animate-in fade-in zoom-in-95">
+                <div className="bg-white m-[6px] rounded-[18px] p-5">
+                    <h3 className="font-black text-[17px] leading-none">{isEditing? `Editar Mesa ${numero}` : "Nova Mesa"}</h3>
+                    <p className="text-[11px] font-bold text-zinc-500 mt-1.5 tracking-wide">{isEditing? "Altere os dados da mesa" : "Crie uma nova mesa para o salão"}</p>
+
+                    <div className="space-y-3 mt-4">
+                        <div>
+                            <p className="text-[8px] font-black tracking-widest text-zinc-500 mb-1 ml-1">NÚMERO DA MESA</p>
+                            <input value={numero} onChange={e => setNumero(e.target.value.toUpperCase())} placeholder="M01" className="w-full h-9 rounded-full border border-[#E8DCCF] px-4 text-[11px] font-black outline-none focus:border-black focus:ring-1 focus:ring-black transition-all" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <p className="text-[8px] font-black tracking-widest text-zinc-500 mb-1 ml-1">CAPACIDADE</p>
+                                <input type="number" value={capacidade} onChange={e => setCapacidade(Number(e.target.value))} className="w-full h-9 rounded-full border border-[#E8DCCF] px-4 text-[11px] font-bold outline-none focus:border-black focus:ring-1 focus:ring-black transition-all" />
+                            </div>
+                            <div>
+                                <p className="text-[8px] font-black tracking-widest text-zinc-500 mb-1 ml-1">ZONA</p>
+                                <CustomSelect value={zonaNew} onChange={setZonaNew} />
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex gap-2 pt-2">
-                        <button onClick={onClose} className="flex-1 h-11 rounded-full border border-[#E8DCCF] text-[12px] font-bold">Cancelar</button>
-                        <button onClick={onCreate} disabled={saving} className="flex-1 h-11 rounded-full bg-black text-white text-[12px] font-black disabled:opacity-50">{saving? "..." : isEditing? "Salvar" : "Criar"}</button>
-                    </div>
+                </div>
+
+                <div className="p-2.5 flex gap-2">
+                    <button onClick={onClose} className="flex-1 bg-white border border-black/10 rounded-full py-2.5 text-[11px] font-bold hover:bg-zinc-50 active:scale-[0.98] transition-all">Cancelar</button>
+                    <button onClick={onCreate} disabled={saving} className="flex-1 bg-black text-white rounded-full py-2.5 text-[11px] font-black disabled:opacity-50 hover:bg-zinc-800 active:scale-[0.98] transition-all">{saving? "..." : isEditing? "Salvar" : "Criar"}</button>
                 </div>
             </div>
         </div>

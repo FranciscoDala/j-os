@@ -5,7 +5,7 @@ export function MesaDeleteModal({ open, mesa, saving, onClose, onConfirm }: any)
     if (!open) return null;
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" onClick={onClose} />
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" />
             <div className="relative w-full max-w-[360px] bg-[#EDEBE6] border border-black/10 rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden">
                 <div className="bg-white m-[6px] rounded-[18px] p-5">
                     <div className="w-10 h-10 rounded-full bg-red-500 text-white flex items-center justify-center mb-3"><Trash2 size={18} /></div>
