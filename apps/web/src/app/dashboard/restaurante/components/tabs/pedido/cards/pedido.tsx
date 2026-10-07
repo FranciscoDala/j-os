@@ -64,9 +64,11 @@ export function PedidoCard({ p, onAtender, onRecusar, onDetalhe }: any) {
             <div className="relative w-full h-[118px] sm:h-[128px] md:h-[138px] bg-[#FFEAA6] overflow-hidden shrink-0">
                 <img src={firstImg} alt={first.produto_nome || first.nome || "pedido"} className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" onError={(e) => (e.currentTarget.src = FALLBACK_IMG)} />
                 <span className="absolute top-2 left-2 bg-black text-white text-[8px] md:text-[9px] font-black px-2 md:px-2.5 py-1 rounded-full shadow-md">MESA {p.mesa_numero}</span>
-                <div className="absolute top-2 right-2 flex items-center gap-1">
+                <div className="absolute top-2 right-2 flex items-center gap-1.5">
                     <span className="bg-white/90 backdrop-blur text-[8px] md:text-[9px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow"><Clock size={10} />{timeAgo(p.created_at)}</span>
-                    <button onClick={() => onDetalhe(p)} className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow active:scale-95"><FileText size={11} /></button>
+                    <button onClick={() => onDetalhe(p)} className="w-9 h-9 md:w-10 md:h-10 bg-black text-white rounded-full flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.25)] border border-white/20 hover:bg-zinc-800 active:scale-95 transition-all">
+                        <FileText size={16} className="md:w-[18px] md:h-[18px]" />
+                    </button>
                 </div>
                 {itens.length > 1 && <span className="absolute bottom-2 right-2 bg-white/90 backdrop-blur text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded-full shadow">+{itens.length - 1}</span>}
             </div>
