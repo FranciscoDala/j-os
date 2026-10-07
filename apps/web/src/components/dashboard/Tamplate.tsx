@@ -5,7 +5,7 @@ import { Sidebar } from "./Sidebar";
 import { ModuleId } from "./menu_config";
 import { VendasTab } from "@/app/dashboard/restaurante/components/tabs/venda/venda";
 import { useGlobalSearch } from "@/features/search/context";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Check } from "lucide-react";
 import ModalEmpresa from "./modal_empresa";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
@@ -29,16 +29,21 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     const [showConfig, setShowConfig] = useState(false);
     const [empresaData, setEmpresaData] = useState<any>(null);
     const [savingEmpresa, setSavingEmpresa] = useState(false);
+    const [toast, setToast] = useState<{ show: boolean; msg: string; type: 'success' | 'error' }>({ show: false, msg: "", type: "success" });
     const { search, setSearch, setActiveTab: setSearchTab } = useGlobalSearch();
     const [pedidosCount, setPedidosCount] = useState(0);
     const prevCountRef = useRef(0);
     const isFirstLoad = useRef(true);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
+    const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+        setToast({ show: true, msg, type });
+        setTimeout(() => setToast({ show: false, msg: "", type: "success" }), 3500);
+    }
+
     useEffect(() => { const token = localStorage.getItem("access_token"); if (!token) { router.push("/login"); return; } try { const u = JSON.parse(localStorage.getItem("user") || "{}"); setUser(u); const r = normalizeRole(u?.role || u?.role_equivalente || u?.perfil_slug || "funcionario"); setRole(r); const saved = localStorage.getItem(`${moduleId}_tab`) || "home"; const allowed = ROLE_PERMISSIONS[r] || ROLE_PERMISSIONS["funcionario"]; if (allowed.includes("*") || allowed.includes(saved)) setActiveTab(saved); else setActiveTab("home"); } catch { setUser({}); } }, [moduleId, router]);
     useEffect(() => { if (!user?.nome) return; setShowWelcome(true); const t = setTimeout(() => setShowWelcome(false), 3200); return () => clearTimeout(t); }, [user]);
 
-    // load empresa when open config
     useEffect(() => {
         if (!showConfig) return;
         const load = async () => {
@@ -77,13 +82,21 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
         try {
             const token = localStorage.getItem("access_token");
             const fd = new FormData();
-            // só campos editáveis - companyName e nif NÃO vão, ficam desativados
-            ["email","phone","address","city","province","iban","iban2","banco1","banco2"].forEach(k=>{ if (data[k]) fd.append(k, data[k]) });
+            // TODOS editáveis agora - inclusive nome e nif
+            ["nome_fantasia","nif","email","phone","address","city","province","iban","iban2","banco1","banco2"].forEach(k=>{
+                const val = k === "nome_fantasia"? (data.companyName || data.nome_fantasia) : data[k];
+                if (val && String(val).trim()!== "") fd.append(k, String(val).trim())
+            });
             if (data.logoFile) fd.append("logo", data.logoFile);
             const res = await fetch(`${API_BASE}/empresas/${data.id || empresaData.id}`, { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: fd });
             if (!res.ok) { const err = await res.text(); throw new Error(err) }
+            const updated = await res.json();
+            setEmpresaData((prev:any) => ({...prev,...updated, companyName: updated.nome_fantasia }));
             setShowConfig(false);
-        } catch (e: any) { alert("Erro: " + e.message) } finally { setSavingEmpresa(false) }
+            showToast(`Empresa ${updated.nome_fantasia || data.companyName} atualizada com sucesso!`, 'success');
+        } catch (e: any) {
+            showToast("Erro ao atualizar empresa: " + (e.message?.slice(0,120) || "tente novamente"), 'error');
+        } finally { setSavingEmpresa(false) }
     }
 
     useEffect(() => {
@@ -114,8 +127,22 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                 </div>
                 {isVendasOpen && <div className="absolute inset-0 z-[100] bg-[#EDEBE6] flex flex-col overflow-hidden"><div className="flex-1 overflow-hidden p-0 md:p-[14px]"><VendasTab onClose={() => setActiveTab("home")} /></div></div>}
             </div>
+
             {empresaData && <ModalEmpresa open={showConfig} initialData={empresaData} saving={savingEmpresa} onClose={() => setShowConfig(false)} onSave={handleSaveEmpresa} />}
-            <style jsx global>{`html,body{height:100%;overflow:hidden;background:#EDEBE6;scrollbar-width:none}::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
+
+            {/* TOAST - ESTILO MESA */}
+            {toast.show && (
+                <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[999] pointer-events-none">
+                    <div className={`flex items-center gap-2 px-4 py-3 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.15)] border text-[12px] font-bold animate-[slideUp_0.3s_ease] ${toast.type === 'success'? 'bg-black text-white border-black' : 'bg-white text-red-600 border-red-100'}`}>
+                        <span className={`w-6 h-6 rounded-full flex items-center justify-center ${toast.type === 'success'? 'bg-white/15' : 'bg-red-50'}`}>
+                            {toast.type === 'success'? <Check size={14} /> : <X size={14} />}
+                        </span>
+                        {toast.msg}
+                    </div>
+                </div>
+            )}
+
+            <style jsx global>{`@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}} html,body{height:100%;overflow:hidden;background:#EDEBE6;scrollbar-width:none}::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
         </DashboardCtx.Provider>
     );
 }
