@@ -18,8 +18,29 @@ export function PedidoDetalheModal({
     onRecusar?: (p: any) => void;
 }) {
     if (!pedido) return null;
-    const total = pedido.total?? pedido.valor_total?? pedido.total_estimado?? 0;
-    const itens = pedido.itens || [];
+    const itensRaw = pedido.itens || [];
+
+    // AGRUPA MESMO PRODUTO - Sumol 1 + Sumol 1 = Sumol 2
+    const mapa = new Map<string, any>();
+    for (const it of itensRaw) {
+        const key = `${it.produto_id || it.produto_nome || it.nome}-${(it.observacao || "").trim().toLowerCase()}`;
+        const qtd = Number(it.quantidade || 1);
+        const unit = Number(it.preco_unit || it.preco || (it.subtotal / qtd) || 0);
+        if (mapa.has(key)) {
+            const ex = mapa.get(key);
+            ex.quantidade += qtd;
+        } else {
+            mapa.set(key, {
+                produto_id: it.produto_id,
+                produto_nome: it.produto_nome || it.nome || "Produto",
+                quantidade: qtd,
+                preco_unit: unit,
+                observacao: it.observacao || "",
+            });
+        }
+    }
+    const itens = Array.from(mapa.values());
+    const total = itens.reduce((s, it) => s + it.preco_unit * it.quantidade, 0) || pedido.total || pedido.valor_total || pedido.total_estimado || 0;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-4">
@@ -32,7 +53,7 @@ export function PedidoDetalheModal({
                             MESA {pedido.mesa_numero}
                         </p>
                         <p className="text-[11px] text-zinc-600 mt-1 font-bold truncate max-w-[220px]">
-                            {pedido.cliente_nome || "Cliente"} • {itens.length} itens
+                            {pedido.cliente_nome || "Cliente"} • {itens.length} {itens.length === 1? "tipo" : "tipos"} • {itensRaw.length} itens
                         </p>
                     </div>
                     <button
@@ -56,20 +77,18 @@ export function PedidoDetalheModal({
                             <p className="text-center text-[12px] text-gray-400 mt-10">Sem itens</p>
                         )}
                         {itens.map((it: any, idx: number) => {
-                            const nome = it.produto_nome || it.nome || "Produto";
-                            const qtd = Number(it.quantidade || 1);
-                            const unit = Number(it.preco_unit || it.preco || (it.subtotal / qtd) || 0);
                             return (
                                 <div
-                                    key={idx}
+                                    key={it.produto_id || idx}
                                     className="flex items-start px-2 py-2.5 border-b border-dashed border-black/10 text-[13px] leading-[16px]"
                                 >
                                     <span className="w-[28px] shrink-0">{idx + 1}</span>
                                     <span className="flex-1 pr-2 break-words whitespace-normal font-medium text-black">
-                                        {nome}
+                                        {it.produto_nome}
+                                        {it.observacao? <span className="text-[10px] text-zinc-500 block">{it.observacao}</span> : null}
                                     </span>
-                                    <span className="w-[36px] shrink-0 text-center">{qtd}</span>
-                                    <span className="w-[70px] shrink-0 text-right">{safeKz(unit)}</span>
+                                    <span className="w-[36px] shrink-0 text-center font-bold">{it.quantidade}</span>
+                                    <span className="w-[70px] shrink-0 text-right">{safeKz(it.preco_unit)}</span>
                                 </div>
                             );
                         })}
