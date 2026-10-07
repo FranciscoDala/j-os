@@ -45,26 +45,25 @@ function CustomSelect({ value, options, onChange, placeholder, disabled, icon: I
     const selected = options.find((o:any) => o.value === value)
     return (
         <div ref={ref} className="relative w-full">
-            <button type="button" disabled={disabled} onClick={() =>!disabled && setOpen(!open)} className={`w-full h-[44px] bg-[#F5F2ED] border border-black/5 rounded-full px-4 text-[13px] text-black flex items-center justify-between focus:outline-none focus:border-black transition ${disabled? 'opacity-50 cursor-not-allowed' : ''}`}>
-                <span className="flex items-center gap-2 truncate">{Icon && <Icon className="w-4 h-4 text-zinc-500 shrink-0" />}<span className={selected? 'text-black font-bold' : 'text-black/40'}>{selected? selected.label : placeholder}</span></span>
-                <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${open? 'rotate-180' : ''}`} />
+            <button type="button" disabled={disabled} onClick={() =>!disabled && setOpen(!open)} className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 h-9 text-[11px] font-bold flex items-center justify-between hover:border-black focus:border-black focus:ring-1 focus:ring-black outline-none transition-all disabled:opacity-50">
+                <span className="flex items-center gap-1.5 truncate">{Icon && <Icon size={14} className="text-zinc-400" />}<span className={selected? 'text-black' : 'text-black/40'}>{selected? selected.label : placeholder}</span></span>
+                <ChevronDown size={14} className={`ml-2 transition-transform ${open? 'rotate-180':''}`} />
             </button>
-            {open && <div className="absolute z-50 top-[48px] left-0 w-full bg-white rounded-[18px] shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-black/10 overflow-hidden p-1.5 max-h-[220px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{options.map((o:any) => (<button key={o.value} type="button" onClick={() => { onChange(o.value); setOpen(false) }} className={`w-full text-left px-3 py-2.5 rounded-full text-[12px] flex items-center justify-between transition ${value === o.value? 'bg-black text-white font-bold' : 'hover:bg-[#F5F2ED] text-zinc-700'}`}>{o.label}</button>))}</div>}
+            {open && <div className="absolute z-50 top-full left-0 right-0 mt-2 bg-white rounded-[16px] border border-[#E8DCCF] shadow-[0_16px_32px_rgba(0,0,0,0.18)] p-1 max-h-[160px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{options.map((o:any)=>(<button key={o.value} type="button" onClick={()=>{onChange(o.value); setOpen(false)}} className={`w-full text-left px-3 py-2.5 rounded-full text-[11px] font-bold transition-all ${value===o.value? 'bg-black text-white':'hover:bg-[#F5E6D3]'}`}>{o.label}</button>))}</div>}
         </div>
     )
 }
-
 function BancoSelect({ value, onChange, placeholder }: any) {
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
     useEffect(() => { const h = (e: MouseEvent) => { if (ref.current &&!ref.current.contains(e.target as Node)) setOpen(false) }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h) }, [])
     return (
         <div ref={ref} className="relative w-full">
-            <button type="button" onClick={() => setOpen(!open)} className="w-full h-[44px] bg-[#F5F2ED] border border-black/5 rounded-full px-4 text-[13px] text-black flex items-center justify-between focus:outline-none focus:border-black">
-                <span className="flex items-center gap-2 truncate"><Landmark className="w-4 h-4 text-zinc-500 shrink-0" /><span className={value? 'text-black font-bold' : 'text-black/40'}>{value || placeholder}</span></span>
-                <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${open? 'rotate-180' : ''}`} />
+            <button type="button" onClick={() => setOpen(!open)} className="w-full bg-white border border-[#E8DCCF] rounded-full px-4 h-9 text-[11px] font-bold flex items-center justify-between hover:border-black focus:border-black focus:ring-1 focus:ring-black outline-none transition-all">
+                <span className="flex items-center gap-1.5 truncate"><Landmark size={14} className="text-zinc-400" /><span className={value? 'text-black':'text-black/40'}>{value||placeholder}</span></span>
+                <ChevronDown size={14} className={`ml-2 transition-transform ${open? 'rotate-180':''}`} />
             </button>
-            {open && <div className="absolute z-50 top-[48px] left-0 w-full bg-white rounded-[18px] shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-black/10 overflow-hidden p-1.5 max-h-[220px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{BANCOS_ANGOLA.map(b => (<button key={b} type="button" onClick={() => { onChange(b); setOpen(false) }} className={`w-full text-left px-3 py-2.5 rounded-full text-[11px] transition ${value === b? 'bg-black text-white font-bold' : 'hover:bg-[#F5F2ED] text-zinc-700'}`}>{b}</button>))}<button type="button" onClick={() => { onChange(undefined); setOpen(false) }} className="w-full text-left px-3 py-2.5 rounded-full text-[11px] text-red-500 hover:bg-red-50">Limpar</button></div>}
+            {open && <div className="absolute z-50 top-full left-0 right-0 mt-2 bg-white rounded-[16px] border border-[#E8DCCF] shadow-[0_16px_32px_rgba(0,0,0,0.18)] p-1 max-h-[160px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{BANCOS_ANGOLA.map(b=>(<button key={b} type="button" onClick={()=>{onChange(b); setOpen(false)}} className={`w-full text-left px-3 py-2.5 rounded-full text-[10px] font-bold transition-all ${value===b? 'bg-black text-white':'hover:bg-[#F5E6D3]'}`}>{b}</button>))}<button type="button" onClick={()=>{onChange(undefined); setOpen(false)}} className="w-full text-left px-3 py-2.5 rounded-full text-[11px] font-bold text-red-500 hover:bg-red-50">Limpar</button></div>}
         </div>
     )
 }
@@ -73,63 +72,60 @@ export default function ModalEmpresa({ open, initialData, saving, onClose, onSav
     const [form, setForm] = useState<EmpresaForm>(initialData)
     const [logoFile, setLogoFile] = useState<File | null>(null)
     const [logoPreview, setLogoPreview] = useState<string | null>(null)
-
     useEffect(() => { if (open) { setForm(initialData); setLogoFile(null); setLogoPreview(initialData.logo_url || initialData.image_url || null) } }, [initialData, open])
     if (!open) return null
 
-    const inputClass = "w-full h-[44px] bg-[#F5F2ED] border border-black/5 rounded-full px-4 text-[13px] text-black placeholder:text-black/40 focus:outline-none focus:border-black focus:bg-white transition"
+    const inputClass = "w-full h-9 rounded-full border border-[#E8DCCF] px-4 text-[11px] font-bold outline-none focus:border-black focus:ring-1 focus:ring-black transition-all bg-white placeholder:text-black/40"
+    const labelClass = "text-[8px] font-black tracking-widest text-zinc-500 mb-1 ml-1"
     const municipiosDisponiveis = form.province? (MUNICIPIOS[form.province] || []) : []
-    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (file) { if (logoPreview && logoFile) URL.revokeObjectURL(logoPreview); setLogoFile(file); setLogoPreview(URL.createObjectURL(file)) }
-    }
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" />
-            <div className="relative w-full max-w-[520px] bg-[#EDEBE6] border border-black/10 rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden flex flex-col max-h-[92dvh]">
+            <div className="relative w-full max-w-[420px] bg-[#EDEBE6] border border-black/10 rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.25)] flex flex-col max-h-[92dvh] overflow-visible">
+
                 <div className="bg-white m-[6px] rounded-[18px] p-3 flex justify-between items-start border border-black/5 shrink-0">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center"><Building2 size={14} /></div>
-                        <div>
-                            <p className="font-black text-[13px] leading-none text-black">CONFIGURAR EMPRESA</p>
-                            <p className="text-[11px] text-zinc-600 mt-1 font-bold truncate max-w-[220px]">{form.companyName || form.nome_fantasia || "Minha empresa"} • EDITÁVEL</p>
-                        </div>
+                    <div>
+                        <p className="font-black text-[13px] leading-none text-black">CONFIGURAR EMPRESA</p>
+                        <p className="text-[11px] text-zinc-600 mt-1 font-bold truncate max-w-[220px]">{form.companyName || form.nome_fantasia || "Minha empresa"}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center hover:bg-zinc-200 active:scale-95"><X size={14} /></button>
                 </div>
-                <div className="bg-white m-[6px] mt-0 rounded-[18px] border border-black/5 overflow-hidden flex flex-col flex-1 min-h-0">
-                    <div className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden p-3 space-y-3">
-                        <div className="flex items-center gap-3 p-3 bg-[#F5F2ED] border border-black/5 rounded-[16px]">
-                            <div className="w-14 h-14 rounded-[12px] bg-white border border-black/5 flex items-center justify-center overflow-hidden shrink-0">
-                                {logoPreview? <img src={logoPreview} className="w-full h-full object-cover" /> : <Upload className="w-5 h-5 text-zinc-400" />}
-                            </div>
-                            <div className="flex-1"><p className="text-[12px] font-black text-black">Logotipo</p><p className="text-[10px] text-zinc-500 font-bold">PNG, JPG até 2MB • Cloudinary</p></div>
-                            <label className="h-9 px-4 rounded-full bg-black text-white text-[11px] font-black flex items-center justify-center cursor-pointer active:scale-95 hover:bg-zinc-800">Escolher<input type="file" accept="image/*" className="hidden" onChange={handleLogoChange} /></label>
+
+                <div className="bg-white m-[6px] mt-0 rounded-[18px] p-4 border border-black/5 flex flex-col flex-1 min-h-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div className="space-y-3 overflow-visible">
+                        <div className="flex items-center gap-3 p-2.5 bg-[#F5F2ED] border border-[#E8DCCF] rounded-[16px]">
+                            <div className="w-10 h-10 rounded-full bg-white border border-[#E8DCCF] flex items-center justify-center overflow-hidden shrink-0">{logoPreview? <img src={logoPreview} className="w-full h-full object-cover" /> : <Upload size={14} className="text-zinc-400" />}</div>
+                            <div className="flex-1"><p className="text-[11px] font-black text-black">Logotipo</p><p className="text-[8px] font-bold tracking-widest text-zinc-500">PNG, JPG até 2MB</p></div>
+                            <label className="h-8 px-3 rounded-full bg-black text-white text-[10px] font-black flex items-center justify-center cursor-pointer hover:bg-zinc-800 active:scale-95">Escolher<input type="file" accept="image/*" className="hidden" onChange={e=>{const f=e.target.files?.[0]; if(f){setLogoFile(f); setLogoPreview(URL.createObjectURL(f))}}} /></label>
                         </div>
-                        <input value={form.companyName || form.nome_fantasia || ''} onChange={e => setForm({...form, companyName: e.target.value, nome_fantasia: e.target.value})} placeholder="Nome da empresa" className={inputClass} />
-                        <input value={form.nif || ''} onChange={e => setForm({...form, nif: e.target.value})} placeholder="NIF da empresa" className={inputClass} />
-                        <div className="grid grid-cols-2 gap-2">
-                            <input value={form.phone || ''} onChange={e => setForm({...form, phone: e.target.value})} placeholder="Telefone" className={inputClass} />
-                            <input value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} placeholder="Email" className={inputClass} />
+
+                        <div><p className={labelClass}>NOME DA EMPRESA</p><input value={form.companyName || form.nome_fantasia || ''} onChange={e => setForm({...form, companyName: e.target.value, nome_fantasia: e.target.value})} placeholder="Nome fantasia" className={`${inputClass} font-black`} /></div>
+                        <div><p className={labelClass}>NIF</p><input value={form.nif || ''} onChange={e => setForm({...form, nif: e.target.value})} placeholder="NIF" className={inputClass} /></div>
+                        <div className="grid grid-cols-2 gap-2.5">
+                            <div><p className={labelClass}>TELEFONE</p><input value={form.phone || ''} onChange={e => setForm({...form, phone: e.target.value})} placeholder="Telefone" className={inputClass} /></div>
+                            <div><p className={labelClass}>EMAIL</p><input value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} placeholder="Email" className={inputClass} /></div>
                         </div>
-                        <input value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} placeholder="Endereço completo" className={inputClass} />
-                        <div className="grid grid-cols-2 gap-2">
-                            <CustomSelect value={form.province || ''} onChange={(v:string) => setForm(prev => ({...prev, province: v, city: ''}))} placeholder="Província" options={PROVINCIAS.map(p => ({ value: p, label: p }))} icon={MapPin} />
-                            <CustomSelect value={form.city || ''} onChange={(v:string) => setForm({...form, city: v})} placeholder={form.province? "Município" : "Selecione província"} options={municipiosDisponiveis.map(m => ({ value: m, label: m }))} disabled={!form.province} icon={MapPin} />
+                        <div><p className={labelClass}>ENDEREÇO</p><input value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} placeholder="Endereço completo" className={inputClass} /></div>
+                        <div className="grid grid-cols-2 gap-2.5 overflow-visible">
+                            <div className="overflow-visible"><p className={labelClass}>PROVÍNCIA</p><CustomSelect value={form.province || ''} onChange={(v:string) => setForm(prev => ({...prev, province: v, city: ''}))} placeholder="Província" options={PROVINCIAS.map(p => ({ value: p, label: p }))} icon={MapPin} /></div>
+                            <div className="overflow-visible"><p className={labelClass}>MUNICÍPIO</p><CustomSelect value={form.city || ''} onChange={(v:string) => setForm({...form, city: v})} placeholder="Município" options={municipiosDisponiveis.map(m => ({ value: m, label: m }))} disabled={!form.province} icon={MapPin} /></div>
                         </div>
+
                         <div className="h-[1px] bg-black/10 border-dashed border-t my-1" />
-                        <p className="text-[10px] tracking-widest text-zinc-500 font-black px-1">DADOS BANCÁRIOS</p>
-                        <div className="space-y-2"><BancoSelect value={form.banco1} onChange={(v:any) => setForm({...form, banco1: v})} placeholder="Banco 1" />{form.banco1 && <input value={form.iban || ''} onChange={e => setForm({...form, iban: e.target.value})} placeholder={`IBAN - ${form.banco1.split('-')[0].trim()}`} className={inputClass} />}</div>
-                        <div className="space-y-2"><BancoSelect value={form.banco2} onChange={(v:any) => setForm({...form, banco2: v})} placeholder="Banco 2 (opcional)" />{form.banco2 && <input value={form.iban2 || ''} onChange={e => setForm({...form, iban2: e.target.value})} placeholder={`IBAN - ${form.banco2.split('-')[0].trim()}`} className={inputClass} />}</div>
-                    </div>
-                    <div className="shrink-0 p-3 border-t bg-white mt-auto">
-                        <div className="flex gap-2">
-                            <button type="button" onClick={onClose} className="flex-1 bg-white border border-black/10 rounded-full py-3.5 text-[12px] font-bold active:scale-[0.97]">Fechar</button>
-                            <button onClick={() => onSave({...form, logoFile})} disabled={saving} className="flex-1 bg-black text-white rounded-full py-3.5 text-[12px] font-black flex items-center justify-center gap-2 active:scale-[0.97] hover:bg-zinc-800 disabled:opacity-50">
-                                {saving? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Check size={14} /> Salvar</>}
-                            </button>
+                        <p className="text-[8px] font-black tracking-widest text-zinc-500 ml-1">DADOS BANCÁRIOS</p>
+
+                        <div className="space-y-2.5 overflow-visible">
+                            <div className="overflow-visible"><p className={labelClass}>BANCO 1</p><BancoSelect value={form.banco1} onChange={(v:any) => setForm({...form, banco1: v})} placeholder="Banco 1" />{form.banco1 && <div className="mt-2"><input value={form.iban || ''} onChange={e => setForm({...form, iban: e.target.value})} placeholder={`IBAN - ${form.banco1.split('-')[0].trim()}`} className={inputClass} /></div>}</div>
+                            <div className="overflow-visible"><p className={labelClass}>BANCO 2 (OPCIONAL)</p><BancoSelect value={form.banco2} onChange={(v:any) => setForm({...form, banco2: v})} placeholder="Banco 2" />{form.banco2 && <div className="mt-2"><input value={form.iban2 || ''} onChange={e => setForm({...form, iban2: e.target.value})} placeholder={`IBAN - ${form.banco2.split('-')[0].trim()}`} className={inputClass} /></div>}</div>
                         </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-5">
+                        <button type="button" onClick={onClose} className="flex-1 bg-white border border-black/10 rounded-full py-3 text-[11px] font-bold hover:bg-zinc-50 active:scale-[0.98] transition-all">Cancelar</button>
+                        <button onClick={() => onSave({...form, logoFile})} disabled={saving} className="flex-1 bg-black text-white rounded-full py-3 text-[11px] font-black disabled:opacity-50 hover:bg-zinc-800 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5">
+                            {saving? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Check size={12} /> Salvar</>}
+                        </button>
                     </div>
                 </div>
             </div>
