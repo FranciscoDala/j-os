@@ -23,10 +23,9 @@ def get_cardapio_publico(db: Session, empresa_id: uuid.UUID, mesa_numero: str | 
         if mesa:
             if mesa.status == MesaStatus.LIVRE and mesa.qr_token is None and token:
                 raise HTTPException(status_code=410, detail="Mesa já foi fechada. Faça scan novamente.")
-            if mesa.qr_token and token and mesa.qr_token != token.upper():
+            if mesa.qr_token and token and mesa.qr_token!= token.upper():
                 raise HTTPException(status_code=410, detail="Sessão desta mesa expirou. Faça scan novamente do QR da mesa.")
 
-            # GERA TOKEN NOVO NO PRIMEIRO SCAN QUANDO MESA ESTA LIVRE
             if mesa.status == MesaStatus.LIVRE and not mesa.qr_token:
                 mesa.qr_token = _gen_token()
                 mesa.qr_token_criado_em = datetime.utcnow()
@@ -41,11 +40,9 @@ def get_cardapio_publico(db: Session, empresa_id: uuid.UUID, mesa_numero: str | 
             pendentes_count = pendentes_q.count()
             primeiro_pendente = pendentes_q.order_by(PedidoQr.created_at.asc()).first()
 
-            # CASO 1: MESA OCUPADA MAS AINDA SEM VENDA (primeiro pedido pendente) -> BLOQUEIA OUTROS
             if pendentes_count > 0 and not mesa.venda_atual_id:
                 token_upper = (token or "").upper().strip()
-                # se não é o dono do token, bloqueia e sugere livres
-                if not token_upper or (mesa.qr_token and token_upper != mesa.qr_token):
+                if not token_upper or (mesa.qr_token and token_upper!= mesa.qr_token):
                     livres = db.query(Mesa).filter(
                         Mesa.empresa_id == empresa_id,
                         Mesa.ativa == True,
@@ -67,13 +64,10 @@ def get_cardapio_publico(db: Session, empresa_id: uuid.UUID, mesa_numero: str | 
                     }
                     return {"empresa_nome": "Restaurante", "mesa": mesa_info, "produtos": [], "categorias": []}
 
-            # CASO 2: MESA JA OCUPADA COM VENDA -> LIBERA PRA AMIGOS (mesmo token pra todos)
             if mesa.status == MesaStatus.OCUPADA and mesa.venda_atual_id and mesa.qr_token:
-                # se escaneou sem token, entrega o mesmo token existente
                 token_upper = (token or "").upper().strip()
                 if not token_upper:
-                    # não tem token na url, mas vamos deixar ele usar o token da mesa
-                    pass  # vai retornar qr_token igual abaixo
+                    pass
 
             bloqueada = False
             cliente_bloqueio = None
@@ -112,8 +106,8 @@ def get_cardapio_publico(db: Session, empresa_id: uuid.UUID, mesa_numero: str | 
         "categorias": cats
     }
 
-
 def criar_pedido_qr(db: Session, empresa_id: uuid.UUID, dados, ip: str | None):
+    # CLIENTE NUNCA ADICIONA DIRETO NA VENDA - SÓ CRIA PEDIDO PENDENTE
     mesa_num_norm = dados.mesa_numero.strip().upper()
     token_cli = (dados.qr_token or "").upper().strip() if getattr(dados, 'qr_token', None) else None
 
@@ -121,7 +115,6 @@ def criar_pedido_qr(db: Session, empresa_id: uuid.UUID, dados, ip: str | None):
     if not mesa: raise HTTPException(404, f"Mesa {mesa_num_norm} não existe")
     if mesa.status == MesaStatus.BLOQUEADA: raise HTTPException(400, f"Mesa {mesa_num_norm} está bloqueada.")
 
-    # valida token
     if mesa.qr_token:
         if not token_cli or mesa.qr_token!= token_cli:
             raise HTTPException(status_code=410, detail="Link desta mesa expirou. Faça scan novamente do QR na mesa.")
@@ -130,15 +123,12 @@ def criar_pedido_qr(db: Session, empresa_id: uuid.UUID, dados, ip: str | None):
             mesa.qr_token = _gen_token()
             mesa.qr_token_criado_em = datetime.utcnow()
 
-    # conta pendentes
     pendentes_mesa = db.query(PedidoQr).filter(PedidoQr.empresa_id == empresa_id, PedidoQr.mesa_numero == mesa_num_norm, PedidoQr.status == PedidoQrStatus.AGUARDANDO_APROVACAO).count()
 
-    # REGRA NOVA: se ainda não tem venda_atual (primeiro pedido), só permite 1 pendente
     if not mesa.venda_atual_id:
         if pendentes_mesa >= 1:
             raise HTTPException(status_code=423, detail="Aguarde o garçom aprovar seu primeiro pedido para fazer outros pedidos.")
     else:
-        # depois de aprovado libera até 10 simultâneos
         if pendentes_mesa >= 10:
             raise HTTPException(429, "Mesa com muitos pedidos pendentes. Aguarde o garçom aprovar.")
 
@@ -188,18 +178,15 @@ def criar_pedido_qr(db: Session, empresa_id: uuid.UUID, dados, ip: str | None):
     emit(str(empresa_id), "pedido_qr:novo", data={"id": str(pedido.id), "mesa": pedido.mesa_numero, "cliente": pedido.cliente_nome, "total": str(total)})
     return pedido
 
-
 def listar_pendentes(db: Session, empresa_id: uuid.UUID):
     pedidos = db.query(PedidoQr).filter(
         PedidoQr.empresa_id == empresa_id,
         PedidoQr.status == PedidoQrStatus.AGUARDANDO_APROVACAO
     ).order_by(PedidoQr.created_at.asc()).all()
 
-    # ENRIQUECE ITENS COM IMG DO PRODUTO ATUAL (primeiro ou ultimo tanto faz)
     for ped in pedidos:
         itens_enriquecidos = []
         for it in (ped.itens or []):
-            # it pode ser dict ou já objeto
             prod_id = it.get("produto_id") if isinstance(it, dict) else getattr(it, 'produto_id', None)
             prod = None
             if prod_id:
@@ -207,12 +194,9 @@ def listar_pendentes(db: Session, empresa_id: uuid.UUID):
                     prod = db.query(Product).filter(Product.id == uuid.UUID(prod_id)).first()
                 except:
                     prod = None
-
-            # pega imagem do produto se não tiver no item salvo
             img = it.get("imagem_url") or it.get("imagem") if isinstance(it, dict) else None
             if not img and prod:
                 img = prod.imagem_url
-
             if isinstance(it, dict):
                 it["imagem_url"] = img
                 it["imagem"] = img
@@ -221,22 +205,58 @@ def listar_pendentes(db: Session, empresa_id: uuid.UUID):
                 itens_enriquecidos.append(it)
             else:
                 itens_enriquecidos.append(it)
-
         ped.itens = itens_enriquecidos
-
     return pedidos
 
-
 def aprovar_pedido(db: Session, pedido_id: uuid.UUID, empresa_id: uuid.UUID, user_id: uuid.UUID, caixa):
+    # IDEMPOTENTE - SE JÁ FOI APROVADO, RETORNA SEM DUPLICAR
     pedido = db.query(PedidoQr).filter(PedidoQr.id == pedido_id, PedidoQr.empresa_id == empresa_id).with_for_update().first()
     if not pedido: raise HTTPException(404, "Pedido QR não encontrado")
-    if pedido.status!= PedidoQrStatus.AGUARDANDO_APROVACAO: raise HTTPException(400, "Pedido já processado")
-    mesa = db.query(Mesa).filter(Mesa.id == pedido.mesa_id).first()
-    if not mesa or mesa.status!= MesaStatus.OCUPADA: raise HTTPException(400, "Mesa não está mais ocupada")
+    if pedido.status == PedidoQrStatus.ACEITO:
+        return pedido
+    if pedido.status!= PedidoQrStatus.AGUARDANDO_APROVACAO:
+        raise HTTPException(400, "Pedido já processado")
+
+    mesa = db.query(Mesa).filter(Mesa.id == pedido.mesa_id).with_for_update().first()
+    if not mesa or mesa.status!= MesaStatus.OCUPADA:
+        raise HTTPException(400, "Mesa não está mais ocupada")
+
+    # CONVERTE ITENS DO PEDIDO QR
     itens_venda = []
     for it in pedido.itens:
-        itens_venda.append(VendaItemCreate(produto_id=uuid.UUID(it["produto_id"]), quantidade=Decimal(it["quantidade"]), observacao=it.get("observacao")))
+        itens_venda.append(VendaItemCreate(
+            produto_id=uuid.UUID(it["produto_id"]),
+            quantidade=Decimal(it["quantidade"]),
+            observacao=it.get("observacao")
+        ))
+
+    # SE JÁ TEM VENDA, VERIFICA SE ITENS JÁ ESTÃO LÁ PARA NÃO DUPLICAR
     if mesa.venda_atual_id:
+        from jos_api.modules.venda.models import Venda, VendaStatus
+        venda_existente = db.query(Venda).filter(Venda.id == mesa.venda_atual_id).first()
+        if venda_existente and venda_existente.status == VendaStatus.ABERTA:
+            existentes_keys = set()
+            for v_item in venda_existente.itens:
+                if v_item.status.name!= "CANCELADO":
+                    existentes_keys.add((str(v_item.produto_id), str(v_item.quantidade), str(v_item.observacao or "")))
+            # filtra só o que ainda não existe
+            itens_filtrados = []
+            for it in itens_venda:
+                key = (str(it.produto_id), str(it.quantidade), str(it.observacao or ""))
+                if key not in existentes_keys:
+                    itens_filtrados.append(it)
+            itens_venda = itens_filtrados
+
+            # SE TUDO JÁ EXISTE, SÓ APROVA O PEDIDO SEM ADICIONAR DE NOVO
+            if len(itens_venda) == 0:
+                pedido.status = PedidoQrStatus.ACEITO
+                pedido.venda_id = mesa.venda_atual_id
+                pedido.aprovado_em = datetime.utcnow()
+                db.commit()
+                emit(str(empresa_id), "pedido_qr:aceito", data={"id": str(pedido.id)})
+                return pedido
+
+        # adiciona só os novos
         for it in itens_venda:
             venda_service.add_item_comanda(db, mesa.venda_atual_id, AddItemRequest(produto_id=it.produto_id, quantidade=it.quantidade, observacao=it.observacao), empresa_id, user_id, "QR", ip=None)
         venda_id = mesa.venda_atual_id
@@ -244,7 +264,10 @@ def aprovar_pedido(db: Session, pedido_id: uuid.UUID, empresa_id: uuid.UUID, use
         venda_req = VendaCreateRequest(itens=itens_venda, mesa_id=mesa.id, dinheiro_recebido=Decimal("0"), forma_pagamento="DINHEIRO", observacao=f"QR - Cliente: {pedido.cliente_nome}", modo="mesa")
         venda, _ = venda_service.create_venda(db, venda_req, empresa_id, user_id, caixa, "QR")
         venda_id = venda.id
-    pedido.status = PedidoQrStatus.ACEITO; pedido.venda_id = venda_id; pedido.aprovado_em = datetime.utcnow()
+
+    pedido.status = PedidoQrStatus.ACEITO
+    pedido.venda_id = venda_id
+    pedido.aprovado_em = datetime.utcnow()
     db.commit()
     emit(str(empresa_id), "pedido_qr:aceito", data={"id": str(pedido.id)})
     return pedido
@@ -252,4 +275,6 @@ def aprovar_pedido(db: Session, pedido_id: uuid.UUID, empresa_id: uuid.UUID, use
 def recusar_pedido(db: Session, pedido_id: uuid.UUID, empresa_id: uuid.UUID):
     pedido = db.query(PedidoQr).filter(PedidoQr.id == pedido_id, PedidoQr.empresa_id == empresa_id).first()
     if not pedido: raise HTTPException(404, "Não encontrado")
-    pedido.status = PedidoQrStatus.RECUSADO; db.commit(); return pedido
+    pedido.status = PedidoQrStatus.RECUSADO
+    db.commit()
+    return pedido

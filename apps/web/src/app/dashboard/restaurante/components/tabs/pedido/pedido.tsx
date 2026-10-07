@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Utensils, ShoppingBag } from "lucide-react";
 import { useDashboard } from "@/components/dashboard/Tamplate";
 import { PedidoCard } from "./cards/pedido";
@@ -12,6 +12,7 @@ export function PedidosTab() {
     const [pedidos, setPedidos] = useState<any[]>([]);
     const [sel, setSel] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const atendendoRef = useRef<string | null>(null);
 
     const load = async () => {
         try {
@@ -29,7 +30,7 @@ export function PedidosTab() {
         const id = setInterval(load, 4000);
         const onAprovado = (e: any) => {
             const idAprovado = e.detail?.id;
-            if (idAprovado) setPedidos(s => s.filter(x => x.id !== idAprovado));
+            if (idAprovado) setPedidos(s => s.filter(x => x.id!== idAprovado));
         };
         window.addEventListener("pedido-qr:aprovado" as any, onAprovado);
         return () => {
@@ -39,8 +40,11 @@ export function PedidosTab() {
     }, []);
 
     const atender = (p: any) => {
+        if (atendendoRef.current === p.id) return;
+        atendendoRef.current = p.id;
         localStorage.setItem("atender_mesa_qr", JSON.stringify(p));
         setActiveTab("vendas");
+        setTimeout(()=>{ atendendoRef.current = null; }, 1000);
     };
 
     const recusar = async (p: any) => {
@@ -52,7 +56,7 @@ export function PedidosTab() {
             method: "POST",
             headers: { Authorization: `Bearer ${token}`, "X-Empresa-ID": emp }
         });
-        setPedidos(s => s.filter(x => x.id !== p.id));
+        setPedidos(s => s.filter(x => x.id!== p.id));
         setSel(null);
     };
 
@@ -86,7 +90,7 @@ export function PedidosTab() {
                 </div>
             </div>
 
-            {pedidos.length === 0 ? (
+            {pedidos.length === 0? (
                 <div className="w-full py-12 md:py-16 text-center border border-dashed border-[#E8DCCF] rounded-[18px] md:rounded-[22px] bg-white">
                     <ShoppingBag className="mx-auto opacity-30 mb-2" size={28} />
                     <p className="font-black text-[13px]">Nenhum pedido QR</p>
@@ -101,7 +105,6 @@ export function PedidosTab() {
             )}
 
             {sel && (
-                
                 <PedidoDetalheModal
                     pedido={sel}
                     onClose={() => setSel(null)}

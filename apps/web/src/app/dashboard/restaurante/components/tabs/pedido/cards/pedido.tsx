@@ -1,5 +1,6 @@
 "use client";
 import { Clock, Check, X, FileText } from "lucide-react";
+import { useState } from "react";
 
 const FALLBACK_IMG = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=400";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
@@ -42,22 +43,19 @@ function safeKz(v: any) {
 }
 
 export function PedidoCard({ p, onAtender, onRecusar, onDetalhe }: any) {
+    const [loadingAtender, setLoadingAtender] = useState(false);
     const total = p.total_estimado?? p.total?? p.valor_total?? 0;
     const itens = p.itens || [];
     const first = itens[0] || {};
-
-    const rawImg =
-        first.produto_imagem_url ||
-        first.imagem_url ||
-        first.imagem ||
-        first.produto_imagem ||
-        first.produto?.imagem_url ||
-        first.produto?.imagem ||
-        first.product?.imagem_url ||
-        p.produto_imagem_url ||
-        null;
-
+    const rawImg = first.produto_imagem_url || first.imagem_url || first.imagem || first.produto_imagem || first.produto?.imagem_url || first.produto?.imagem || first.product?.imagem_url || p.produto_imagem_url || null;
     const firstImg = getImgUrl(rawImg);
+
+    const handleAtender = async () => {
+        if (loadingAtender) return;
+        setLoadingAtender(true);
+        onAtender(p);
+        setTimeout(()=> setLoadingAtender(false), 1000);
+    };
 
     return (
         <div className="group relative w-full min-h-[250px] sm:min-h-[265px] md:min-h-[272px] rounded-[18px] md:rounded-[22px] overflow-hidden bg-[#FFFEFB] border border-[#F3E9DF] shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] md:hover:-translate-y-0.5 transition-all duration-300 flex flex-col">
@@ -73,9 +71,7 @@ export function PedidoCard({ p, onAtender, onRecusar, onDetalhe }: any) {
                 {itens.length > 1 && <span className="absolute bottom-2 right-2 bg-white/90 backdrop-blur text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded-full shadow">+{itens.length - 1}</span>}
             </div>
             <div className="px-3 md:px-3.5 pt-3 pb-3 md:pb-4 flex flex-col flex-1 bg-[#FFFEFB]">
-                <h3 className="font-black text-[12px] md:text-[13px] leading-[1.2] text-[#1E1E1E] line-clamp-2 break-words whitespace-normal min-h-[28px] md:min-h-[31px]">
-                    {p.cliente_nome || "Cliente"}
-                </h3>
+                <h3 className="font-black text-[12px] md:text-[13px] leading-[1.2] text-[#1E1E1E] line-clamp-2 break-words whitespace-normal min-h-[28px] md:min-h-[31px]">{p.cliente_nome || "Cliente"}</h3>
                 <div className="mt-1.5 flex items-center gap-1 flex-wrap min-h-[18px]">
                     <span className="text-[8px] md:text-[9px] font-bold text-[#8A8A8A] bg-[#F5F0E9] px-2 py-0.5 rounded-full">{itens.length} itens</span>
                     <span className="text-[8px] md:text-[9px] font-bold text-[#8A8A8A] bg-[#F5F0E9] px-2 py-0.5 rounded-full">Mesa {p.mesa_numero}</span>
@@ -88,7 +84,7 @@ export function PedidoCard({ p, onAtender, onRecusar, onDetalhe }: any) {
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                         <button onClick={() => onRecusar(p)} className="w-[32px] h-[32px] md:w-[30px] md:h-[30px] rounded-full bg-red-50 border border-red-100 text-red-600 flex items-center justify-center hover:bg-red-100 active:scale-95"><X size={12} strokeWidth={3} /></button>
-                        <button onClick={() => onAtender(p)} className="h-[32px] md:h-[30px] px-4 rounded-full bg-black text-white text-[11px] font-black flex items-center gap-1 hover:bg-zinc-800 active:scale-95"><Check size={12} /> Atender</button>
+                        <button disabled={loadingAtender} onClick={handleAtender} className="h-[32px] md:h-[30px] px-4 rounded-full bg-black text-white text-[11px] font-black flex items-center gap-1 hover:bg-zinc-800 active:scale-95 disabled:opacity-50"><Check size={12} /> {loadingAtender? "..." : "Atender"}</button>
                     </div>
                 </div>
             </div>

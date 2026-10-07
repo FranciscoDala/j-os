@@ -46,7 +46,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     const PEDIDOS_QR_API = `${API_URL}/api/v1/pedidos-qr`;
     const qrProcessadoRef = useRef<string | null>(null);
     const adicionandoRef = useRef(false);
-    const itensOriginaisRef = useRef<string>("");
 
     const pushToast = (msg: string, type: Toast["type"] = "info") => {
         const id = Date.now().toString() + Math.random().toString().slice(2);
@@ -66,7 +65,6 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
             setFecharMesaAtiva(null);
             setMostrarCatalogoExtra(false);
             setCart([]);
-            itensOriginaisRef.current = JSON.stringify(dados.itens || []);
             (async () => {
                 const empresaId = getEmpresaId();
                 if (!empresaId) return;
@@ -184,70 +182,56 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         else { setRecebido((s) => (s + val).slice(0, 10)); }
     };
 
+    // NOVO FLUXO: SE TEM pedidoQrAtivo, SÓ CHAMA APROVAR. BACKEND CRIA A VENDA.
     const adicionarNaMesa = async () => {
         if (!mesaSelecionada || cart.length === 0 || finalizando || adicionandoRef.current) return;
         adicionandoRef.current = true;
         setFinalizando(true);
         try {
-            const vendaId = mesaSelecionada.venda_atual_id || vendaMesa?.id;
+            // CASO QR - CLIENTE NÃO PODE ADD DIRETO, SÓ GARÇOM APROVANDO
+            if (pedidoQrAtivo) {
+                const idQr = pedidoQrAtivo.id || pedidoQrAtivo.pedido_id;
+                const itensQr = cart.filter((c:any)=> c.origem === "qr");
+                const itensExtra = cart.filter((c:any)=> c.origem === "extra");
 
-            // NÃO SOMA - FILTRA DUPLICADO MANTENDO QTD ORIGINAL
-            const seen = new Set<string>();
-            const itensUnicos = cart.filter((c: any) => {
-                if (seen.has(c.id)) return false;
-                seen.add(c.id);
-                return true;
-            }).map((c: any) => ({
-                produto_id: c.id,
-                quantidade: Number(c.qtd || 1)
-            }));
+                // 1. APROVA - backend cria venda com itensQr
+                const rAprovar = await fetch(`${PEDIDOS_QR_API}/${idQr}/aprovar`, { method: "POST", headers: getAuthHeaders() as any });
+                const txtA = await rAprovar.text(); let dataA:any={}; try{ dataA=JSON.parse(txtA);}catch{ dataA={detail:txtA};}
+                if (!rAprovar.ok) throw new Error(dataA.detail || "Erro ao aprovar pedido QR");
+                const vendaId = dataA.venda_id || mesaSelecionada.venda_atual_id || vendaMesa?.id;
 
-            if (itensUnicos.length === 0) { setFinalizando(false); adicionandoRef.current = false; return; }
-
-            if (!vendaId) {
-                const rCreate = await fetch(`${VENDAS_API}/`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json",...getAuthHeaders() as any },
-                    body: JSON.stringify({
-                        mesa_id: mesaSelecionada.id,
-                        itens: itensUnicos,
-                        dinheiro_recebido: 0,
-                        forma_pagamento: "DINHEIRO",
-                        pessoas: mesaSelecionada.pessoas_atual || 1,
-                        modo: "mesa"
-                    })
-                });
-                const txt = await rCreate.text(); let data: any = {}; try { data = JSON.parse(txt); } catch { data = { detail: txt }; }
-                if (!rCreate.ok) throw new Error(data.detail || "Erro ao criar comanda");
-
-                if (pedidoQrAtivo) {
-                    const idQr = pedidoQrAtivo.id || pedidoQrAtivo.pedido_id;
-                    await fetch(`${PEDIDOS_QR_API}/${idQr}/aprovar`, { method: "POST", headers: getAuthHeaders() as any });
-                    window.dispatchEvent(new CustomEvent("pedido-qr:aprovado", { detail: { id: idQr } }));
-                    localStorage.removeItem("atender_mesa_qr");
+                // 2. SE TEM EXTRA ADICIONADO PELO GARÇOM, ADICIONA NA MESMA VENDA
+                if (itensExtra.length > 0 && vendaId) {
+                    const seen = new Set<string>();
+                    const itensUnicosExtra = itensExtra.filter((c:any)=>{ if(seen.has(c.id)) return false; seen.add(c.id); return true; }).map((c:any)=>({ produto_id: c.id, quantidade: Number(c.qtd||1) }));
+                    if (itensUnicosExtra.length > 0) {
+                        await fetch(`${VENDAS_API}/${vendaId}/itens`, { method:"POST", headers:{"Content-Type":"application/json",...getAuthHeaders() as any}, body: JSON.stringify({ itens: itensUnicosExtra }) });
+                    }
                 }
-                pushToast(`Mesa ${mesaSelecionada.numero} • ${itensUnicos.length} itens adicionados`, "success");
-                setCart([]); setMesaSelecionada(null); setVendaMesa(null); setPedidoQrAtivo(null); qrProcessadoRef.current = null; itensOriginaisRef.current = ""; setActiveCat("All");
+
+                window.dispatchEvent(new CustomEvent("pedido-qr:aprovado", { detail: { id: idQr } }));
+                localStorage.removeItem("atender_mesa_qr");
+                pushToast(`Mesa ${mesaSelecionada.numero} • Pedido aprovado`, "success");
+                setCart([]); setMesaSelecionada(null); setVendaMesa(null); setPedidoQrAtivo(null); qrProcessadoRef.current=null; setActiveCat("All");
                 return;
             }
 
-            // MESA JÁ TEM VENDA - SÓ ADICIONA O QUE NÃO EXISTE AINDA
-            const r = await fetch(`${VENDAS_API}/${vendaId}/itens`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json",...getAuthHeaders() as any },
-                body: JSON.stringify({ itens: itensUnicos })
-            });
-            const txt = await r.text(); let data: any = {}; try { data = JSON.parse(txt); } catch { data = { detail: txt }; }
-            if (!r.ok) throw new Error(data.detail || "Erro ao adicionar na mesa");
+            // CASO MESA NORMAL (SEM QR) - FLUXO ANTIGO
+            const vendaId = mesaSelecionada.venda_atual_id || vendaMesa?.id;
+            const seen = new Set<string>();
+            const itensUnicos = cart.filter((c:any)=>{ if(seen.has(c.id)) return false; seen.add(c.id); return true; }).map((c:any)=>({ produto_id: c.id, quantidade: Number(c.qtd||1) }));
 
-            if (pedidoQrAtivo) {
-                const idQr = pedidoQrAtivo.id || pedidoQrAtivo.pedido_id;
-                await fetch(`${PEDIDOS_QR_API}/${idQr}/aprovar`, { method: "POST", headers: getAuthHeaders() as any });
-                window.dispatchEvent(new CustomEvent("pedido-qr:aprovado", { detail: { id: idQr } }));
-                localStorage.removeItem("atender_mesa_qr");
+            if (!vendaId) {
+                const rCreate = await fetch(`${VENDAS_API}/`, { method:"POST", headers:{"Content-Type":"application/json",...getAuthHeaders() as any}, body: JSON.stringify({ mesa_id: mesaSelecionada.id, itens: itensUnicos, dinheiro_recebido:0, forma_pagamento:"DINHEIRO", pessoas: mesaSelecionada.pessoas_atual||1, modo:"mesa" }) });
+                if (!rCreate.ok) throw new Error(await rCreate.text());
+                pushToast(`Mesa ${mesaSelecionada.numero} • ${itensUnicos.length} itens`, "success");
+                setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("All");
+                return;
             }
-            pushToast(`Mesa ${mesaSelecionada.numero} • ${itensUnicos.length} itens adicionados`, "success");
-            setCart([]); setMesaSelecionada(null); setVendaMesa(null); setPedidoQrAtivo(null); qrProcessadoRef.current = null; itensOriginaisRef.current = ""; setActiveCat("All");
+            const r = await fetch(`${VENDAS_API}/${vendaId}/itens`, { method:"POST", headers:{"Content-Type":"application/json",...getAuthHeaders() as any}, body: JSON.stringify({ itens: itensUnicos }) });
+            if (!r.ok) throw new Error(await r.text());
+            pushToast(`Mesa ${mesaSelecionada.numero} • ${itensUnicos.length} itens`, "success");
+            setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("All");
 
         } catch (e: any) { pushToast(e.message, "error"); } finally {
             setFinalizando(false);
@@ -294,11 +278,11 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
     };
     const aposVenda = (comRecibo: boolean) => {
         if (comRecibo) imprimirFaturaFinal();
-        setShowConfirm(false); setShowPay(false); setCart([]); setRecebido(""); setUltimaVenda(null); setMesaSelecionada(null); setVendaMesa(null); setPedidoQrAtivo(null); setFecharMesaAtiva(null); localStorage.removeItem("atender_mesa_qr"); localStorage.removeItem("fechar_mesa"); qrProcessadoRef.current = null; adicionandoRef.current = false; itensOriginaisRef.current = "";
+        setShowConfirm(false); setShowPay(false); setCart([]); setRecebido(""); setUltimaVenda(null); setMesaSelecionada(null); setVendaMesa(null); setPedidoQrAtivo(null); setFecharMesaAtiva(null); localStorage.removeItem("atender_mesa_qr"); localStorage.removeItem("fechar_mesa"); qrProcessadoRef.current = null; adicionandoRef.current = false;
     };
     const cancelarTudo = () => {
         localStorage.removeItem("atender_mesa_qr"); localStorage.removeItem("fechar_mesa");
-        setPedidoQrAtivo(null); setFecharMesaAtiva(null); qrProcessadoRef.current = null; setMesaSelecionada(null); setCart([]); setVendaMesa(null); adicionandoRef.current = false; itensOriginaisRef.current = "";
+        setPedidoQrAtivo(null); setFecharMesaAtiva(null); qrProcessadoRef.current = null; setMesaSelecionada(null); setCart([]); setVendaMesa(null); adicionandoRef.current = false;
     };
 
     const produtosDoPedidoIds = pedidoQrAtivo?.itens?.map((it: any) => it.produto_id || it.produto?.id) || [];
