@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 function RemoveItemModal({ item, onClose, onConfirm }: { item: any, onClose: () => void, onConfirm: () => void }) {
     if (!item) return null;
@@ -11,7 +11,7 @@ function RemoveItemModal({ item, onClose, onConfirm }: { item: any, onClose: () 
                     <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center text-[16px] mb-3">✕</div>
                     <h3 className="font-black text-[18px] leading-none tracking-tight text-black">Remover item?</h3>
                     <p className="text-[12px] text-zinc-600 mt-2 leading-[16px]">Tens a certeza que queres remover <span className="font-black text-black">{item.name}</span> do carrinho?</p>
-                    <div className="mt-3 flex items-center gap-2 text-[11px] px-3 py-2 rounded-full bg-[#F5F7FB] border w-fit"><span>REF #{item.id?.slice(0,4) || "1"}</span><span className="w-1 h-1 bg-black rounded-full" /><span>{item.qtd}x • Kz {(item.price * item.qtd).toLocaleString("de-DE")}</span></div>
+                    <div className="mt-3 flex items-center gap-2 text-[11px] px-3 py-2 rounded-full bg-[#F5F7FB] border w-fit"><span>REF #{String(item.id)?.slice(0,4) || "1"}</span><span className="w-1 h-1 bg-black rounded-full" /><span>{item.qtd}x • Kz {(item.price * item.qtd).toLocaleString("de-DE")}</span></div>
                 </div>
                 <div className="p-3 flex gap-2"><button onClick={onClose} className="flex-1 bg-white border border-black/10 rounded-full py-3.5 text-[12px] font-bold active:scale-[0.97]">Cancelar</button><button onClick={onConfirm} className="flex-1 bg-black text-white rounded-full py-3.5 text-[12px] font-bold active:scale-[0.97]">Remover</button></div>
             </div>
@@ -38,7 +38,28 @@ export function CarrinhoSection({ cart, total, mesaSelecionada, onAddMesa, onLim
     const isQr =!!pedidoQrAtivo;
     const isFechar =!!fecharMesaAtiva;
     const [itemParaRemover, setItemParaRemover] = useState<any>(null);
-    const temItens = cart.length > 0;
+
+    // AGRUPA MESMO PRODUTO - 1 Cuca + 1 Cuca = 1 linha com QTD 2
+    const groupedCart = useMemo(() => {
+        const map = new Map<string, any>();
+        for (const c of cart) {
+            const key = String(c.id);
+            if (map.has(key)) {
+                const ex = map.get(key);
+                ex.qtd = Number(ex.qtd) + Number(c.qtd);
+            } else {
+                map.set(key, {...c, qtd: Number(c.qtd) });
+            }
+        }
+        return Array.from(map.values());
+    }, [cart]);
+
+    const totalAgrupado = useMemo(() => {
+        return groupedCart.reduce((s, i) => s + i.price * i.qtd, 0);
+    }, [groupedCart]);
+
+    const temItens = groupedCart.length > 0;
+
     return (
         <>
             <div className="w-full h-full bg-white flex flex-col overflow-hidden">
@@ -47,19 +68,22 @@ export function CarrinhoSection({ cart, total, mesaSelecionada, onAddMesa, onLim
                         <p className="font-black text-[13px]">{isFechar? `MESA ${fecharMesaAtiva.mesa_numero}` : isMesa? "Cliente" : "Seu pedido"}</p>
                         {isMesa && <p className="text-[11px] text-amber-600">{isFechar? "Fechando conta" : isQr? `${pedidoQrAtivo.cliente_nome} • pendente` : 'pendente'}</p>}
                     </div>
-                    <span className="text-[11px] bg-black text-white px-3 py-1 rounded-full">{cart.length}</span>
+                    <span className="text-[11px] bg-black text-white px-3 py-1 rounded-full">{groupedCart.length}</span>
                 </div>
                 <div className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden bg-white">
-                    {cart.length > 0 && (<div className="flex text-[10px] tracking-widest text-zinc-500 px-2 py-2 border-b border-black/10 sticky top-0 bg-white z-10"><span className="w-[28px]">REF</span><span className="flex-1">DESCRIÇÃO</span><span className="w-[36px] text-center">QTD</span><span className="w-[70px] text-right">P/UNIT</span></div>)}
-                    {cart.length === 0 && <p className="text-center text-[12px] text-gray-400 mt-10 whitespace-pre-line">{isFechar? "Carregando consumo..." : isMesa? "Adicione produtos\npara somar na mesa" : "Dê 2 cliques no produto"}</p>}
-                    {cart.map((i: any, idx: number) => (
+                    {groupedCart.length > 0 && (<div className="flex text-[10px] tracking-widest text-zinc-500 px-2 py-2 border-b border-black/10 sticky top-0 bg-white z-10"><span className="w-[28px]">REF</span><span className="flex-1">DESCRIÇÃO</span><span className="w-[36px] text-center">QTD</span><span className="w-[70px] text-right">P/UNIT</span></div>)}
+                    {groupedCart.length === 0 && <p className="text-center text-[12px] text-gray-400 mt-10 whitespace-pre-line">{isFechar? "Carregando consumo..." : isMesa? "Adicione produtos\npara somar na mesa" : "Dê 2 cliques no produto"}</p>}
+                    {groupedCart.map((i: any, idx: number) => (
                         <div key={i.id} onDoubleClick={() => { if(!isFechar) setItemParaRemover(i) }} title={isFechar? "" : "Duplo clique para remover"} className={`flex items-start px-2 py-2.5 border-b border-dashed border-black/10 text-[13px] leading-[16px] select-none ${isFechar? "" : "cursor-pointer hover:bg-black/[0.04] transition-colors"}`}>
-                            <span className="w-[28px] shrink-0">{idx + 1}</span><span className="flex-1 pr-2 break-words whitespace-normal">{i.name}</span><span className="w-[36px] shrink-0 text-center">{i.qtd}</span><span className="w-[70px] shrink-0 text-right">{i.price.toLocaleString("de-DE")}</span>
+                            <span className="w-[28px] shrink-0">{idx + 1}</span>
+                            <span className="flex-1 pr-2 break-words whitespace-normal">{i.name}</span>
+                            <span className="w-[36px] shrink-0 text-center font-bold">{i.qtd}</span>
+                            <span className="w-[70px] shrink-0 text-right">{i.price.toLocaleString("de-DE")}</span>
                         </div>
                     ))}
                 </div>
                 <div className="shrink-0 p-3 border-t bg-white mt-auto">
-                    <div className="flex justify-between items-center px-1 pb-2"><span className="text-[13px]">Kz</span><span className="text-[30px] leading-none text-[#2F4A8A] font-bold">{total.toLocaleString("de-DE")}</span></div>
+                    <div className="flex justify-between items-center px-1 pb-2"><span className="text-[13px]">Kz</span><span className="text-[30px] leading-none text-[#2F4A8A] font-bold">{(totalAgrupado || total).toLocaleString("de-DE")}</span></div>
                     {isFechar? (
                         <div className="flex gap-2">
                             <button onClick={onLimparMesa} className="flex-1 bg-zinc-100 rounded-full py-3 text-[12px] font-bold active:scale-[0.97]">Cancelar</button>
