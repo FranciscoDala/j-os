@@ -8,7 +8,7 @@ const statusConfig: any = {
     SUJA: { topBg: "bg-[#EEEEEE]", badge: "bg-zinc-500 text-white", price: "text-zinc-500", border: "border-zinc-200", cardBg: "bg-[#FAFAFA]", label: "SUJA" },
 };
 
-export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onEdit, onDelete, canManage }: any) {
+export function MesaCard({ m, onOcupar, onComanda, onFechar, onLimpar, onLiberar, onEdit, onDelete, canManage }: any) {
     const cfg = statusConfig[m.status] || statusConfig.LIVRE;
     const min = m.aberta_em? Math.floor((Date.now() - new Date(m.aberta_em).getTime()) / 60000) : 0;
     const total = Number(m.venda_total || m.total_consumo || 0);
@@ -57,7 +57,7 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onEdit, 
                 <div className="mt-auto pt-2 md:pt-3 flex items-end justify-between gap-2">
                     <div className="leading-none"><p className={`text-[14px] md:text-[15px] font-black tracking-tight ${cfg.price}`}>{hasConsumo? total.toLocaleString("de-DE") : "—"}{hasConsumo && <span className="text-[10px]">Kz</span>}</p><p className="text-[8px] md:text-[9px] font-bold text-[#9A9A9A] mt-1">+ {hasConsumo? "Consumo" : cfg.label}</p></div>
                     {m.status === "LIVRE" && <button onClick={() => onOcupar(m)} className="h-[30px] px-4 rounded-full bg-[#FFC91A] hover:bg-[#FFB800] text-black text-[11px] font-black active:scale-95">Ocupar</button>}
-                    {m.status === "OCUPADA" && hasConsumo && <button onClick={() => onComanda(m)} className="h-[32px] px-3.5 rounded-full bg-black text-white text-[10px] font-black flex items-center gap-1 hover:bg-zinc-800 active:scale-95"><Receipt size={11} /> Fechar</button>}
+                    {m.status === "OCUPADA" && hasConsumo && <button onClick={() => onFechar(m)} className="h-[32px] px-3.5 rounded-full bg-black text-white text-[10px] font-black flex items-center gap-1 hover:bg-zinc-800 active:scale-95"><Receipt size={11} /> Fechar</button>}
                     {m.status === "OCUPADA" &&!hasConsumo && <button onClick={() => onComanda(m)} className="h-[30px] px-4 rounded-full bg-[#FFC91A] hover:bg-[#FFB800] text-black text-[11px] font-black active:scale-95">Comanda</button>}
                     {m.status === "SUJA" && <button onClick={() => onLimpar(m)} className="h-[30px] px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black active:scale-95">Limpar</button>}
                     {m.status === "RESERVADA" && <button onClick={() => onOcupar(m)} className="h-[30px] px-4 rounded-full bg-[#A67C52] hover:bg-[#8C6A45] text-white text-[10px] font-black active:scale-95">Check-in</button>}

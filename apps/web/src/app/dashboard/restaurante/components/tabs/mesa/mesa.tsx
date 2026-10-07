@@ -10,11 +10,8 @@ import { MesaOcuparModal } from "./modals/ocupar";
 import { MesaComandaModal } from "./modals/comanda";
 import { MesaDeleteModal } from "./modals/deletar";
 import { MesaQrModal } from "./modals/qr";
-import { MesaFecharModal } from "./modals/fechar";
-import { MesaReciboModal } from "./modals/recibo";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
-const VENDAS_API = `${API_BASE}/vendas`;
 const STATUS_OPTS = ["", "LIVRE", "OCUPADA", "RESERVADA", "SUJA"] as const;
 const STATUS_LABELS: Record<string, string> = { "": "Todos status", LIVRE: "Livre", OCUPADA: "Ocupada", RESERVADA: "Reservada", SUJA: "Suja" };
 
@@ -43,7 +40,7 @@ function CustomSelect({ value, onChange, options, labelMap }: { value: string, o
 }
 
 export function MesasTab() {
-    const { role } = useDashboard();
+    const { role, setActiveTab } = useDashboard();
     const { search: globalSearch } = useGlobalSearch();
     const canManage = ["dono","gerente","gerente_restaurante","admin","owner"].includes((role||"").toLowerCase());
     const [mesas, setMesas] = useState<any[]>([]); const [zonas, setZonas] = useState<string[]>([]); const [zona, setZona] = useState(""); const [status, setStatus] = useState("");
@@ -53,9 +50,6 @@ export function MesasTab() {
     const [showQr, setShowQr] = useState(false);
     const [editingMesa, setEditingMesa] = useState<any>(null);
     const [showDelete, setShowDelete] = useState(false); const [mesaParaDeletar, setMesaParaDeletar] = useState<any>(null);
-    const [showPay, setShowPay] = useState(false); const [showConfirm, setShowConfirm] = useState(false);
-    const [forma, setForma] = useState<"dinheiro"|"transferencia"|"tpa">("dinheiro"); const [recebido, setRecebido] = useState(""); const [finalizando, setFinalizando] = useState(false);
-    const [ultimaVenda, setUltimaVenda] = useState<any>(null); const [mesaParaFechar, setMesaParaFechar] = useState<any>(null);
 
     useEffect(() => { setEmpresaId(getEmpresaId()); }, []);
     const load = useCallback(async () => {
@@ -107,18 +101,18 @@ export function MesasTab() {
     const handleLimpar = async (m:any) => { try{ const res=await fetch(`${API_BASE}/mesas/${empresaId}/${m.id}/limpar`,{method:"POST",headers:{"Content-Type":"application/json",...getAuthHeaders()} as any}); if(!res.ok) throw new Error("Erro"); toast.success("Mesa limpa"); setMesas(prev=>prev.map(x=>x.id===m.id? {...x,status:"LIVRE"}:x)); window.dispatchEvent(new CustomEvent("mesa:update")); load(); }catch(e:any){toast.error(e.message);} };
     const handleLiberar = async (m:any) => { try{ const res=await fetch(`${API_BASE}/mesas/${empresaId}/${m.id}/liberar?limpar=true`,{method:"POST",headers:{"Content-Type":"application/json",...getAuthHeaders()} as any}); if(!res.ok) throw new Error("Erro"); toast.success("Mesa liberada"); setMesas(prev=>prev.map(x=>x.id===m.id? {...x,status:"LIVRE",venda_atual_id:null}:x)); window.dispatchEvent(new CustomEvent("mesa:update")); load(); }catch(e:any){toast.error(e.message);} };
 
-    const abrirFechar = (m:any) => { setMesaParaFechar(m); setRecebido(String(Number(m.venda_total||m.total||0))); setForma("dinheiro"); setShowPay(true); };
-    const fecharContaMesa = async () => {
-        const vendaId = mesaParaFechar?.venda_atual_id; if (!vendaId) return toast.error("Mesa sem venda");
-        const recebidoNum = recebido? parseFloat(recebido):0; const total = Number(mesaParaFechar?.venda_total||0);
-        if (forma==="dinheiro" && recebidoNum < total) return toast.error("Valor insuficiente");
-        setFinalizando(true);
-        try{
-            const r = await fetch(`${VENDAS_API}/${vendaId}/fechar`,{method:"POST",headers:{"Content-Type":"application/json",...getAuthHeaders() as any},body:JSON.stringify({forma_pagamento:forma.toUpperCase(),dinheiro_recebido:recebidoNum||0})});
-            const txt=await r.text(); let data:any={}; try{data=JSON.parse(txt);}catch{data={detail:txt};}
-            if(!r.ok) throw new Error(data.detail||"Erro ao fechar");
-            setUltimaVenda({...data,mesa_numero:mesaParaFechar.numero}); setShowPay(false); setShowConfirm(true); toast.success(`Mesa ${mesaParaFechar.numero} fechada!`); load();
-        }catch(e:any){toast.error(e.message);} finally{setFinalizando(false);}
+    // NOVO FLUXO: Fechar leva pra Venda
+    const handleFecharMesa = (m:any) => {
+        if(!m.venda_atual_id) return toast.error("Mesa sem venda ativa");
+        localStorage.setItem("fechar_mesa", JSON.stringify({
+            mesa_id: m.id,
+            mesa_numero: m.numero,
+            venda_id: m.venda_atual_id,
+            cliente_nome: m.cliente_atual || `Mesa ${m.numero}`,
+            total: m.venda_total || m.total_consumo || 0
+        }));
+        toast.success(`Fechando Mesa ${m.numero}...`);
+        setActiveTab("vendas");
     };
 
     if (!empresaId) return <div className="p-6 text-[12px] font-bold opacity-60">Carregando empresa...</div>;
@@ -143,7 +137,7 @@ export function MesasTab() {
                     <div className="grid gap-2.5 md:gap-3 grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
                         {mesas.length===0? <div className="col-span-full py-12 text-center border border-dashed rounded-[22px] bg-white/50 text-[13px] font-black">Nenhuma mesa encontrada</div> : mesas.map(m=>(
                             <div key={m.id} className="flex flex-col gap-2">
-                                <MesaCard m={m} canManage={canManage} onEdit={handleEditClick} onDelete={handleDeleteClick} onOcupar={(mm:any)=>{setMesaAlvo(mm); setShowOcupar(true);}} onComanda={(mm:any)=>{setMesaAlvo(mm); setShowComanda(true);}} onLimpar={handleLimpar} onLiberar={handleLiberar} onDetalhe={(mm:any)=>{setMesaAlvo(mm); setShowComanda(true);}} />
+                                <MesaCard m={m} canManage={canManage} onEdit={handleEditClick} onDelete={handleDeleteClick} onOcupar={(mm:any)=>{setMesaAlvo(mm); setShowOcupar(true);}} onComanda={(mm:any)=>{setMesaAlvo(mm); setShowComanda(true);}} onFechar={handleFecharMesa} onLimpar={handleLimpar} onLiberar={handleLiberar} onDetalhe={(mm:any)=>{setMesaAlvo(mm); setShowComanda(true);}} />
                             </div>
                         ))}
                     </div>
@@ -155,8 +149,6 @@ export function MesasTab() {
             <MesaComandaModal open={showComanda} mesa={mesaAlvo} onClose={()=>{setShowComanda(false); setMesaAlvo(null);}} />
             <MesaDeleteModal open={showDelete} mesa={mesaParaDeletar} saving={saving} onClose={()=>setShowDelete(false)} onConfirm={confirmDelete} />
             <MesaQrModal open={showQr} onClose={()=>setShowQr(false)} empresaId={empresaId!} mesas={mesas} />
-            <MesaFecharModal open={showPay} mesa={mesaParaFechar} forma={forma} setForma={setForma} recebido={recebido} setRecebido={setRecebido} finalizando={finalizando} onClose={()=>setShowPay(false)} onConfirm={fecharContaMesa} onOpenFechar={abrirFechar} />
-            <MesaReciboModal open={showConfirm} venda={ultimaVenda} forma={forma} recebido={recebido} onClose={()=>{setShowConfirm(false); setShowPay(false); setRecebido(""); setUltimaVenda(null); setMesaParaFechar(null);}} />
         </>
     );
 }
