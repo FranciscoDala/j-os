@@ -20,7 +20,6 @@ export function PedidoDetalheModal({
     if (!pedido) return null;
     const itensRaw = pedido.itens || [];
 
-    // AGRUPA MESMO PRODUTO - Sumol 1 + Sumol 1 = Sumol 2
     const mapa = new Map<string, any>();
     for (const it of itensRaw) {
         const key = `${it.produto_id || it.produto_nome || it.nome}-${(it.observacao || "").trim().toLowerCase()}`;
@@ -29,18 +28,20 @@ export function PedidoDetalheModal({
         if (mapa.has(key)) {
             const ex = mapa.get(key);
             ex.quantidade += qtd;
+            ex.total_linha = ex.quantidade * ex.preco_unit;
         } else {
             mapa.set(key, {
                 produto_id: it.produto_id,
                 produto_nome: it.produto_nome || it.nome || "Produto",
                 quantidade: qtd,
                 preco_unit: unit,
+                total_linha: unit * qtd,
                 observacao: it.observacao || "",
             });
         }
     }
     const itens = Array.from(mapa.values());
-    const total = itens.reduce((s, it) => s + it.preco_unit * it.quantidade, 0) || pedido.total || pedido.valor_total || pedido.total_estimado || 0;
+    const total = itens.reduce((s, it) => s + it.total_linha, 0) || pedido.total || pedido.valor_total || pedido.total_estimado || 0;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-4">
@@ -49,82 +50,34 @@ export function PedidoDetalheModal({
 
                 <div className="bg-white m-[6px] rounded-[18px] p-3 flex justify-between items-start border border-black/5 shrink-0">
                     <div>
-                        <p className="font-black text-[13px] leading-none text-black">
-                            MESA {pedido.mesa_numero}
-                        </p>
-                        <p className="text-[11px] text-zinc-600 mt-1 font-bold truncate max-w-[220px]">
-                            {pedido.cliente_nome || "Cliente"} • {itens.length} {itens.length === 1? "tipo" : "tipos"} • {itensRaw.length} itens
-                        </p>
+                        <p className="font-black text-[13px] leading-none text-black">MESA {pedido.mesa_numero}</p>
+                        <p className="text-[11px] text-zinc-600 mt-1 font-bold truncate max-w-[220px]">{pedido.cliente_nome || "Cliente"} • {itens.length} {itens.length === 1? "tipo" : "tipos"}</p>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center hover:bg-zinc-200 active:scale-95"
-                    >
-                        <X size={14} />
-                    </button>
+                    <button onClick={onClose} className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center hover:bg-zinc-200 active:scale-95"><X size={14} /></button>
                 </div>
 
                 <div className="bg-white m-[6px] mt-0 rounded-[18px] border border-black/5 overflow-hidden flex flex-col flex-1 min-h-0">
                     <div className="flex text-[10px] tracking-widest text-zinc-500 px-2 py-2 border-b border-black/10 shrink-0 bg-white">
-                        <span className="w-[28px]">REF</span>
-                        <span className="flex-1">DESCRIÇÃO</span>
-                        <span className="w-[36px] text-center">QTD</span>
-                        <span className="w-[70px] text-right">P/UNIT</span>
+                        <span className="w-[28px]">REF</span><span className="flex-1">DESCRIÇÃO</span><span className="w-[36px] text-center">QTD</span><span className="w-[70px] text-right">TOTAL</span>
                     </div>
 
                     <div className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                        {itens.length === 0 && (
-                            <p className="text-center text-[12px] text-gray-400 mt-10">Sem itens</p>
-                        )}
-                        {itens.map((it: any, idx: number) => {
-                            return (
-                                <div
-                                    key={it.produto_id || idx}
-                                    className="flex items-start px-2 py-2.5 border-b border-dashed border-black/10 text-[13px] leading-[16px]"
-                                >
-                                    <span className="w-[28px] shrink-0">{idx + 1}</span>
-                                    <span className="flex-1 pr-2 break-words whitespace-normal font-medium text-black">
-                                        {it.produto_nome}
-                                        {it.observacao? <span className="text-[10px] text-zinc-500 block">{it.observacao}</span> : null}
-                                    </span>
-                                    <span className="w-[36px] shrink-0 text-center font-bold">{it.quantidade}</span>
-                                    <span className="w-[70px] shrink-0 text-right">{safeKz(it.preco_unit)}</span>
-                                </div>
-                            );
-                        })}
+                        {itens.length === 0 && <p className="text-center text-[12px] text-gray-400 mt-10">Sem itens</p>}
+                        {itens.map((it: any, idx: number) => (
+                            <div key={it.produto_id || idx} className="flex items-start px-2 py-2.5 border-b border-dashed border-black/10 text-[13px] leading-[16px]">
+                                <span className="w-[28px] shrink-0">{idx + 1}</span>
+                                <span className="flex-1 pr-2 break-words whitespace-normal font-medium text-black">{it.produto_nome}{it.observacao? <span className="text-[10px] text-zinc-500 block">{it.observacao}</span> : null}</span>
+                                <span className="w-[36px] shrink-0 text-center font-bold">{it.quantidade}</span>
+                                <span className="w-[70px] shrink-0 text-right font-bold">{safeKz(it.total_linha)}</span>
+                            </div>
+                        ))}
                     </div>
 
                     <div className="shrink-0 p-3 border-t bg-white mt-auto">
-                        <div className="flex justify-between items-center px-1 pb-3">
-                            <span className="text-[13px] font-bold">Kz</span>
-                            <span className="text-[30px] leading-none text-[#2F4A8A] font-bold">
-                                {safeKz(total)}
-                            </span>
-                        </div>
+                        <div className="flex justify-between items-center px-1 pb-3"><span className="text-[13px] font-bold">Kz</span><span className="text-[30px] leading-none text-[#2F4A8A] font-bold">{safeKz(total)}</span></div>
                         <div className="flex gap-2">
-                            {onRecusar && (
-                                <button
-                                    onClick={() => onRecusar(pedido)}
-                                    className="flex-1 bg-white border border-red-200 text-red-600 rounded-full py-3.5 text-[12px] font-bold active:scale-[0.97] hover:bg-red-50"
-                                >
-                                    Recusar
-                                </button>
-                            )}
-                            {onAtender? (
-                                <button
-                                    onClick={() => onAtender(pedido)}
-                                    className="flex-1 bg-black text-white rounded-full py-3.5 text-[12px] font-black flex items-center justify-center gap-1.5 active:scale-[0.97] hover:bg-zinc-800"
-                                >
-                                    <Check size={14} /> Atender
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={onClose}
-                                    className="flex-1 bg-black text-white rounded-full py-3.5 text-[12px] font-bold active:scale-[0.97] hover:bg-zinc-800"
-                                >
-                                    Fechar
-                                </button>
-                            )}
+                            {onRecusar && <button onClick={() => onRecusar(pedido)} className="flex-1 bg-white border border-red-200 text-red-600 rounded-full py-3.5 text-[12px] font-bold active:scale-[0.97] hover:bg-red-50">Recusar</button>}
+                            {onAtender? <button onClick={() => onAtender(pedido)} className="flex-1 bg-black text-white rounded-full py-3.5 text-[12px] font-black flex items-center justify-center gap-1.5 active:scale-[0.97] hover:bg-zinc-800"><Check size={14} /> Atender</button> : <button onClick={onClose} className="flex-1 bg-black text-white rounded-full py-3.5 text-[12px] font-bold active:scale-[0.97] hover:bg-zinc-800">Fechar</button>}
                         </div>
                     </div>
                 </div>

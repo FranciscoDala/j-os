@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { X } from "lucide-react";
 import { ProdutosSection } from "./cards/produto";
 import { CarrinhoSection } from "./carrinho/carrinho";
@@ -163,7 +163,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         if (state === "zero") { pushToast(`Sem stock: "${p.nome}"`, "error"); return; }
         setCart(prev => {
             const ex = prev.find((c) => c.id === p.id);
-            if (ex) return prev.map((c) => (c.id === p.id? {...c, qtd: c.qtd + 1 } : c));
+            if (ex) return prev.map((c) => (c.id === p.id? {...c, qtd: Number(c.qtd) + 1 } : c));
             return [...prev, { id: p.id, name: p.nome, price: Number(p.preco_venda) || 0, img: p.imagem_url? `${API_URL}${p.imagem_url}` : "", qtd: 1, origem: pedidoQrAtivo? "extra" : "balcao" }];
         });
     };
@@ -173,7 +173,17 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         setCart(prev => prev.filter((c: any) => c.id!== id));
     };
     const getQty = (id: string) => cart.find((c) => c.id === id)?.qtd || 0;
-    const total = cart.reduce((s, i) => s + i.price * i.qtd, 0);
+
+    const total = useMemo(() => {
+        const map = new Map<string, any>();
+        for (const c of cart) {
+            const key = String(c.id);
+            if (map.has(key)) map.get(key).qtd = Number(map.get(key).qtd) + Number(c.qtd);
+            else map.set(key, {...c});
+        }
+        return Array.from(map.values()).reduce((s, i) => s + Number(i.price) * Number(i.qtd), 0);
+    }, [cart]);
+
     const recebidoNum = recebido? parseFloat(recebido) : 0;
     const handleCalc = (val: string) => {
         if (val === "C") setRecebido(""); else if (val === "DEL") setRecebido((s) => s.slice(0, -1));
@@ -182,57 +192,54 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         else { setRecebido((s) => (s + val).slice(0, 10)); }
     };
 
-    // NOVO FLUXO: SE TEM pedidoQrAtivo, SÓ CHAMA APROVAR. BACKEND CRIA A VENDA.
     const adicionarNaMesa = async () => {
         if (!mesaSelecionada || cart.length === 0 || finalizando || adicionandoRef.current) return;
         adicionandoRef.current = true;
         setFinalizando(true);
         try {
-            // CASO QR - CLIENTE NÃO PODE ADD DIRETO, SÓ GARÇOM APROVANDO
             if (pedidoQrAtivo) {
                 const idQr = pedidoQrAtivo.id || pedidoQrAtivo.pedido_id;
                 const itensQr = cart.filter((c:any)=> c.origem === "qr");
                 const itensExtra = cart.filter((c:any)=> c.origem === "extra");
-
-                // 1. APROVA - backend cria venda com itensQr
                 const rAprovar = await fetch(`${PEDIDOS_QR_API}/${idQr}/aprovar`, { method: "POST", headers: getAuthHeaders() as any });
                 const txtA = await rAprovar.text(); let dataA:any={}; try{ dataA=JSON.parse(txtA);}catch{ dataA={detail:txtA};}
                 if (!rAprovar.ok) throw new Error(dataA.detail || "Erro ao aprovar pedido QR");
                 const vendaId = dataA.venda_id || mesaSelecionada.venda_atual_id || vendaMesa?.id;
-
-                // 2. SE TEM EXTRA ADICIONADO PELO GARÇOM, ADICIONA NA MESMA VENDA
                 if (itensExtra.length > 0 && vendaId) {
-                    const seen = new Set<string>();
-                    const itensUnicosExtra = itensExtra.filter((c:any)=>{ if(seen.has(c.id)) return false; seen.add(c.id); return true; }).map((c:any)=>({ produto_id: c.id, quantidade: Number(c.qtd||1) }));
+                    const mapExtra = new Map<string, any>();
+                    for (const c of itensExtra) {
+                        if (mapExtra.has(c.id)) mapExtra.get(c.id).qtd += Number(c.qtd||1);
+                        else mapExtra.set(c.id, { id: c.id, qtd: Number(c.qtd||1) });
+                    }
+                    const itensUnicosExtra = Array.from(mapExtra.values()).map((c:any)=>({ produto_id: c.id, quantidade: c.qtd }));
                     if (itensUnicosExtra.length > 0) {
                         await fetch(`${VENDAS_API}/${vendaId}/itens`, { method:"POST", headers:{"Content-Type":"application/json",...getAuthHeaders() as any}, body: JSON.stringify({ itens: itensUnicosExtra }) });
                     }
                 }
-
                 window.dispatchEvent(new CustomEvent("pedido-qr:aprovado", { detail: { id: idQr } }));
                 localStorage.removeItem("atender_mesa_qr");
                 pushToast(`Mesa ${mesaSelecionada.numero} • Pedido aprovado`, "success");
                 setCart([]); setMesaSelecionada(null); setVendaMesa(null); setPedidoQrAtivo(null); qrProcessadoRef.current=null; setActiveCat("All");
                 return;
             }
-
-            // CASO MESA NORMAL (SEM QR) - FLUXO ANTIGO
             const vendaId = mesaSelecionada.venda_atual_id || vendaMesa?.id;
-            const seen = new Set<string>();
-            const itensUnicos = cart.filter((c:any)=>{ if(seen.has(c.id)) return false; seen.add(c.id); return true; }).map((c:any)=>({ produto_id: c.id, quantidade: Number(c.qtd||1) }));
-
+            const mapCart = new Map<string, any>();
+            for (const c of cart) {
+                if (mapCart.has(c.id)) mapCart.get(c.id).qtd += Number(c.qtd||1);
+                else mapCart.set(c.id, { id: c.id, qtd: Number(c.qtd||1) });
+            }
+            const itensUnicos = Array.from(mapCart.values()).map((c:any)=>({ produto_id: c.id, quantidade: c.qtd }));
             if (!vendaId) {
                 const rCreate = await fetch(`${VENDAS_API}/`, { method:"POST", headers:{"Content-Type":"application/json",...getAuthHeaders() as any}, body: JSON.stringify({ mesa_id: mesaSelecionada.id, itens: itensUnicos, dinheiro_recebido:0, forma_pagamento:"DINHEIRO", pessoas: mesaSelecionada.pessoas_atual||1, modo:"mesa" }) });
                 if (!rCreate.ok) throw new Error(await rCreate.text());
-                pushToast(`Mesa ${mesaSelecionada.numero} • ${itensUnicos.length} itens`, "success");
+                pushToast(`Mesa ${mesaSelecionada.numero} • ${itensUnicos.length} tipos`, "success");
                 setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("All");
                 return;
             }
             const r = await fetch(`${VENDAS_API}/${vendaId}/itens`, { method:"POST", headers:{"Content-Type":"application/json",...getAuthHeaders() as any}, body: JSON.stringify({ itens: itensUnicos }) });
             if (!r.ok) throw new Error(await r.text());
-            pushToast(`Mesa ${mesaSelecionada.numero} • ${itensUnicos.length} itens`, "success");
+            pushToast(`Mesa ${mesaSelecionada.numero} • ${itensUnicos.length} tipos`, "success");
             setCart([]); setMesaSelecionada(null); setVendaMesa(null); setActiveCat("All");
-
         } catch (e: any) { pushToast(e.message, "error"); } finally {
             setFinalizando(false);
             setTimeout(() => { adicionandoRef.current = false; }, 1200);
@@ -245,8 +252,12 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         adicionandoRef.current = true;
         setFinalizando(true);
         try {
-            const seen = new Set<string>();
-            const itensUnicos = cart.filter((c: any) => { if (seen.has(c.id)) return false; seen.add(c.id); return true; }).map(c => ({ produto_id: c.id, quantidade: c.qtd }));
+            const mapCart = new Map<string, any>();
+            for (const c of cart) {
+                if (mapCart.has(c.id)) mapCart.get(c.id).qtd += Number(c.qtd||1);
+                else mapCart.set(c.id, { id: c.id, qtd: Number(c.qtd||1) });
+            }
+            const itensUnicos = Array.from(mapCart.values()).map((c:any)=>({ produto_id: c.id, quantidade: c.qtd }));
             const payload = { itens: itensUnicos, forma_pagamento: forma.toUpperCase(), dinheiro_recebido: forma === "dinheiro"? recebidoNum : total, mesa_id: null, modo: "balcao" };
             const r = await fetch(`${VENDAS_API}/`, { method: "POST", headers: { "Content-Type": "application/json",...getAuthHeaders() as any }, body: JSON.stringify(payload) });
             const txt = await r.text(); let data: any = {}; try { data = JSON.parse(txt) } catch { data = { detail: txt } }; if (!r.ok) throw new Error(data.detail || "Erro");
@@ -271,7 +282,7 @@ export function VendasTab({ onClose }: { onClose: () => void }) {
         const v = ultimaVenda; if (!v) return;
         const win = window.open("", "_blank", "width=320,height=600"); if (!win) return;
         const itens = v.itens || cart;
-        const itensHtml = itens.map((i: any) => { const nome = i.nome_produto || i.produto_nome || i.nome || i.name; const qtd = i.quantidade || i.qtd; const tot = i.total || i.subtotal || (i.price * i.qtd) || 0; return `<tr><td>${nome} x${qtd}</td><td style="text-align:right">Kz ${Number(tot).toLocaleString("de-DE")}</td></tr>`; }).join("");
+        const itensHtml = itens.map((i: any) => { const nome = i.nome_produto || i.produto_nome || i.nome || i.name; const qtd = i.quantidade || i.qtd; const unit = Number(i.preco_unit || i.price || 0); const tot = Number(i.total || i.subtotal || unit * qtd || 0); return `<tr><td>${nome} x${qtd}</td><td style="text-align:right">Kz ${Number(tot).toLocaleString("de-DE")}</td></tr>`; }).join("");
         const totalFinal = Number(v.total || total).toLocaleString("de-DE");
         win.document.write(`<html><head><style>body{font-family:monospace;width:80mm;padding:10px;font-size:12px}.center{text-align:center}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}table{width:100%}</style></head><body><div class="center bold">FATURA #${v.numero || ""}<br/>MESA ${v.mesa_numero || fecharMesaAtiva?.mesa_numero || ""}</div><div class="line"></div><table>${itensHtml}</table><div class="line"></div><table><tr><td class="bold">TOTAL</td><td style="text-align:right" class="bold">Kz ${totalFinal}</td></tr></table><script>window.print();</script></body></html>`);
         win.document.close();

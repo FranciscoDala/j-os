@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from decimal import Decimal
 import uuid
 from sqlalchemy import func
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 from jos_api.modules.venda.models import Venda, VendaItem, VendaTipo, VendaStatus, VendaItemStatus, ReservaCarrinho
 from jos_api.modules.mesa.models import Mesa, MesaStatus, MesaReserva, ReservaStatus
@@ -65,7 +65,6 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
         mesa = db.query(Mesa).filter(Mesa.id == data.mesa_id, Mesa.empresa_id == empresa_id).with_for_update().first()
         if not mesa: raise HTTPException(404, "Mesa não encontrada")
         if mesa.status == MesaStatus.OCUPADA and mesa.venda_atual_id:
-            # se já tem venda aberta, bloqueia criação nova - tem que usar add_item
             venda_existente = db.query(Venda).filter(Venda.id == mesa.venda_atual_id, Venda.status == VendaStatus.ABERTA).first()
             if venda_existente:
                 raise HTTPException(400, f"Mesa {mesa.numero} já ocupada com comanda #{venda_existente.numero}. Use adicionar itens.")
@@ -74,11 +73,20 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
     else:
         venda_status = VendaStatus.CONCLUIDA
 
+    # AGRUPA MESMO PRODUTO - 1 Cuca + 1 Cuca = 1 item com qtd 2 e total multiplicado
+    agrupado: Dict[str, Any] = {}
+    for it in data.itens:
+        key = f"{it.produto_id}-{(getattr(it,'observacao',None) or '').strip().lower()}"
+        if key in agrupado:
+            agrupado[key].quantidade = Decimal(agrupado[key].quantidade) + Decimal(it.quantidade)
+        else:
+            agrupado[key] = it
+
     venda = Venda(empresa_id=empresa_id, created_by=created_by, garcom_id=garcom_id, caixa_id=caixa.id, numero=_next_numero(db, empresa_id), tipo=venda_tipo, mesa_id=data.mesa_id, pessoas=pessoas, observacao=getattr(data,'observacao',None), status=venda_status, forma_pagamento=data.forma_pagamento, dinheiro_recebido=data.dinheiro_recebido)
     sub = Decimal("0"); iva_tot = Decimal("0"); tot = Decimal("0")
     produtos_afectados = []
 
-    for it in data.itens:
+    for it in agrupado.values():
         prod = db.query(Product).filter(Product.id == it.produto_id, Product.empresa_id == empresa_id).with_for_update().first()
         if not prod: raise HTTPException(404, f"Produto {it.produto_id} não encontrado")
         if getattr(prod, 'controlar_stock', False):
@@ -86,7 +94,7 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
             minha_reserva_qtd = db.query(func.coalesce(func.sum(ReservaCarrinho.quantidade),0)).filter(ReservaCarrinho.empresa_id==empresa_id, ReservaCarrinho.produto_id==prod.id, ReservaCarrinho.user_id==created_by).scalar() or Decimal("0")
             if (disp + Decimal(str(minha_reserva_qtd))) < it.quantidade and not getattr(prod, 'allow_negative', False):
                 raise HTTPException(400, f"Stock insuficiente: {prod.nome}")
-        sub_item = prod.preco_venda * it.quantidade
+        sub_item = prod.preco_venda * Decimal(it.quantidade) # AQUI JÁ MULTIPLICA
         if getattr(prod, 'tem_iva', False) and getattr(prod, 'iva', Decimal("0")) > 0:
             iva_v = sub_item * (prod.iva / Decimal("100")); tem_iva = True; iva_p = prod.iva
         else: iva_v = Decimal("0"); tem_iva = False; iva_p = Decimal("0")
@@ -94,7 +102,7 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
         venda.itens.append(VendaItem(empresa_id=empresa_id, produto_id=prod.id, nome_produto=prod.nome, quantidade=it.quantidade, preco_unit=prod.preco_venda, tem_iva=tem_iva, iva_percent=iva_p, subtotal=sub_item, iva_valor=iva_v, total=tot_item, status=VendaItemStatus.PENDENTE, observacao=getattr(it, 'observacao', None)))
         sub += sub_item; iva_tot += iva_v; tot += tot_item
         if venda_status == VendaStatus.CONCLUIDA and getattr(prod, 'controlar_stock', False):
-            prod.stock_atual -= it.quantidade
+            prod.stock_atual -= Decimal(it.quantidade)
             produtos_afectados.append({"id": str(prod.id), "stock_atual": str(prod.stock_atual), "nome": prod.nome})
         db.query(ReservaCarrinho).filter(ReservaCarrinho.empresa_id==empresa_id, ReservaCarrinho.produto_id==prod.id, ReservaCarrinho.user_id==created_by).delete()
 
@@ -122,13 +130,14 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
     if mesa: emit(str(empresa_id), "mesa:update", data={"id": str(mesa.id), "numero": mesa.numero, "status": "OCUPADA", "venda_atual_id": str(venda.id)})
     return venda, produtos_afectados
 
+
 def add_item_comanda(db: Session, venda_id: uuid.UUID, data, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
     venda = db.query(Venda).filter(Venda.id == venda_id, Venda.empresa_id == empresa_id).with_for_update().first()
-    if not venda or venda.status!= VendaStatus.ABERTA: 
+    if not venda or venda.status!= VendaStatus.ABERTA:
         raise HTTPException(400, "Comanda não está aberta")
-    
+
     prod = db.query(Product).filter(Product.id == data.produto_id, Product.empresa_id == empresa_id).first()
-    if not prod: 
+    if not prod:
         raise HTTPException(404, "Produto não encontrado")
 
     # SE JÁ EXISTE MESMO PRODUTO COM MESMA OBSERVAÇÃO, SOMA QUANTIDADE
@@ -166,20 +175,20 @@ def add_item_comanda(db: Session, venda_id: uuid.UUID, data, empresa_id: uuid.UU
     sub_item = prod.preco_venda * data.quantidade
     iva_v = sub_item * (prod.iva / Decimal("100")) if getattr(prod, 'tem_iva', False) and prod.iva > 0 else Decimal("0")
     tot_item = sub_item + iva_v
-    
+
     item = VendaItem(
-        empresa_id=empresa_id, 
-        venda_id=venda.id, 
-        produto_id=prod.id, 
-        nome_produto=prod.nome, 
-        quantidade=data.quantidade, 
-        preco_unit=prod.preco_venda, 
-        tem_iva=getattr(prod, 'tem_iva', False), 
-        iva_percent=prod.iva if getattr(prod, 'tem_iva', False) else Decimal("0"), 
-        subtotal=sub_item, 
-        iva_valor=iva_v, 
-        total=tot_item, 
-        status=VendaItemStatus.PENDENTE, 
+        empresa_id=empresa_id,
+        venda_id=venda.id,
+        produto_id=prod.id,
+        nome_produto=prod.nome,
+        quantidade=data.quantidade,
+        preco_unit=prod.preco_venda,
+        tem_iva=getattr(prod, 'tem_iva', False),
+        iva_percent=prod.iva if getattr(prod, 'tem_iva', False) else Decimal("0"),
+        subtotal=sub_item,
+        iva_valor=iva_v,
+        total=tot_item,
+        status=VendaItemStatus.PENDENTE,
         observacao=getattr(data, 'observacao', None)
     )
     venda.itens.append(item)
