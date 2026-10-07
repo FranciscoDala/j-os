@@ -108,8 +108,6 @@ export function PedidosTab() {
                 <PedidoDetalheModal
                     pedido={sel}
                     onClose={() => setSel(null)}
-                    onAtender={(pr) => { setSel(null); atender(pr); }}
-                    onRecusar={recusar}
                 />
             )}
         </div>
