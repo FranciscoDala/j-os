@@ -45,14 +45,13 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
     return (
         <div className={`group relative w-full h-[250px] sm:h-[265px] md:h-[272px] rounded-[18px] md:rounded-[22px] overflow-hidden border shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] md:hover:-translate-y-0.5 transition-all duration-300 flex flex-col ${cfg.cardBg} ${cfg.border}`}>
 
-            {/* FIX: sempre visível no mobile, hover só no desktop */}
             {canManage && (
-                <div className="absolute top-2 right-2 flex gap-1 z-[20] opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => { e.stopPropagation(); onEdit?.(m); }} className="w-7 h-7 bg-black/80 backdrop-blur text-white rounded-full flex items-center justify-center hover:bg-black shadow-md active:scale-95">
-                        <Pencil size={12} />
+                <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    <button onClick={(e) => { e.stopPropagation(); onEdit?.(m); }} className="w-9 h-9 bg-black/90 text-white rounded-full flex items-center justify-center hover:bg-black shadow-[0_4px_12px_rgba(0,0,0,0.25)] active:scale-95">
+                        <Pencil size={14} />
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); onDelete?.(m); }} className="w-7 h-7 bg-white border border-black/10 rounded-full flex items-center justify-center hover:bg-red-50 shadow-md active:scale-95">
-                        <Trash2 size={12} />
+                    <button onClick={(e) => { e.stopPropagation(); onDelete?.(m); }} className="w-9 h-9 bg-white border rounded-full flex items-center justify-center hover:bg-red-50 shadow-[0_4px_12px_rgba(0,0,0,0.15)] active:scale-95">
+                        <Trash2 size={14} />
                     </button>
                 </div>
             )}
@@ -74,7 +73,7 @@ export function MesaCard({ m, onOcupar, onComanda, onLimpar, onLiberar, onDetalh
                     {cfg.label}
                 </span>
                 {m.status === "OCUPADA" && (
-                    <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-[#C62828] rounded-full animate-pulse border-2 border-white shadow pointer-events-none" />
+                    <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-[#C62828] rounded-full animate-pulse border-2 border-white shadow pointer-events-none group-hover:opacity-0 transition-opacity" />
                 )}
             </div>
 
