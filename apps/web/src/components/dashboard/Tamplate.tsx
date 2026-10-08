@@ -134,7 +134,6 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                                 <div className="flex-1 min-w-0"><h1 className="text-[14px] md:text-[18px] font-[900] text-[#1E1E1E] leading-[0.9] tracking-[-0.02em] truncate">{headerTitle}</h1><p className="text-[11px] md:text-[13px] text-[#8A8A8A] mt-1 font-medium truncate hidden sm:block">{headerDesc}</p></div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                                {/* INPUT BUSCA - MESMO PADRÃO SIDEBAR */}
                                 <div className="hidden lg:flex bg-white rounded-full items-center pl-4 pr-1.5 py-1 w-[300px] h-11 shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5">
                                     <input value={search} onChange={e => setSearch(e.target.value)} className="flex-1 outline-none text-[12px] bg-transparent placeholder:text-[#AAAAAA] font-bold" placeholder={`Pesquisar em ${meta.title}...`} />
                                     <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center shrink-0">
@@ -142,7 +141,14 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                                     </div>
                                 </div>
                                 <button className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5 text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED] transition active:scale-95"><MessageCircle size={20} strokeWidth={2} /></button>
-                                <button id="btn-notif" onClick={() => setShowNotifications(v =>!v)} className={`relative w-11 h-11 rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5 transition active:scale-95 ${showNotifications? 'bg-black text-white' : 'bg-white text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED]'}`}><Bell size={20} strokeWidth={2} />{pedidosCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#EDEBE6] animate-pulse">{pedidosCount > 9? "9+" : pedidosCount}</span>}</button>
+
+                                {/* WRAPPER RELATIVE - CORREÇÃO PRINCIPAL */}
+                                <div className="relative">
+                                    <button id="btn-notif" onClick={() => setShowNotifications(v =>!v)} className={`relative w-11 h-11 rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5 transition active:scale-95 ${showNotifications? 'bg-black text-white' : 'bg-white text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED]'}`}><Bell size={20} strokeWidth={2} />{pedidosCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#EDEBE6] animate-pulse">{pedidosCount > 9? "9+" : pedidosCount}</span>}</button>
+                                    {/* MODAL AGORA DENTRO DO RELATIVE - ANCORADA CERTA */}
+                                    <NotificationsModal open={showNotifications} onClose={() => setShowNotifications(false)} pedidosCount={pedidosCount} onGoPedidos={() => setActiveTab("pedidos")} />
+                                </div>
+
                                 <div className="bg-white rounded-full pl-1 pr-3 py-1 flex items-center gap-2 shadow-[0_1px_6px_rgba(0,0,0,0.05)] h-11 ml-1 border border-black/5"><img src="https://i.pravatar.cc/100?img=33" className="w-8 h-8 rounded-full" alt="user" /><div className="hidden md:block leading-none"><p className="text-[11px] font-bold">{user?.nome || "Francisco"}</p><p className="text-[9px] text-[#9A9A9A] capitalize">{role.replace('_', ' ')}</p></div></div>
                             </div>
                         </div>
@@ -152,7 +158,6 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                 {isVendasOpen && <div className="absolute inset-0 z-[100] bg-[#EDEBE6] flex flex-col overflow-hidden"><div className="flex-1 overflow-hidden p-0 md:p-[14px]"><VendasTab onClose={() => setActiveTab("home")} /></div></div>}
             </div>
             {empresaData && <ModalEmpresa open={showConfig} initialData={empresaData} saving={savingEmpresa} onClose={() => setShowConfig(false)} onSave={handleSaveEmpresa} />}
-            <NotificationsModal open={showNotifications} onClose={() => setShowNotifications(false)} pedidosCount={pedidosCount} onGoPedidos={() => setActiveTab("pedidos")} />
             <style jsx global>{`html,body{height:100%;overflow:hidden;background:#EDEBE6;scrollbar-width:none}::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
         </DashboardCtx.Provider>
     );
