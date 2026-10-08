@@ -31,20 +31,36 @@ def _broadcast_safe(empresa_id, payload: dict):
 
 def _whatsapp_async(func, *args, **kwargs):
     def run():
-        try: func(*args, **kwargs)
-        except Exception as e: logger.error(f"[WHATSAPP BG] {e}")
+        try:
+            print(f"[WA-THREAD] iniciando {func.__name__} args={args[0]}")
+            func(*args, **kwargs)
+            print(f"[WA-THREAD] finalizado {func.__name__}")
+        except Exception as e:
+            print(f"[WA-THREAD] ERRO {e}")
+            logger.error(f"[WHATSAPP BG] {e}", exc_info=True)
     threading.Thread(target=run, daemon=True).start()
 
 def _get_dono_phone_sync(db: Session, empresa_id: uuid.UUID) -> str:
+    print(f"[WA-DEBUG] _get_dono_phone_sync empresa_id={empresa_id}")
     try:
         from jos_api.modules.empresa.models import Empresa
         emp = db.query(Empresa).filter(Empresa.id == empresa_id).first()
-        if emp and emp.phone:
-            num = emp.phone.strip().replace("+","").replace(" ","").replace("-","")
-            if len(num)==9: num="244"+num
-            return num
-    except: pass
-    return os.getenv("WHATSAPP_DONO_NUMERO","").replace("+","").replace(" ","").replace("-","")
+        if emp:
+            print(f"[WA-DEBUG] empresa encontrada phone='{getattr(emp,'phone',None)}'")
+            if emp.phone:
+                num = emp.phone.strip().replace("+","").replace(" ","").replace("-","")
+                if len(num)==9: num="244"+num
+                print(f"[WA-DEBUG] usando phone da empresa: {num}")
+                return num
+    except Exception as e:
+        print(f"[WA-DEBUG] erro ao buscar empresa {e}")
+
+    env_num = os.getenv("WHATSAPP_DONO_NUMERO","")
+    print(f"[WA-DEBUG] WHATSAPP_DONO_NUMERO env='{env_num}'")
+    clean = env_num.replace("+","").replace(" ","").replace("-","")
+    if len(clean)==9: clean="244"+clean
+    print(f"[WA-DEBUG] numero final limpo='{clean}'")
+    return clean
 
 def get_caixa_aberto(db: Session, empresa_id: uuid.UUID) -> Caixa | None:
     return db.query(Caixa).filter(Caixa.empresa_id == empresa_id, Caixa.status == CaixaStatus.ABERTO).order_by(Caixa.aberto_em.desc()).first()
@@ -81,11 +97,16 @@ def abrir_caixa(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nom
     _broadcast_safe(empresa_id, {"type": "caixa:update", "data": payload})
     try:
         numero = _get_dono_phone_sync(db, empresa_id)
+        print(f"[WA-DEBUG] abrir_caixa numero={numero}")
         if numero:
             from jos_api.core.whatsapp import enviar_abertura_caixa as wa_abrir
             aberto_em_safe = novo.aberto_em or datetime.now(timezone.utc)
             _whatsapp_async(wa_abrir, numero, novo.aberto_por_nome, novo.saldo_inicial, aberto_em_safe)
-    except Exception as e: logger.warning(f"wa fail {e}")
+        else:
+            print("[WA-DEBUG] abrir_caixa numero VAZIO, nao enviou")
+    except Exception as e:
+        print(f"[WA-DEBUG] abrir fail {e}")
+        logger.warning(f"wa fail {e}")
     return novo
 
 def forcar_abertura(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, saldo_inicial: Decimal, motivo: str, ip: str | None = None) -> Tuple[Caixa, Caixa | None]:
@@ -102,20 +123,22 @@ def forcar_abertura(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, user
     try:
         numero = _get_dono_phone_sync(db, empresa_id)
         if numero:
-            from jos_api.core.whatsapp import enviar_fechamento_caixa, enviar_abertura_caixa, format_kz
+            from jos_api.core.whatsapp import enviar_fechamento_caixa, enviar_abertura_caixa
             movs = db.query(CaixaMovimento).filter(CaixaMovimento.caixa_id == caixa_antigo.id).all()
-            total_ent = sum((m.valor for m in movs if m.valor and m.valor > 0 and str(m.tipo) != "ABERTURA"), Decimal("0"))
+            total_ent = sum((m.valor for m in movs if m.valor and m.valor > 0 and str(m.tipo)!= "ABERTURA"), Decimal("0"))
             qtd_vendas = sum(1 for m in movs if "VENDA" in str(m.tipo).upper())
             aberto_safe = caixa_antigo.aberto_em or datetime.now(timezone.utc)
             dados = {"aberto_por_nome": caixa_antigo.aberto_por_nome, "aberto": aberto_safe.astimezone(TZ_LUANDA).strftime("%H:%M"), "fechado": datetime.now(TZ_LUANDA).strftime("%H:%M"), "duracao": "", "total_ent": total_ent, "total_sai": Decimal("0"), "qtd_vendas": qtd_vendas, "saldo_entregar": saldo_esperado, "divergencia": Decimal("0"), "status_div": "✅", "qtd_hoje": 1, "fechado_por_nome": user_nome}
             _whatsapp_async(enviar_fechamento_caixa, numero, dados)
             _whatsapp_async(enviar_abertura_caixa, numero, novo.aberto_por_nome, novo.saldo_inicial, novo.aberto_em or datetime.now(timezone.utc))
-    except: pass
+    except Exception as e:
+        print(f"[WA-DEBUG] forcar fail {e}")
     payload = {"id": str(novo.id), "status": "ABERTO", "aberto_por_nome": novo.aberto_por_nome, "antigo_id": str(caixa_antigo.id)}
     emit(str(empresa_id), "caixa:update", data=payload); _broadcast_safe(empresa_id, {"type": "caixa:update", "data": payload})
     return novo, caixa_antigo
 
 def fechar_caixa(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, saldo_informado: Decimal, fechado_por_nome: str, ip: str | None = None) -> Caixa:
+    print(f"[WA-DEBUG] fechar_caixa chamado empresa={empresa_id} por={fechado_por_nome}")
     caixa = get_caixa_aberto(db, empresa_id)
     if caixa is None: raise HTTPException(status_code=400, detail="Nenhum caixa aberto")
     from jos_api.modules.mesa.models import Mesa, MesaStatus
@@ -128,9 +151,12 @@ def fechar_caixa(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, saldo_i
     db.commit(); db.refresh(caixa)
     try:
         numero = _get_dono_phone_sync(db, empresa_id)
-        if numero:
+        print(f"[WA-DEBUG] fechar numero='{numero}'")
+        if not numero:
+            print("[WA-DEBUG] NUMERO VAZIO - verifica WHATSAPP_DONO_NUMERO no Render")
+        else:
             movs = db.query(CaixaMovimento).filter(CaixaMovimento.caixa_id == caixa.id).all()
-            total_ent = sum((m.valor for m in movs if m.valor and m.valor > 0 and str(m.tipo) != "ABERTURA"), Decimal("0"))
+            total_ent = sum((m.valor for m in movs if m.valor and m.valor > 0 and str(m.tipo)!= "ABERTURA"), Decimal("0"))
             total_sai = sum((m.valor for m in movs if m.valor and m.valor < 0), Decimal("0"))
             qtd_vendas = sum(1 for m in movs if "VENDA" in str(m.tipo).upper())
             aberto_dt = caixa.aberto_em or datetime.now(timezone.utc)
@@ -144,9 +170,12 @@ def fechar_caixa(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, saldo_i
                 duracao = f" ({h}h {m}min)"
             except: duracao = ""
             dados = {"aberto_por_nome": caixa.aberto_por_nome, "aberto": aberto, "fechado": fechado, "duracao": duracao, "total_ent": total_ent, "total_sai": abs(total_sai), "qtd_vendas": qtd_vendas, "saldo_entregar": caixa.saldo_final_esperado or Decimal("0"), "divergencia": caixa.divergencia or Decimal("0"), "status_div": "✅" if (caixa.divergencia or 0)==0 else "⚠️", "qtd_hoje": 1, "fechado_por_nome": fechado_por_nome}
+            print(f"[WA-DEBUG] dados preparados {dados}")
             from jos_api.core.whatsapp import enviar_fechamento_caixa
             _whatsapp_async(enviar_fechamento_caixa, numero, dados)
-    except Exception as e: logger.warning(f"whatsapp fechamento fail {e}")
+    except Exception as e:
+        print(f"[WA-DEBUG] fechar fail {e}")
+        logger.warning(f"whatsapp fechamento fail {e}", exc_info=True)
     payload = {"id": str(caixa.id), "status": "FECHADO", "fechado_por_nome": fechado_por_nome, "aberto_por_nome": caixa.aberto_por_nome, "divergencia": str(caixa.divergencia)}
     emit(str(empresa_id), "caixa:update", data=payload); _broadcast_safe(empresa_id, {"type": "caixa:update", "data": payload})
     return caixa
