@@ -15,37 +15,37 @@ import { getCaixaStatus } from "@/lib/api";
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 type Toast = { id: string; msg: string; type: "success" | "error" | "info" | "warning" };
-type Ctx = { activeTab: string; setActiveTab: (t: string) => void; user: any; moduleId: ModuleId; role: string; can: (p: string) => boolean; pedidosCount: number; setPedidosCount: (n: number) => void; stockAlerts: number; setStockAlerts: (n:number)=>void; };
+type Ctx = { activeTab: string; setActiveTab: (t: string) => void; user: any; moduleId: ModuleId; role: string; can: (p: string) => boolean; pedidosCount: number; setPedidosCount: (n: number) => void; stockAlerts: number; setStockAlerts: (n: number) => void; };
 const DashboardCtx = createContext<Ctx>(null as any);
 export const useDashboard = () => useContext(DashboardCtx);
 
 const TAB_META: Record<string, { title: string; desc: string }> = {
-  home: { title: "Painel", desc: "Visão geral do seu restaurante" },
-  pedidos: { title: "Pedidos QR", desc: "Gerencie seus pedidos feitos em tempo real • LIVE" },
-  produtos: { title: "Produtos", desc: "Gerencie seus produtos, catálogo e preços" },
-  mesas: { title: "Mesas", desc: "Controle de mesas e atendimento" },
-  caixa: { title: "Caixa", desc: "Controle financeiro do dia" },
-  funcionarios: { title: "Equipe", desc: "Gestão de funcionários e acessos" },
-  vendas: { title: "Vendas", desc: "" },
-  relatorios: { title: "Relatórios", desc: "Análises e desempenho" }
+    home: { title: "Painel", desc: "Visão geral do seu restaurante" },
+    pedidos: { title: "Pedidos QR", desc: "Gerencie seus pedidos feitos em tempo real • LIVE" },
+    produtos: { title: "Produtos", desc: "Gerencie seus produtos, catálogo e preços" },
+    mesas: { title: "Mesas", desc: "Controle de mesas e atendimento" },
+    caixa: { title: "Caixa", desc: "Controle financeiro do dia" },
+    funcionarios: { title: "Equipe", desc: "Gestão de funcionários e acessos" },
+    vendas: { title: "Vendas", desc: "" },
+    relatorios: { title: "Relatórios", desc: "Análises e desempenho" }
 };
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
-  dono: ["*"],
-  gerente_restaurante: ["*"],
-  operador_caixa: ["home", "caixa", "vendas", "produtos", "funcionarios", "pedidos", "mesas"],
-  caixa: ["home", "caixa", "vendas"],
-  garcom: ["home", "vendas", "pedidos", "mesas"],
-  vigilante: ["home"],
-  rh: ["home", "funcionarios"],
-  funcionario: ["home", "produtos", "vendas"]
+    dono: ["*"],
+    gerente_restaurante: ["*"],
+    operador_caixa: ["home", "caixa", "vendas", "produtos", "funcionarios", "pedidos", "mesas"],
+    caixa: ["home", "caixa", "vendas"],
+    garcom: ["home", "vendas", "pedidos", "mesas"],
+    vigilante: ["home"],
+    rh: ["home", "funcionarios"],
+    funcionario: ["home", "produtos", "vendas"]
 };
 
 function normalizeRole(raw: any) { return String(raw || "funcionario").toLowerCase(); }
 function getLogoSrc(logo_url?: string) {
     if (!logo_url) return null;
     if (logo_url.startsWith("http")) return logo_url;
-    return `${API_URL}${logo_url.startsWith("/")? "" : "/"}${logo_url}`;
+    return `${API_URL}${logo_url.startsWith("/") ? "" : "/"}${logo_url}`;
 }
 
 export function DashboardLayoutProvider({ children }: { children: React.ReactNode }) {
@@ -77,35 +77,35 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     const pushToast = (msg: string, type: Toast["type"] = "info") => {
         const id = Date.now().toString() + Math.random().toString().slice(2);
         setToasts(t => [...t, { id, msg, type }]);
-        setTimeout(() => setToasts(t => t.filter(x => x.id!== id)), 4000);
+        setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000);
     };
 
     // auth + role
     useEffect(() => {
-      const token = localStorage.getItem("access_token");
-      if (!token) { router.push("/login"); return; }
-      try {
-        const u = JSON.parse(localStorage.getItem("user") || "{}");
-        setUser(u);
-        const r = normalizeRole(u?.role || u?.role_equivalente || u?.perfil_slug || "funcionario");
-        setRole(r);
-        const saved = localStorage.getItem(`${moduleId}_tab`) || "home";
-        const allowed = ROLE_PERMISSIONS[r] || ROLE_PERMISSIONS["funcionario"];
-        if (allowed.includes("*") || allowed.includes(saved)) setActiveTab(saved);
-        else setActiveTab("home");
-      } catch { setUser({}); }
+        const token = localStorage.getItem("access_token");
+        if (!token) { router.push("/login"); return; }
+        try {
+            const u = JSON.parse(localStorage.getItem("user") || "{}");
+            setUser(u);
+            const r = normalizeRole(u?.role || u?.role_equivalente || u?.perfil_slug || "funcionario");
+            setRole(r);
+            const saved = localStorage.getItem(`${moduleId}_tab`) || "home";
+            const allowed = ROLE_PERMISSIONS[r] || ROLE_PERMISSIONS["funcionario"];
+            if (allowed.includes("*") || allowed.includes(saved)) setActiveTab(saved);
+            else setActiveTab("home");
+        } catch { setUser({}); }
     }, [moduleId, router]);
 
     useEffect(() => {
-      if (!user?.nome) return;
-      setShowWelcome(true);
-      const t = setTimeout(() => setShowWelcome(false), 3200);
-      return () => clearTimeout(t);
+        if (!user?.nome) return;
+        setShowWelcome(true);
+        const t = setTimeout(() => setShowWelcome(false), 3200);
+        return () => clearTimeout(t);
     }, [user]);
 
     useEffect(() => {
         if (empresa) {
-            setEmpresaData((prev:any) => ({...prev,...empresa, companyName: empresa.nome_fantasia || empresa.companyName}));
+            setEmpresaData((prev: any) => ({ ...prev, ...empresa, companyName: empresa.nome_fantasia || empresa.companyName }));
         }
     }, [empresa]);
 
@@ -138,53 +138,53 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                         image_url: d.image_url || ""
                     })
                 }
-            } catch {}
+            } catch { }
         };
-        if(!empresa) load();
+        if (!empresa) load();
     }, [showConfig, empresa]);
 
     // realtime listeners para header - COM ESTOQUE
     useEffect(() => {
-        const onEmpresaUpdate = (e:any) => {
+        const onEmpresaUpdate = (e: any) => {
             const detail = e.detail || {};
-            if(detail?.logo_url || detail?.nome_fantasia) {
-                if(refreshEmpresa) refreshEmpresa();
-                setEmpresaData((prev:any)=> prev? {...prev,...detail, companyName: detail.nome_fantasia || prev.companyName} : prev);
+            if (detail?.logo_url || detail?.nome_fantasia) {
+                if (refreshEmpresa) refreshEmpresa();
+                setEmpresaData((prev: any) => prev ? { ...prev, ...detail, companyName: detail.nome_fantasia || prev.companyName } : prev);
             }
         };
-        const onPedidoQr = (e:any) => {
-            if(Array.isArray(e.detail)) {
+        const onPedidoQr = (e: any) => {
+            if (Array.isArray(e.detail)) {
                 setPedidosCount(e.detail.length);
                 prevCountRef.current = e.detail.length;
             } else {
-                setPedidosCount(c=> c+1);
+                setPedidosCount(c => c + 1);
             }
         };
         const onPedidoAprovado = () => {
-            setPedidosCount(c => Math.max(0, c-1));
-            prevCountRef.current = Math.max(0, prevCountRef.current-1);
+            setPedidosCount(c => Math.max(0, c - 1));
+            prevCountRef.current = Math.max(0, prevCountRef.current - 1);
         };
 
-        const onStockBaixo = (e:any) => {
+        const onStockBaixo = (e: any) => {
             const d = e.detail || {};
-            setStockAlerts(c => c+1);
+            setStockAlerts(c => c + 1);
             setStockList(prev => {
-                const exists = prev.find(x=> x.id === d.id);
-                if(exists) return prev.map(x=> x.id===d.id? d : x);
-                return [d,...prev].slice(0, 20);
+                const exists = prev.find(x => x.id === d.id);
+                if (exists) return prev.map(x => x.id === d.id ? d : x);
+                return [d, ...prev].slice(0, 20);
             });
-            pushToast(`Stock baixo: ${d.nome || "produto"} - restam ${d.estoque?? d.stock_atual}`, "warning");
+            pushToast(`Stock baixo: ${d.nome || "produto"} - restam ${d.estoque ?? d.stock_atual}`, "warning");
         };
-        const onStockZerado = (e:any) => {
+        const onStockZerado = (e: any) => {
             const d = e.detail || {};
-            setStockAlerts(c => c+1);
+            setStockAlerts(c => c + 1);
             setStockList(prev => {
-                const exists = prev.find(x=> x.id === d.id);
-                if(exists) return prev.map(x=> x.id===d.id? d : x);
-                return [d,...prev].slice(0, 20);
+                const exists = prev.find(x => x.id === d.id);
+                if (exists) return prev.map(x => x.id === d.id ? d : x);
+                return [d, ...prev].slice(0, 20);
             });
             pushToast(`SEM STOCK: ${d.nome || "produto"} zerado!`, "error");
-            try { alertRef.current?.play().catch(()=>{}); } catch {}
+            try { alertRef.current?.play().catch(() => { }); } catch { }
         };
 
         window.addEventListener("empresa:updated" as any, onEmpresaUpdate);
@@ -216,16 +216,16 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
             const token = localStorage.getItem("access_token");
             const fd = new FormData();
             ["nome_fantasia", "nif", "email", "phone", "address", "city", "province", "iban", "iban2", "banco1", "banco2"].forEach(k => {
-                const val = k === "nome_fantasia"? (data.companyName || data.nome_fantasia) : data[k];
-                if (val && String(val).trim()!== "") fd.append(k, String(val).trim())
+                const val = k === "nome_fantasia" ? (data.companyName || data.nome_fantasia) : data[k];
+                if (val && String(val).trim() !== "") fd.append(k, String(val).trim())
             });
             if (data.logoFile) fd.append("logo", data.logoFile);
             if (data.bannerFile) fd.append("banner", data.bannerFile);
             const res = await fetch(`${API_BASE}/empresas/${data.id || empresaData.id}`, { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: fd });
             if (!res.ok) { const err = await res.text(); throw new Error(err) }
             const updated = await res.json();
-            setEmpresaData((prev: any) => ({...prev,...updated, companyName: updated.nome_fantasia }));
-            if(refreshEmpresa) await refreshEmpresa();
+            setEmpresaData((prev: any) => ({ ...prev, ...updated, companyName: updated.nome_fantasia }));
+            if (refreshEmpresa) await refreshEmpresa();
             else {
                 localStorage.setItem("empresa_data", JSON.stringify(updated));
                 window.dispatchEvent(new CustomEvent("empresa:updated", { detail: updated }));
@@ -244,33 +244,33 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
         alertRef.current = new Audio("/sounds/alert.mp3");
         alertRef.current.volume = 0.9;
         const fetchPedidosCount = async () => {
-          try {
-            const token = localStorage.getItem("access_token") || "";
-            const u = JSON.parse(localStorage.getItem("user") || "{}");
-            const emp = u.empresa_id || localStorage.getItem("empresa_id") || "";
-            if (!emp) return;
-            const r = await fetch(`${API_URL}/api/v1/pedidos-qr/pendentes`, { headers: { Authorization: `Bearer ${token}`, "X-Empresa-ID": emp }, cache: "no-store" as any });
-            if (!r.ok) return;
-            const data = await r.json();
-            const newCount = Array.isArray(data)? data.length : 0;
-            if (!isFirstLoad.current && newCount > prevCountRef.current) {
-              audioRef.current?.play().catch(() => {});
-              if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-            }
-            prevCountRef.current = newCount;
-            setPedidosCount(newCount);
-            isFirstLoad.current = false;
+            try {
+                const token = localStorage.getItem("access_token") || "";
+                const u = JSON.parse(localStorage.getItem("user") || "{}");
+                const emp = u.empresa_id || localStorage.getItem("empresa_id") || "";
+                if (!emp) return;
+                const r = await fetch(`${API_URL}/api/v1/pedidos-qr/pendentes`, { headers: { Authorization: `Bearer ${token}`, "X-Empresa-ID": emp }, cache: "no-store" as any });
+                if (!r.ok) return;
+                const data = await r.json();
+                const newCount = Array.isArray(data) ? data.length : 0;
+                if (!isFirstLoad.current && newCount > prevCountRef.current) {
+                    audioRef.current?.play().catch(() => { });
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                }
+                prevCountRef.current = newCount;
+                setPedidosCount(newCount);
+                isFirstLoad.current = false;
 
-            // fetch stock baixo inicial
-            const r2 = await fetch(`${API_URL}/api/v1/produtos/alerta/stock-baixo`, { headers: { Authorization: `Bearer ${token}`, "X-Empresa-ID": emp }, cache: "no-store" as any });
-            if(r2.ok){
-              const stockData = await r2.json();
-              if(Array.isArray(stockData)){
-                setStockAlerts(stockData.length);
-                setStockList(stockData.map((p:any)=>({ id: p.id, nome: p.nome, estoque: Number(p.stock_atual), minimo: Number(p.stock_minimo), codigo: p.codigo })));
-              }
-            }
-          } catch {}
+                // fetch stock baixo inicial
+                const r2 = await fetch(`${API_URL}/api/v1/produtos/alerta/stock-baixo`, { headers: { Authorization: `Bearer ${token}`, "X-Empresa-ID": emp }, cache: "no-store" as any });
+                if (r2.ok) {
+                    const stockData = await r2.json();
+                    if (Array.isArray(stockData)) {
+                        setStockAlerts(stockData.length);
+                        setStockList(stockData.map((p: any) => ({ id: p.id, nome: p.nome, estoque: Number(p.stock_atual), minimo: Number(p.stock_minimo), codigo: p.codigo })));
+                    }
+                }
+            } catch { }
         };
         fetchPedidosCount();
         const interval = setInterval(fetchPedidosCount, 30000);
@@ -278,26 +278,26 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     }, []);
 
     useEffect(() => {
-      localStorage.setItem(`${moduleId}_tab`, activeTab);
-      setSearchTab(activeTab);
-      setSearch("");
-      if (activeTab === "vendas") {
-        getCaixaStatus().then((d:any)=> { if (!d.aberto) setActiveTab("caixa"); }).catch(()=> setActiveTab("caixa"));
-      }
+        localStorage.setItem(`${moduleId}_tab`, activeTab);
+        setSearchTab(activeTab);
+        setSearch("");
+        if (activeTab === "vendas") {
+            getCaixaStatus().then((d: any) => { if (!d.aberto) setActiveTab("caixa"); }).catch(() => setActiveTab("caixa"));
+        }
     }, [activeTab, moduleId, setSearchTab, setSearch]);
 
     const can = useMemo(() => (tab: string) => {
-      const a = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS["funcionario"];
-      return a.includes("*") || a.includes(tab);
+        const a = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS["funcionario"];
+        return a.includes("*") || a.includes(tab);
     }, [role]);
 
-    useEffect(() => { if (role &&!can(activeTab)) setActiveTab("home"); }, [role, activeTab, can]);
+    useEffect(() => { if (role && !can(activeTab)) setActiveTab("home"); }, [role, activeTab, can]);
 
     const logout = () => { localStorage.clear(); router.push("/login"); };
     const isVendasOpen = activeTab === "vendas";
     const meta = TAB_META[activeTab] || { title: "Painel", desc: "Visão geral" };
-    const headerTitle = showWelcome? `Bem-vindo, ${user?.nome || empresa?.nome_fantasia || "Francisco Dala"}!` : meta.title;
-    const headerDesc = showWelcome? `Explore as informações e atividades do seu restaurante` : meta.desc;
+    const headerTitle = showWelcome ? `Bem-vindo, ${user?.nome || empresa?.nome_fantasia || "Francisco Dala"}!` : meta.title;
+    const headerDesc = showWelcome ? `Explore as informações e atividades do seu restaurante` : meta.desc;
     const totalNotifs = pedidosCount + stockAlerts;
 
     return (
@@ -305,7 +305,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
             <div className="h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-0 md:p-[14px] md:gap-[14px]" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
                 <Toasts toasts={toasts} setToasts={setToasts} />
                 <div className="hidden md:flex shrink-0"><Sidebar activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} onOpenConfig={() => setShowConfig(true)} /></div>
-                {!isVendasOpen && (<div className={`fixed inset-0 z-[300] md:hidden transition ${isMobileOpen? "visible" : "invisible"}`}><div className={`absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity ${isMobileOpen? "opacity-100" : "opacity-0"}`} onClick={() => setIsMobileOpen(false)} /><div className={`absolute left-0 top-0 h-full w-[84%] max-w-[330px] bg-[#EDEBE6] p-4 shadow-[8px_0_30px_rgba(0,0,0,0.15)] transition-transform duration-300 overflow-y-auto no-scrollbar ${isMobileOpen? "translate-x-0" : "-translate-x-full"}`}><div className="flex justify-between items-center mb-6"><div className="flex items-center gap-2">{empresaLogo? <img src={empresaLogo} className="w-8 h-8 rounded-full object-cover border" /> : <div className="w-8 h-8 bg-black text-white rounded-full grid place-items-center text-[10px] font-black">JD</div>}<div className="leading-none"><p className="text-[12px] font-black truncate">{empresa?.nome_fantasia || "Menu"}</p><p className="text-[10px] text-[#8A8A8A] capitalize">{role.replace('_', ' ')}</p></div></div><button onClick={() => setIsMobileOpen(false)} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center active:scale-95"><X size={16} /></button></div><Sidebar isMobile={true} activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} onOpenConfig={() => { setIsMobileOpen(false); setShowConfig(true) }} /></div></div>)}
+                {!isVendasOpen && (<div className={`fixed inset-0 z-[300] md:hidden transition ${isMobileOpen ? "visible" : "invisible"}`}><div className={`absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity ${isMobileOpen ? "opacity-100" : "opacity-0"}`} onClick={() => setIsMobileOpen(false)} /><div className={`absolute left-0 top-0 h-full w-[84%] max-w-[330px] bg-[#EDEBE6] p-4 shadow-[8px_0_30px_rgba(0,0,0,0.15)] transition-transform duration-300 overflow-y-auto no-scrollbar ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}`}><div className="flex justify-between items-center mb-6"><div className="flex items-center gap-2">{empresaLogo ? <img src={empresaLogo} className="w-8 h-8 rounded-full object-cover border" /> : <div className="w-8 h-8 bg-black text-white rounded-full grid place-items-center text-[10px] font-black">JD</div>}<div className="leading-none"><p className="text-[12px] font-black truncate">{empresa?.nome_fantasia || "Menu"}</p><p className="text-[10px] text-[#8A8A8A] capitalize">{role.replace('_', ' ')}</p></div></div><button onClick={() => setIsMobileOpen(false)} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center active:scale-95"><X size={16} /></button></div><Sidebar isMobile={true} activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} onOpenConfig={() => { setIsMobileOpen(false); setShowConfig(true) }} /></div></div>)}
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                     {!isVendasOpen && (
                         <div className="flex items-center justify-between gap-3 px-4 md:px-0 py-3 shrink-0 bg-[#EDEBE6] md:bg-transparent border-b md:border-0 border-black/5">
@@ -321,15 +321,40 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                                     </div>
                                 </div>
                                 <button className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5 text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED] transition active:scale-95"><MessageCircle size={20} strokeWidth={2} /></button>
+
                                 <div className="relative">
-                                    <button id="btn-notif" onClick={() => setShowNotifications(v =>!v)} className={`relative w-11 h-11 rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5 transition active:scale-95 ${showNotifications? 'bg-black text-white' : stockAlerts > 0? 'bg-red-50 text-red-600 border-red-200' : 'bg-white text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED]'}`}>
-                                        {stockAlerts > 0? <AlertTriangle size={20} strokeWidth={2} /> : <Bell size={20} strokeWidth={2} />}
-                                        {totalNotifs > 0 && <span className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#EDEBE6] animate-pulse ${stockAlerts>0? 'bg-red-500' : 'bg-black'}`}>{totalNotifs > 9? "9+" : totalNotifs}</span>}
+                                    <button
+                                        id="btn-notif"
+                                        onClick={() => setShowNotifications(v => !v)}
+                                        className={`relative w-11 h-11 rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5 transition active:scale-95 ${showNotifications
+                                                ? 'bg-black text-white'
+                                                : stockList.length > 0
+                                                    ? 'bg-red-50 text-red-600 border-red-200'
+                                                    : 'bg-white text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED]'
+                                            }`}
+                                    >
+                                        {stockList.length > 0 ? <AlertTriangle size={20} strokeWidth={2} /> : <Bell size={20} strokeWidth={2} />}
+                                        {totalNotifs > 0 && (
+                                            <span className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#EDEBE6] animate-pulse ${stockList.length > 0 ? 'bg-red-500' : 'bg-black'}`}>
+                                                {totalNotifs > 9 ? "9+" : totalNotifs}
+                                            </span>
+                                        )}
                                     </button>
-                                    <NotificationsModal open={showNotifications} onClose={() => { setShowNotifications(false); setStockAlerts(0); }} pedidosCount={pedidosCount} stockAlerts={stockList} onGoPedidos={() => setActiveTab("pedidos")} onGoProdutos={() => setActiveTab("produtos")} />
+
+                                    <NotificationsModal
+                                        open={showNotifications}
+                                        onClose={() => {
+                                            setShowNotifications(false);
+                                        }}
+                                        pedidosCount={pedidosCount}
+                                        stockAlerts={stockList}
+                                        onGoPedidos={() => setActiveTab("pedidos")}
+                                        onGoProdutos={() => setActiveTab("produtos")}
+                                    />
                                 </div>
+
                                 <div className="bg-white rounded-full pl-1 pr-3 py-1 flex items-center gap-2 shadow-[0_1px_6px_rgba(0,0,0,0.05)] h-11 ml-1 border border-black/5">
-                                    {empresaLogo? (
+                                    {empresaLogo ? (
                                         <img src={empresaLogo} className="w-8 h-8 rounded-full object-cover" alt="logo empresa" />
                                     ) : (
                                         <div className="w-8 h-8 rounded-full bg-black text-white grid place-items-center text-[10px] font-black">{empresa?.nome_fantasia?.[0] || user?.nome?.[0] || "F"}</div>
