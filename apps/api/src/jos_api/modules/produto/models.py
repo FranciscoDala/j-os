@@ -44,7 +44,6 @@ class Product(Base):
     descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
     categoria: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     imagem_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    # FIX DEFINITIVO: TEXT ao invés de ENUM
     tipo: Mapped[str] = mapped_column(String(50), default=ProductType.GENERAL.value, nullable=False, server_default="GENERAL")
     unidade: Mapped[str] = mapped_column(String(20), default=ProductUnit.UNIT.value, nullable=False, server_default="UNIT")
     preco_venda: Mapped[Decimal] = mapped_column(Numeric(12,2), nullable=False)

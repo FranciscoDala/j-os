@@ -60,14 +60,114 @@ export function EntidadesTab() {
     const [form, setForm] = useState<any>({ id: null, tipo: "FUNCIONARIO", nome: "", telefone: "", email: "", documento: "", endereco: "", cargo: "", departamento: "", salario: "", carga_horaria: "", data_admissao: "", empresa_fornecedora: "", categoria_fornecedor: "", tem_acesso_app: false, perfil_id: "", senha: "" });
 
     useEffect(() => { setEmpresaId(getEmpresaId()); }, []);
-    const load = useCallback(async () => { if (!empresaId) return; try { const res = await fetch(`${API_BASE}/entidades/${empresaId}?tipo=${tipoFiltro}`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, cache: "no-store" }); if (res.ok) setLista(await res.json()); } catch {} }, [tipoFiltro, empresaId]);
-    const loadPerfis = useCallback(async () => { if (!empresaId) return; try { const res = await fetch(`${API_BASE}/entidades/${empresaId}/perfis`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, cache: "no-store" }); if (res.ok) { const data = await res.json(); const m:any={}; data.forEach((p:any)=>{m[p.slug]=p}); setPerfis(Object.values(m) as any[]); } } catch {} }, [empresaId]);
+
+    const load = useCallback(async () => {
+        if (!empresaId) return;
+        try {
+            const res = await fetch(`${API_BASE}/entidades/${empresaId}?tipo=${tipoFiltro}`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, cache: "no-store" });
+            if (res.ok) setLista(await res.json());
+        } catch {}
+    }, [tipoFiltro, empresaId]);
+
+    const loadPerfis = useCallback(async () => {
+        if (!empresaId) return;
+        try {
+            const res = await fetch(`${API_BASE}/entidades/${empresaId}/perfis`, { headers: { "Content-Type": "application/json",...getAuthHeaders() } as any, cache: "no-store" });
+            if (res.ok) {
+                const data = await res.json();
+                const m:any={};
+                data.forEach((p:any)=>{m[p.slug]=p});
+                setPerfis(Object.values(m) as any[]);
+            }
+        } catch {}
+    }, [empresaId]);
+
     useEffect(() => { if (empresaId) { load(); loadPerfis(); } }, [load, loadPerfis]);
+
+    // REALTIME
+    useEffect(() => {
+        const onCreate = (e:any) => {
+            const d = e.detail?.data || e.detail;
+            if (!d) return;
+            // só adiciona se for do tipo atual
+            if (d.tipo && d.tipo!== tipoFiltro) return;
+            if (d.id &&!lista.some(x=> x.id === d.id)) {
+                // se backend só mandou id/nome, faz fetch leve
+                if (!d.nome) { load(); return; }
+                setLista(prev => [d,...prev]);
+            }
+        };
+        const onUpdate = (e:any) => {
+            const d = e.detail?.data || e.detail;
+            if (!d?.id) { load(); return; }
+            setLista(prev => prev.map(x=> x.id === d.id? {...x,...d} : x));
+        };
+        const onDelete = (e:any) => {
+            const d = e.detail?.data || e.detail;
+            if (!d?.id) { load(); return; }
+            setLista(prev => prev.filter(x=> x.id!== d.id));
+        };
+        const onFullReload = () => load();
+
+        window.addEventListener("entidade:created" as any, onCreate);
+        window.addEventListener("entidade:update" as any, onUpdate);
+        window.addEventListener("entidade:deleted" as any, onDelete);
+        window.addEventListener("entidade:created" as any, onCreate);
+        window.addEventListener("usuario:created" as any, onFullReload);
+        window.addEventListener("usuario:update" as any, onFullReload);
+        // compat antigo
+        window.addEventListener("usuario:created" as any, onCreate);
+
+        return () => {
+            window.removeEventListener("entidade:created" as any, onCreate);
+            window.removeEventListener("entidade:update" as any, onUpdate);
+            window.removeEventListener("entidade:deleted" as any, onDelete);
+            window.removeEventListener("usuario:created" as any, onFullReload);
+            window.removeEventListener("usuario:update" as any, onFullReload);
+        };
+    }, [tipoFiltro, lista, load]);
 
     const handleEdit = (ent: any) => { if (!canManage) return toast.error("Sem permissão"); setForm({ id: ent.id, tipo: ent.tipo, nome: ent.nome, telefone: ent.telefone||"", email: ent.email||"", documento: ent.documento||"", endereco: ent.endereco||"", cargo: ent.cargo||"", departamento: ent.departamento||"", salario: ent.salario||"", carga_horaria: ent.carga_horaria||"", data_admissao: ent.data_admissao?ent.data_admissao.split("T")[0]:"", empresa_fornecedora: ent.empresa_fornecedora||"", categoria_fornecedor: ent.categoria_fornecedor||"", tem_acesso_app: ent.tem_acesso_app||false, perfil_id: ent.perfil_id||"", senha: "" }); setOpen(true); };
     const handleDeleteClick = (ent: any) => { if (!canManage) return toast.error("Sem permissão"); setSelected(ent); setOpenDelete(true); };
-    const handleSave = async () => { if (!empresaId) return; if (!canManage) return; setSaving(true); try { const clean=(v:any)=>v===""||v===undefined?null:typeof v==='string'?(v.trim()||null):v; const payload:any={ tipo:form.tipo, nome:form.nome.trim(), telefone:clean(form.telefone), email:clean(form.email)?.toLowerCase()||null, documento:clean(form.documento), endereco:clean(form.endereco), cargo:clean(form.cargo), departamento:clean(form.departamento), empresa_fornecedora:clean(form.empresa_fornecedora), categoria_fornecedor:clean(form.categoria_fornecedor), tem_acesso_app:!!form.tem_acesso_app, perfil_id:clean(form.perfil_id), data_admissao:clean(form.data_admissao), salario:form.salario?Number(form.salario):null, carga_horaria:form.carga_horaria?Number(form.carga_horaria):null, }; if(form.senha?.trim().length>=6) payload.senha=form.senha.trim(); if(!payload.tem_acesso_app) payload.perfil_id=null; const url=form.id?`${API_BASE}/entidades/${empresaId}/${form.id}`:`${API_BASE}/entidades/${empresaId}`; const method=form.id?"PUT":"POST"; const res=await fetch(url,{method,headers:{"Content-Type":"application/json",...getAuthHeaders()} as any,body:JSON.stringify(payload)}); const json=await res.json().catch(()=>({})); if(!res.ok) throw new Error(json.detail||"Erro"); if(form.id){ setLista(p=>p.map(x=>x.id===json.id?json:x)); toast.success("Atualizado"); } else { setLista(p=>[json,...p]); toast.success("Criado"); } setOpen(false); } catch(e:any){ toast.error(e.message); } finally { setSaving(false); } };
-    const confirmDelete = async () => { if(!selected||!empresaId) return; setDeleting(true); const backup=lista; setLista(p=>p.filter(x=>x.id!==selected.id)); try { const res=await fetch(`${API_BASE}/entidades/${empresaId}/${selected.id}`,{method:"DELETE",headers:{"Content-Type":"application/json",...getAuthHeaders()} as any}); if(!res.ok) throw new Error(); toast.success("Apagado"); setOpenDelete(false); } catch { setLista(backup); toast.error("Erro"); } finally { setDeleting(false); } };
+
+    const handleSave = async () => {
+        if (!empresaId) return;
+        if (!canManage) return;
+        setSaving(true);
+        try {
+            const clean=(v:any)=>v===""||v===undefined?null:typeof v==='string'?(v.trim()||null):v;
+            const payload:any={
+                tipo:form.tipo, nome:form.nome.trim(), telefone:clean(form.telefone), email:clean(form.email)?.toLowerCase()||null,
+                documento:clean(form.documento), endereco:clean(form.endereco), cargo:clean(form.cargo), departamento:clean(form.departamento),
+                empresa_fornecedora:clean(form.empresa_fornecedora), categoria_fornecedor:clean(form.categoria_fornecedor),
+                tem_acesso_app:!!form.tem_acesso_app, perfil_id:clean(form.perfil_id), data_admissao:clean(form.data_admissao),
+                salario:form.salario?Number(form.salario):null, carga_horaria:form.carga_horaria?Number(form.carga_horaria):null,
+            };
+            if(form.senha?.trim().length>=6) payload.senha=form.senha.trim();
+            if(!payload.tem_acesso_app) payload.perfil_id=null;
+            const url=form.id?`${API_BASE}/entidades/${empresaId}/${form.id}`:`${API_BASE}/entidades/${empresaId}`;
+            const method=form.id?"PUT":"POST";
+            const res=await fetch(url,{method,headers:{"Content-Type":"application/json",...getAuthHeaders()} as any,body:JSON.stringify(payload)});
+            const json=await res.json().catch(()=>({}));
+            if(!res.ok) throw new Error(json.detail||"Erro");
+            if(form.id){ setLista(p=>p.map(x=>x.id===json.id?json:x)); toast.success("Atualizado"); }
+            else { setLista(p=>[json,...p]); toast.success("Criado"); }
+            setOpen(false);
+        } catch(e:any){ toast.error(e.message); } finally { setSaving(false); }
+    };
+
+    const confirmDelete = async () => {
+        if(!selected||!empresaId) return;
+        setDeleting(true);
+        const backup=lista;
+        setLista(p=>p.filter(x=>x.id!==selected.id));
+        try {
+            const res=await fetch(`${API_BASE}/entidades/${empresaId}/${selected.id}`,{method:"DELETE",headers:{"Content-Type":"application/json",...getAuthHeaders()} as any});
+            if(!res.ok) throw new Error();
+            toast.success("Apagado");
+            setOpenDelete(false);
+        } catch { setLista(backup); toast.error("Erro"); } finally { setDeleting(false); }
+    };
 
     const filtered = lista.filter(l => {
         const s = globalSearch.toLowerCase();

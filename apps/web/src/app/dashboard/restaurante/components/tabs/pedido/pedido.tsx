@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Utensils, ShoppingBag } from "lucide-react";
 import { useDashboard } from "@/components/dashboard/Tamplate";
 import { PedidoCard } from "./cards/pedido";
@@ -14,50 +14,95 @@ export function PedidosTab() {
     const [loading, setLoading] = useState(true);
     const atendendoRef = useRef<string | null>(null);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         try {
             const token = localStorage.getItem("access_token") || "";
             const u = JSON.parse(localStorage.getItem("user") || "{}");
-            const emp = u.empresa_id || "";
-            const r = await fetch(`${API_URL}/pedidos-qr/pendentes`, { headers: { Authorization: `Bearer ${token}`, "X-Empresa-ID": emp }, cache: "no-store" });
-            const data = await r.json();
+            const emp = u.empresa_id || localStorage.getItem("empresa_id") || "";
+            if (!emp) return;
+            const r = await fetch(`${API_URL}/pedidos-qr/pendentes`, { headers: { Authorization: `Bearer ${token}`, "X-Empresa-ID": emp }, cache: "no-store" as any });
+            const data = await r.json().catch(()=> []);
             if (Array.isArray(data)) setPedidos(data);
-        } catch { } finally { setLoading(false); }
-    };
+        } catch {} finally { setLoading(false); }
+    }, []);
 
     useEffect(() => {
         load();
-        const id = setInterval(load, 4000);
-        const onAprovado = (e: any) => {
-            const idAprovado = e.detail?.id;
-            if (idAprovado) setPedidos(s => s.filter(x => x.id!== idAprovado));
+
+        const onNovo = (e:any) => {
+            const d = e.detail?.data || e.detail;
+            if (!d) { load(); return; }
+            // pode vir array ou objeto unico
+            if (Array.isArray(d)) {
+                setPedidos(d);
+                return;
+            }
+            if (d.id) {
+                setPedidos(prev => {
+                    if (prev.some(x=> x.id === d.id)) return prev;
+                    return [d,...prev];
+                });
+            } else {
+                load();
+            }
         };
-        window.addEventListener("pedido-qr:aprovado" as any, onAprovado);
+
+        const onRemover = (e:any) => {
+            const d = e.detail?.data || e.detail;
+            const id = d?.id || d?.pedido_id;
+            if (id) setPedidos(s => s.filter(x => x.id!== id));
+            else load();
+        };
+
+        // compat todos os nomes que backend manda
+        window.addEventListener("pedido_qr:novo" as any, onNovo);
+        window.addEventListener("notificacao:nova" as any, (e:any)=>{
+            const d = e.detail?.data || e.detail;
+            if (d?.tipo === "PEDIDO_QR" || d?.mesa_numero) onNovo(e);
+        });
+        window.addEventListener("pedido_qr:aceito" as any, onRemover);
+        window.addEventListener("pedido_qr:recusado" as any, onRemover);
+        window.addEventListener("pedido_qr:remover" as any, onRemover);
+        window.addEventListener("pedido-qr:aprovado" as any, onRemover);
+        window.addEventListener("pedido-qr:recusado" as any, onRemover);
+
+        // fallback leve 20s se WS cair
+        const id = setInterval(load, 20000);
+
         return () => {
             clearInterval(id);
-            window.removeEventListener("pedido-qr:aprovado" as any, onAprovado);
+            window.removeEventListener("pedido_qr:novo" as any, onNovo);
+            window.removeEventListener("pedido_qr:aceito" as any, onRemover);
+            window.removeEventListener("pedido_qr:recusado" as any, onRemover);
+            window.removeEventListener("pedido_qr:remover" as any, onRemover);
+            window.removeEventListener("pedido-qr:aprovado" as any, onRemover);
+            window.removeEventListener("pedido-qr:recusado" as any, onRemover);
         };
-    }, []);
+    }, [load]);
 
     const atender = (p: any) => {
         if (atendendoRef.current === p.id) return;
         atendendoRef.current = p.id;
         localStorage.setItem("atender_mesa_qr", JSON.stringify(p));
+        // remove da lista imediatamente otimista
+        setPedidos(s => s.filter(x=> x.id!== p.id));
         setActiveTab("vendas");
         setTimeout(()=>{ atendendoRef.current = null; }, 1000);
     };
 
     const recusar = async (p: any) => {
         if (!confirm(`Recusar MESA ${p.mesa_numero}?`)) return;
-        const token = localStorage.getItem("access_token") || "";
-        const u = JSON.parse(localStorage.getItem("user") || "{}");
-        const emp = u.empresa_id || "";
-        await fetch(`${API_URL}/pedidos-qr/${p.id}/recusar`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}`, "X-Empresa-ID": emp }
-        });
-        setPedidos(s => s.filter(x => x.id!== p.id));
-        setSel(null);
+        try {
+            const token = localStorage.getItem("access_token") || "";
+            const u = JSON.parse(localStorage.getItem("user") || "{}");
+            const emp = u.empresa_id || localStorage.getItem("empresa_id") || "";
+            await fetch(`${API_URL}/pedidos-qr/${p.id}/recusar`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}`, "X-Empresa-ID": emp }
+            });
+            setPedidos(s => s.filter(x => x.id!== p.id));
+            setSel(null);
+        } catch {}
     };
 
     if (loading) {

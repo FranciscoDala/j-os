@@ -2,17 +2,31 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from uuid import UUID, uuid4
 import enum
+import asyncio
+import logging
 from jos_api.db.session import get_db
 from jos_api.core.deps import get_current_user
 from jos_api.modules.auth.models import User, UserEmpresa, RoleEnum
 from jos_api.modules.empresa.perfis_models import Perfil
 from jos_api.core.security import hash_password
 from jos_api.core.permissions import check_permission
+from jos_api.core.realtime import manager
 from . import models, schemas
 from jos_api.modules.atividade.service import registrar_atividade
 from jos_api.core.events import emit
 
 router = APIRouter(prefix="/entidades", tags=["entidades"])
+logger = logging.getLogger(__name__)
+
+def _broadcast_safe(empresa_id, payload: dict):
+    try:
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(manager.broadcast(str(empresa_id), payload))
+        except RuntimeError:
+            asyncio.run(manager.broadcast(str(empresa_id), payload))
+    except Exception as e:
+        logger.warning(f"[WS] entidade broadcast fail {e} {payload.get('type')}")
 
 def _get_ip(request: Request):
     return request.client.host if request.client else None
@@ -129,7 +143,14 @@ def criar_entidade(empresa_id: UUID, dados: schemas.EntidadeCreate, request: Req
     except: pass
     db.commit()
     db.refresh(ent)
-    try: emit(str(empresa_id), "entidade:created", data={"id": str(ent.id), "tipo": str(ent.tipo), "nome": ent.nome})
+
+    # === WS ===
+    try:
+        payload = {"id": str(ent.id), "tipo": str(ent.tipo), "nome": ent.nome, "email": ent.email}
+        emit(str(empresa_id), "entidade:created", data=payload)
+        _broadcast_safe(empresa_id, {"type": "entidade:created", "data": payload})
+        _broadcast_safe(empresa_id, {"type": "entidade:update", "data": payload})
+        _broadcast_safe(empresa_id, {"type": "stats.updated", "acao": "entidade_created"})
     except: pass
     return ent
 
@@ -238,7 +259,11 @@ def atualizar_entidade(
 
     db.commit()
     db.refresh(ent)
-    try: emit(str(empresa_id), "entidade:updated", data={"id": str(ent.id), "nome": ent.nome})
+    try:
+        payload_ws = {"id": str(ent.id), "nome": ent.nome, "tipo": str(ent.tipo)}
+        emit(str(empresa_id), "entidade:updated", data=payload_ws)
+        _broadcast_safe(empresa_id, {"type": "entidade:updated", "data": payload_ws})
+        _broadcast_safe(empresa_id, {"type": "entidade:update", "data": payload_ws})
     except: pass
     return ent
 
@@ -250,6 +275,10 @@ def deletar_entidade(empresa_id: UUID, entidade_id: UUID, request: Request, db: 
     if not ent: raise HTTPException(404, "Entidade não encontrada")
     ent.ativo = False
     db.commit()
-    try: emit(str(empresa_id), "entidade:deleted", data={"id": str(entidade_id)})
+    try:
+        payload_ws = {"id": str(entidade_id)}
+        emit(str(empresa_id), "entidade:deleted", data=payload_ws)
+        _broadcast_safe(empresa_id, {"type": "entidade:deleted", "data": payload_ws})
+        _broadcast_safe(empresa_id, {"type": "entidade:update", "data": payload_ws})
     except: pass
     return {"message": "Apagado"}

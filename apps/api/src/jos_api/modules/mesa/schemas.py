@@ -60,6 +60,8 @@ class MesaResponse(BaseModel):
     pos_x: int = 0
     pos_y: int = 0
     ativa: bool
+    qr_token: Optional[str] = None
+    qr_token_criado_em: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     reserva_ativa: Optional[ReservaResponse] = None

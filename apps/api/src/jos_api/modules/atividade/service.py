@@ -2,8 +2,23 @@ from sqlalchemy.orm import Session
 import uuid
 from typing import Optional, Any
 from decimal import Decimal
+import asyncio
+import logging
 from jos_api.modules.atividade.models import AtividadeLog
 from jos_api.core.events import emit
+from jos_api.core.realtime import manager
+
+logger = logging.getLogger(__name__)
+
+def _broadcast_safe(empresa_id, payload: dict):
+    try:
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(manager.broadcast(str(empresa_id), payload))
+        except RuntimeError:
+            asyncio.run(manager.broadcast(str(empresa_id), payload))
+    except Exception as e:
+        logger.warning(f"[WS] atividade broadcast fail {e}")
 
 def _to_jsonable(obj: Any):
     if isinstance(obj, dict):
@@ -18,6 +33,11 @@ def _to_jsonable(obj: Any):
         try: return obj.isoformat()
         except: pass
     return obj
+
+def _safe_iso(dt):
+    if dt is None: return None
+    try: return dt.isoformat()
+    except: return str(dt)
 
 def registrar_atividade(
     db: Session,
@@ -52,7 +72,7 @@ def registrar_atividade(
     if commit:
         db.commit()
         db.refresh(entry)
-        emit(str(empresa_id), "atividade:nova", data={
+        payload = {
             "id": str(entry.id),
             "user_nome": entry.user_nome,
             "modulo": entry.modulo,
@@ -60,15 +80,16 @@ def registrar_atividade(
             "entidade": entry.entidade,
             "entidade_nome": entry.entidade_nome,
             "descricao": entry.descricao,
-            "created_at": entry.created_at.isoformat() if entry.created_at else None
-        })
+            "created_at": _safe_iso(entry.created_at)
+        }
+        try: emit(str(empresa_id), "atividade:nova", data=payload)
+        except: pass
+        _broadcast_safe(empresa_id, {"type": "atividade:nova", "data": payload})
+        _broadcast_safe(empresa_id, {"type": "atividade.update", "data": payload})
     else:
-        # quando commit=False (criar_produto, criar_usuario), ainda tem que emitir após flush
-        # mas deixa o commit da transação principal cuidar do broadcast via after_commit
-        # aqui emitimos mesmo assim porque o front espera realtime imediato
         db.flush()
         try:
-            emit(str(empresa_id), "atividade:nova", data={
+            payload = {
                 "id": str(entry.id),
                 "user_nome": entry.user_nome,
                 "modulo": entry.modulo,
@@ -76,10 +97,11 @@ def registrar_atividade(
                 "entidade": entry.entidade,
                 "entidade_nome": entry.entidade_nome,
                 "descricao": entry.descricao,
-                "created_at": entry.created_at.isoformat() if hasattr(entry, 'created_at') and entry.created_at else None
-            })
-        except:
-            pass
+                "created_at": _safe_iso(getattr(entry, 'created_at', None))
+            }
+            emit(str(empresa_id), "atividade:nova", data=payload)
+            _broadcast_safe(empresa_id, {"type": "atividade:nova", "data": payload})
+        except: pass
     return entry
 
 log = registrar_atividade

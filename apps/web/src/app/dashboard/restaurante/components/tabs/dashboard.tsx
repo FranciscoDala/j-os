@@ -6,11 +6,11 @@ const BASE = `${API_URL}/api/v1`;
 
 async function apiFetch(path: string) {
     const token = typeof window!== "undefined"? localStorage.getItem("access_token") : null;
+    const empresa_id = typeof window!== "undefined"? localStorage.getItem("empresa_id") : null;
     if (!token) throw new Error("Sem token");
-    const r = await fetch(`${BASE}${path}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: "no-store"
-    });
+    const headers: any = { Authorization: `Bearer ${token}` };
+    if (empresa_id) headers["X-Empresa-ID"] = empresa_id;
+    const r = await fetch(`${BASE}${path}`, { headers, cache: "no-store" as any });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw d;
     return d;
@@ -51,14 +51,19 @@ export function HomeTab({ user }: { user: any }) {
     }, [load]);
 
     useEffect(() => {
+        const getData = (e:any) => e.detail?.data || e.detail;
+
         const onExtrato = (e: any) => {
-            const m = e.detail;
-            if (!m || (!m.id &&!m.valor &&!m.total)) return;
+            const m = getData(e);
+            if (!m) return;
+            // se for stats completo já do backend
+            if (m.faturamento!==undefined || m.total_entradas!==undefined) { load(); return; }
+            if (!m.id &&!m.valor &&!m.total &&!m.total_venda) return;
             const valorNum = Number(m.valor?? m.total_venda?? m.total?? 0);
             if (isNaN(valorNum)) return;
-            const isVenda = (m.tipo || "").toUpperCase().includes("VENDA") || e.type === "venda:nova";
+            const isVenda = (m.tipo || "").toUpperCase().includes("VENDA") || e.type.includes("venda");
             setStats(s => ({
-             ...s,
+              ...s,
                 caixaAtual: m.saldo_atual? Number(m.saldo_atual) : s.caixaAtual + valorNum,
                 faturamento: valorNum > 0? s.faturamento + valorNum : s.faturamento,
                 pending: valorNum < 0? s.pending + Math.abs(valorNum) : s.pending,
@@ -67,10 +72,20 @@ export function HomeTab({ user }: { user: any }) {
             }));
             if (isVenda) setUltimasVendas(prev => [m,...prev].slice(0, 5));
         };
-        const events = ["caixa:extrato", "caixa:update", "caixa:atualizado", "venda:nova", "entidade:created"] as const;
-        events.forEach(ev => window.addEventListener(ev as any, onExtrato));
-        return () => { events.forEach(ev => window.removeEventListener(ev as any, onExtrato)); };
-    }, []);
+
+        const onFull = () => load();
+
+        const eventsIncremental = ["caixa:extrato", "venda:nova", "venda:fechada", "venda:update"] as const;
+        const eventsFull = ["caixa:update", "caixa:atualizado", "caixa.updated", "dashboard:refresh", "stats.updated", "entidade:created", "entidade:update"] as const;
+
+        eventsIncremental.forEach(ev => window.addEventListener(ev as any, onExtrato));
+        eventsFull.forEach(ev => window.addEventListener(ev as any, onFull));
+
+        return () => {
+            eventsIncremental.forEach(ev => window.removeEventListener(ev as any, onExtrato));
+            eventsFull.forEach(ev => window.removeEventListener(ev as any, onFull));
+        };
+    }, [load]);
 
     const fmt = (v: number) => {
         const n = Number(v);
@@ -78,13 +93,11 @@ export function HomeTab({ user }: { user: any }) {
         return n.toLocaleString('pt-PT', { minimumFractionDigits: 2 });
     };
 
-    // DADOS REAIS PARA O GRÁFICO
     const percSave = stats.faturamento > 0? ((stats.caixaAtual / stats.faturamento) * 100) : 0;
     const goalPerc = Math.min(99, Math.max(5, Math.round((stats.faturamento / (stats.faturamento + stats.pending + 1)) * 100)));
 
     return (
         <div className="flex flex-col gap-[14px] w-full min-w-0 pb-6" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
-            {/* TOP 4 - DADOS REAIS DO DB - SEM ZOOM, CARDS FINOS */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[14px]">
                 <div className="bg-white rounded-[16px] p-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex justify-between items-center h-[82px]">
                     <div>

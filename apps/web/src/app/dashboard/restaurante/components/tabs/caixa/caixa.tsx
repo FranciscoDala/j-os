@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { CaixaModal } from "./modals/open_close";
 import { SangriaModal } from "./modals/saida";
 import { MasterCard, EntradasCard, SaidasCard } from "./cards/cards_master";
@@ -23,7 +23,7 @@ function getAuthHeaders() {
 async function apiFetch(path: string, options: RequestInit = {}) {
     const headers: any = { "Content-Type": "application/json",...getAuthHeaders(),...(options.headers || {}) };
     if (options.body instanceof FormData) delete headers["Content-Type"];
-    const res = await fetch(`${BASE}${path}`, {...options, headers });
+    const res = await fetch(`${BASE}${path}`, {...options, headers, cache: "no-store" as any });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) throw d;
     return d;
@@ -35,6 +35,7 @@ const STORAGE_KEY = "j-os:mostrar_extrato";
 
 const formatDateTimeFull = (iso: string) => {
     try {
+        if (!iso) return "--";
         return new Date(iso).toLocaleString('pt-PT', { timeZone: 'Africa/Luanda', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     } catch { return iso; }
 };
@@ -54,9 +55,9 @@ export function CaixaTab() {
     const [showDateModal, setShowDateModal] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const menuRefMobile = useRef<HTMLDivElement>(null);
-    const [confirm, setConfirm] = useState<{ open: boolean, title: string, desc: string, type: "black" | "green" | "red", action: () => void }>({ open: false, title: "", desc: "", type: "black", action: () => { } });
+    const [confirm, setConfirm] = useState<{ open: boolean, title: string, desc: string, type: "black" | "green" | "red", action: () => void }>({ open: false, title: "", desc: "", type: "black", action: () => {} });
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true);
         try {
             const s = await apiFetch("/caixa/status").catch(() => null);
@@ -66,62 +67,93 @@ export function CaixaTab() {
             if (inicio === hoje && fim === hoje && s?.aberto) ext = await apiFetch("/caixa/extrato");
             else ext = await apiFetch(`/caixa/extrato-por-periodo?inicio=${inicio}&fim=${fim}`);
             setExtrato(ext);
-        } catch { setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0, total_entradas: 0, total_saidas: 0, qtd_caixas: 0, periodo_inicio: inicio, periodo_fim: fim }); }
+        } catch {
+            setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0, total_entradas: 0, total_saidas: 0, qtd_caixas: 0, periodo_inicio: inicio, periodo_fim: fim });
+        }
         setLoading(false);
-    };
+    }, [inicio, fim]);
 
     useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved!== null) setShowExtrato(saved === "true");
         else setShowExtrato(false);
     }, []);
-    useEffect(() => { load(); }, [inicio, fim]);
+
+    useEffect(() => { load(); }, [load]);
+
     useEffect(() => {
         const h = (e: MouseEvent) => {
             if (menuRef.current &&!menuRef.current.contains(e.target as Node)) setMenuOpen(false);
             if (menuRefMobile.current &&!menuRefMobile.current.contains(e.target as Node)) setMenuOpen(false);
         };
-        document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
+        document.addEventListener("mousedown", h);
+        return () => document.removeEventListener("mousedown", h);
     }, []);
 
+    // REALTIME COMPLETO
     useEffect(() => {
+        const hoje = todayISO();
+        const isHoje = inicio === hoje && fim === hoje;
+
         const onExtratoPush = (e: any) => {
-            const m = e.detail;
-            if (!m?.id &&!m?.valor &&!m?.total_venda &&!m?.total) return;
-            const hoje = todayISO();
-            if (inicio!== hoje || fim!== hoje) return;
+            if (!isHoje) { load(); return; }
+            const m = e.detail?.data || e.detail;
+            if (!m) return;
+            const valor = Number(m.valor?? m.total_venda?? m.total?? 0);
+            if (!m.id && valor === 0) return;
+
             setExtrato((prev: any) => {
                 if (!prev) return prev;
                 if (m.id && prev.movimentos?.some((x: any) => x.id === m.id)) return prev;
+                // se é venda já registrada por outro evento, evita duplicar
+                if (m.venda_id && prev.movimentos?.some((x: any) => x.venda_id === m.venda_id)) return prev;
+
+                const novoMovs = [m,...(prev.movimentos || [])];
                 return {
-                  ...prev,
-                    movimentos: [m,...(prev.movimentos || [])],
-                    saldo_atual: Number(prev.saldo_atual || 0) + Number(m.valor || m.total_venda || m.total || 0),
-                    total_entradas: Number(m.valor || m.total || 0) > 0? Number(prev.total_entradas || 0) + Number(m.valor || m.total || 0) : prev.total_entradas,
-                    total_saidas: Number(m.valor || 0) < 0? Number(prev.total_saidas || 0) + Number(m.valor) : prev.total_saidas,
+                   ...prev,
+                    movimentos: novoMovs,
+                    saldo_atual: Number(prev.saldo_atual || 0) + valor,
+                    total_entradas: valor > 0? Number(prev.total_entradas || 0) + valor : prev.total_entradas,
+                    total_saidas: valor < 0? Number(prev.total_saidas || 0) + valor : prev.total_saidas,
                 };
             });
         };
+
         const onCaixaStatus = (e: any) => {
-            const s = e.detail;
-            if (s) setStatus((prev: any) => ({...prev,...s }));
+            const d = e.detail?.data || e.detail;
+            if (!d) return;
+            // se for evento de status completo
+            if (d.aberto!== undefined || d.caixa_atual) {
+                setStatus(d);
+            } else if (d.status) {
+                // forcar fechamento/abertura
+                load();
+            } else {
+                // movimento também atualiza status saldo
+                if (isHoje) setStatus((prev: any) => prev? {...prev, caixa_atual: {...prev.caixa_atual, saldo_atual: (prev.caixa_atual?.saldo_atual || 0) + Number(d.valor || 0) } } : prev);
+            }
         };
+
+        const onCaixaFullUpdate = () => load();
+
         window.addEventListener("caixa:extrato" as any, onExtratoPush);
-        window.addEventListener("caixa:update" as any, onCaixaStatus);
-        window.addEventListener("caixa:atualizado" as any, (e: any) => {
-            onCaixaStatus(e);
-            onExtratoPush(e);
-        });
+        window.addEventListener("caixa:update" as any, onCaixaFullUpdate);
+        window.addEventListener("caixa.updated" as any, onCaixaFullUpdate);
+        window.addEventListener("caixa:atualizado" as any, onCaixaFullUpdate);
         window.addEventListener("venda:nova" as any, onExtratoPush);
         window.addEventListener("venda:fechada" as any, onExtratoPush);
+        window.addEventListener("venda:update" as any, onExtratoPush);
+
         return () => {
             window.removeEventListener("caixa:extrato" as any, onExtratoPush);
-            window.removeEventListener("caixa:update" as any, onCaixaStatus);
-            window.removeEventListener("caixa:atualizado" as any, onExtratoPush);
+            window.removeEventListener("caixa:update" as any, onCaixaFullUpdate);
+            window.removeEventListener("caixa.updated" as any, onCaixaFullUpdate);
+            window.removeEventListener("caixa:atualizado" as any, onCaixaFullUpdate);
             window.removeEventListener("venda:nova" as any, onExtratoPush);
             window.removeEventListener("venda:fechada" as any, onExtratoPush);
+            window.removeEventListener("venda:update" as any, onExtratoPush);
         };
-    }, [inicio, fim]);
+    }, [inicio, fim, load]);
 
     const movs = extrato?.movimentos || [];
     const entradas = Number(extrato?.total_entradas || 0);
@@ -168,16 +200,13 @@ export function CaixaTab() {
 
     if (loading &&!extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
 
-    // Info do responsavel do caixa atual
     const caixaAtual = status?.caixa_atual;
-    const responsavelAbertura = caixaAtual?.aberto_por_nome || status?.mensagem || "";
     const dataAberturaFull = caixaAtual?.aberto_em? formatDateTimeFull(caixaAtual.aberto_em) : "";
 
     return (
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
-            {/* INFO RESPONSAVEL - novo */}
             {status?.aberto && caixaAtual && (
                 <div className="bg-zinc-900 text-white rounded-[14px] px-4 py-2.5 flex items-center justify-between text-[11px]">
                     <span className="font-bold tracking-wide">Caixa {status.aberto? 'aberto' : 'fechado'} por: <span className="text-white font-black">{caixaAtual.aberto_por_nome}</span></span>
@@ -241,7 +270,7 @@ export function CaixaTab() {
                     <MasterCard
                         aberto={!!status?.aberto}
                         atual={atual}
-                        nomeRestaurante={responsavelAbertura? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE"}
+                        nomeRestaurante={caixaAtual?.aberto_por_nome? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE"}
                         dataAbertura={dataAberturaFull? dataAberturaFull.split(',')[0] || dataAberturaFull.split(' ')[0] : inicio.slice(5).replace("-", "/")}
                         horaAbertura={dataAberturaFull? dataAberturaFull.split(',').pop()?.trim() || dataAberturaFull : (movs[0]? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : "--:--")}
                     />
@@ -265,8 +294,8 @@ export function CaixaTab() {
             {showExtrato && <ExtratoList movimentos={movs} selectedDate={extrato?.periodo_inicio || inicio} statusCaixa={status} />}
 
             <JConfirm open={confirm.open} title={confirm.title} desc={confirm.desc} type={confirm.type} onClose={() => setConfirm(s => ({...s, open: false }))} onConfirm={confirm.action} />
-            <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={status?.caixa_atual || extrato} onClose={() => setModalOpen(false)} onSuccess={async () => { await load(); toast.success("Ok sucesso, o caixa aberto para operações consolte a tabela de movimentos!"); }} />
-            <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={() => setSangriaOpen(false)} onSuccess={async () => { await load(); toast.success("Ok sucesso, saída feita no caixa consulte a tabela de movimentos!"); }} />
+            <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={status?.caixa_atual || extrato} onClose={() => setModalOpen(false)} onSuccess={async () => { await load(); toast.success("Caixa atualizado!"); }} />
+            <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={() => setSangriaOpen(false)} onSuccess={async () => { await load(); toast.success("Movimento registrado!"); }} />
         </div>
     )
 }

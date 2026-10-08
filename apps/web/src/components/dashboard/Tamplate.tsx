@@ -10,6 +10,7 @@ import ModalEmpresa from "./modal_empresa";
 import { NotificationsModal } from "./modal_notificacoes";
 import { Toasts } from "@/app/dashboard/restaurante/components/tabs/venda/modals/venda";
 import { useEmpresa } from "@/components/dashboard/empresaContext";
+import { getCaixaStatus } from "@/lib/api";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
@@ -17,13 +18,34 @@ type Toast = { id: string; msg: string; type: "success" | "error" | "info" | "wa
 type Ctx = { activeTab: string; setActiveTab: (t: string) => void; user: any; moduleId: ModuleId; role: string; can: (p: string) => boolean; pedidosCount: number; setPedidosCount: (n: number) => void; };
 const DashboardCtx = createContext<Ctx>(null as any);
 export const useDashboard = () => useContext(DashboardCtx);
-const TAB_META: Record<string, { title: string; desc: string }> = { home: { title: "Painel", desc: "Visão geral do seu restaurante" }, pedidos: { title: "Pedidos QR", desc: "Gerencie seus pedidos feitos em tempo real • LIVE" }, produtos: { title: "Produtos", desc: "Gerencie seus produtos, catálogo e preços" }, mesas: { title: "Mesas", desc: "Controle de mesas e atendimento" }, caixa: { title: "Caixa", desc: "Controle financeiro do dia" }, funcionarios: { title: "Equipe", desc: "Gestão de funcionários e acessos" }, vendas: { title: "Vendas", desc: "" }, relatorios: { title: "Relatórios", desc: "Análises e desempenho" } };
-const ROLE_PERMISSIONS: Record<string, string[]> = { dono: ["*"], gerente_restaurante: ["*"], operador_caixa: ["home", "caixa", "vendas", "produtos", "funcionarios", "pedidos", "mesas"], caixa: ["home", "caixa", "vendas"], garcom: ["home", "vendas", "pedidos", "mesas"], vigilante: ["home"], rh: ["home", "funcionarios"], funcionario: ["home", "produtos", "vendas"] };
+
+const TAB_META: Record<string, { title: string; desc: string }> = {
+  home: { title: "Painel", desc: "Visão geral do seu restaurante" },
+  pedidos: { title: "Pedidos QR", desc: "Gerencie seus pedidos feitos em tempo real • LIVE" },
+  produtos: { title: "Produtos", desc: "Gerencie seus produtos, catálogo e preços" },
+  mesas: { title: "Mesas", desc: "Controle de mesas e atendimento" },
+  caixa: { title: "Caixa", desc: "Controle financeiro do dia" },
+  funcionarios: { title: "Equipe", desc: "Gestão de funcionários e acessos" },
+  vendas: { title: "Vendas", desc: "" },
+  relatorios: { title: "Relatórios", desc: "Análises e desempenho" }
+};
+
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  dono: ["*"],
+  gerente_restaurante: ["*"],
+  operador_caixa: ["home", "caixa", "vendas", "produtos", "funcionarios", "pedidos", "mesas"],
+  caixa: ["home", "caixa", "vendas"],
+  garcom: ["home", "vendas", "pedidos", "mesas"],
+  vigilante: ["home"],
+  rh: ["home", "funcionarios"],
+  funcionario: ["home", "produtos", "vendas"]
+};
+
 function normalizeRole(raw: any) { return String(raw || "funcionario").toLowerCase(); }
 function getLogoSrc(logo_url?: string) {
     if (!logo_url) return null;
     if (logo_url.startsWith("http")) return logo_url;
-    return `${API_URL}${logo_url.startsWith("/") ? "" : "/"}${logo_url}`;
+    return `${API_URL}${logo_url.startsWith("/")? "" : "/"}${logo_url}`;
 }
 
 export function DashboardLayoutProvider({ children }: { children: React.ReactNode }) {
@@ -45,18 +67,45 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     const prevCountRef = useRef(0);
     const isFirstLoad = useRef(true);
     const audioRef = useRef<HTMLAudioElement | null>(null);
-    const { empresa } = useEmpresa();
+    const { empresa, refreshEmpresa } = useEmpresa() as any;
 
     const empresaLogo = getLogoSrc(empresa?.logo_url);
 
     const pushToast = (msg: string, type: Toast["type"] = "info") => {
         const id = Date.now().toString() + Math.random().toString().slice(2);
         setToasts(t => [...t, { id, msg, type }]);
-        setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000);
+        setTimeout(() => setToasts(t => t.filter(x => x.id!== id)), 4000);
     };
 
-    useEffect(() => { const token = localStorage.getItem("access_token"); if (!token) { router.push("/login"); return; } try { const u = JSON.parse(localStorage.getItem("user") || "{}"); setUser(u); const r = normalizeRole(u?.role || u?.role_equivalente || u?.perfil_slug || "funcionario"); setRole(r); const saved = localStorage.getItem(`${moduleId}_tab`) || "home"; const allowed = ROLE_PERMISSIONS[r] || ROLE_PERMISSIONS["funcionario"]; if (allowed.includes("*") || allowed.includes(saved)) setActiveTab(saved); else setActiveTab("home"); } catch { setUser({}); } }, [moduleId, router]);
-    useEffect(() => { if (!user?.nome) return; setShowWelcome(true); const t = setTimeout(() => setShowWelcome(false), 3200); return () => clearTimeout(t); }, [user]);
+    // auth + role
+    useEffect(() => {
+      const token = localStorage.getItem("access_token");
+      if (!token) { router.push("/login"); return; }
+      try {
+        const u = JSON.parse(localStorage.getItem("user") || "{}");
+        setUser(u);
+        const r = normalizeRole(u?.role || u?.role_equivalente || u?.perfil_slug || "funcionario");
+        setRole(r);
+        const saved = localStorage.getItem(`${moduleId}_tab`) || "home";
+        const allowed = ROLE_PERMISSIONS[r] || ROLE_PERMISSIONS["funcionario"];
+        if (allowed.includes("*") || allowed.includes(saved)) setActiveTab(saved);
+        else setActiveTab("home");
+      } catch { setUser({}); }
+    }, [moduleId, router]);
+
+    useEffect(() => {
+      if (!user?.nome) return;
+      setShowWelcome(true);
+      const t = setTimeout(() => setShowWelcome(false), 3200);
+      return () => clearTimeout(t);
+    }, [user]);
+
+    // carrega empresa na modal + sync com context
+    useEffect(() => {
+        if (empresa) {
+            setEmpresaData((prev:any) => ({...prev,...empresa, companyName: empresa.nome_fantasia || empresa.companyName}));
+        }
+    }, [empresa]);
 
     useEffect(() => {
         if (!showConfig) return;
@@ -71,7 +120,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                     const d = await res.json();
                     setEmpresaData({
                         id: d.id,
-                        companyName: d.nome_fantasia || d.companyName || "",
+                        companyName: d.nome_fantasia || "",
                         nome_fantasia: d.nome_fantasia,
                         nif: d.nif || "",
                         email: d.email || "",
@@ -87,9 +136,50 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                         image_url: d.image_url || ""
                     })
                 }
-            } catch { }
-        }; load();
-    }, [showConfig]);
+            } catch {}
+        };
+        if(!empresa) load();
+    }, [showConfig, empresa]);
+
+    // realtime listeners para header
+    useEffect(() => {
+        const onEmpresaUpdate = (e:any) => {
+            const detail = e.detail || {};
+            if(detail?.logo_url || detail?.nome_fantasia) {
+                if(refreshEmpresa) refreshEmpresa();
+                setEmpresaData((prev:any)=> prev? {...prev,...detail, companyName: detail.nome_fantasia || prev.companyName} : prev);
+            }
+        };
+        const onPedidoQr = (e:any) => {
+            const newCount = e.detail?.length?? (pedidosCount+1);
+            // se for evento de lista, usa length, se for unitário, incrementa
+            if(Array.isArray(e.detail)) {
+                setPedidosCount(e.detail.length);
+                prevCountRef.current = e.detail.length;
+            } else {
+                setPedidosCount(c=> c+1);
+            }
+        };
+        const onPedidoAprovado = (e:any) => {
+            setPedidosCount(c => Math.max(0, c-1));
+            prevCountRef.current = Math.max(0, prevCountRef.current-1);
+        };
+
+        window.addEventListener("empresa:updated" as any, onEmpresaUpdate);
+        window.addEventListener("empresa:update" as any, onEmpresaUpdate);
+        window.addEventListener("pedido_qr:novo" as any, onPedidoQr);
+        window.addEventListener("pedido-qr:aprovado" as any, onPedidoAprovado);
+        window.addEventListener("pedido-qr:recusado" as any, onPedidoAprovado);
+        window.addEventListener("pedido_qr:remover" as any, onPedidoAprovado);
+        return () => {
+            window.removeEventListener("empresa:updated" as any, onEmpresaUpdate);
+            window.removeEventListener("empresa:update" as any, onEmpresaUpdate);
+            window.removeEventListener("pedido_qr:novo" as any, onPedidoQr);
+            window.removeEventListener("pedido-qr:aprovado" as any, onPedidoAprovado);
+            window.removeEventListener("pedido-qr:recusado" as any, onPedidoAprovado);
+            window.removeEventListener("pedido_qr:remover" as any, onPedidoAprovado);
+        };
+    }, [refreshEmpresa, pedidosCount]);
 
     const handleSaveEmpresa = async (data: any) => {
         setSavingEmpresa(true);
@@ -97,14 +187,20 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
             const token = localStorage.getItem("access_token");
             const fd = new FormData();
             ["nome_fantasia", "nif", "email", "phone", "address", "city", "province", "iban", "iban2", "banco1", "banco2"].forEach(k => {
-                const val = k === "nome_fantasia" ? (data.companyName || data.nome_fantasia) : data[k];
-                if (val && String(val).trim() !== "") fd.append(k, String(val).trim())
+                const val = k === "nome_fantasia"? (data.companyName || data.nome_fantasia) : data[k];
+                if (val && String(val).trim()!== "") fd.append(k, String(val).trim())
             });
             if (data.logoFile) fd.append("logo", data.logoFile);
+            if (data.bannerFile) fd.append("banner", data.bannerFile);
             const res = await fetch(`${API_BASE}/empresas/${data.id || empresaData.id}`, { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: fd });
             if (!res.ok) { const err = await res.text(); throw new Error(err) }
             const updated = await res.json();
-            setEmpresaData((prev: any) => ({ ...prev, ...updated, companyName: updated.nome_fantasia }));
+            setEmpresaData((prev: any) => ({...prev,...updated, companyName: updated.nome_fantasia }));
+            if(refreshEmpresa) await refreshEmpresa();
+            else {
+                localStorage.setItem("empresa_data", JSON.stringify(updated));
+                window.dispatchEvent(new CustomEvent("empresa:updated", { detail: updated }));
+            }
             setShowConfig(false);
             pushToast(`Empresa ${updated.nome_fantasia || data.companyName} atualizada com sucesso!`, 'success');
         } catch (e: any) {
@@ -112,29 +208,62 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
         } finally { setSavingEmpresa(false) }
     }
 
+    // pedidos count inicial + fallback polling leve
     useEffect(() => {
-        audioRef.current = new Audio("/sounds/new-order.wav"); audioRef.current.volume = 0.8;
-        const fetchPedidosCount = async () => { try { const token = localStorage.getItem("access_token") || ""; const u = JSON.parse(localStorage.getItem("user") || "{}"); const emp = u.empresa_id || localStorage.getItem("empresa_id") || ""; if (!emp) return; const r = await fetch(`${API_URL}/api/v1/pedidos-qr/pendentes`, { headers: { Authorization: `Bearer ${token}`, "X-Empresa-ID": emp }, cache: "no-store" as any }); if (!r.ok) return; const data = await r.json(); const newCount = Array.isArray(data) ? data.length : 0; if (!isFirstLoad.current && newCount > prevCountRef.current) { audioRef.current?.play().catch(() => { }); if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } prevCountRef.current = newCount; setPedidosCount(newCount); isFirstLoad.current = false; } catch { } };
-        fetchPedidosCount(); const interval = setInterval(fetchPedidosCount, 4000);
-        const onAprovado = (e: any) => { const id = e.detail?.id; if (id) { setPedidosCount(c => Math.max(0, c - 1)); prevCountRef.current = Math.max(0, prevCountRef.current - 1); } else fetchPedidosCount(); };
-        window.addEventListener("pedido-qr:aprovado" as any, onAprovado); window.addEventListener("pedido-qr:recusado" as any, onAprovado);
-        return () => { clearInterval(interval); window.removeEventListener("pedido-qr:aprovado" as any, onAprovado); window.removeEventListener("pedido-qr:recusado" as any, onAprovado); };
+        audioRef.current = new Audio("/sounds/new-order.wav");
+        audioRef.current.volume = 0.8;
+        const fetchPedidosCount = async () => {
+          try {
+            const token = localStorage.getItem("access_token") || "";
+            const u = JSON.parse(localStorage.getItem("user") || "{}");
+            const emp = u.empresa_id || localStorage.getItem("empresa_id") || "";
+            if (!emp) return;
+            const r = await fetch(`${API_URL}/api/v1/pedidos-qr/pendentes`, { headers: { Authorization: `Bearer ${token}`, "X-Empresa-ID": emp }, cache: "no-store" as any });
+            if (!r.ok) return;
+            const data = await r.json();
+            const newCount = Array.isArray(data)? data.length : 0;
+            if (!isFirstLoad.current && newCount > prevCountRef.current) {
+              audioRef.current?.play().catch(() => {});
+              if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            }
+            prevCountRef.current = newCount;
+            setPedidosCount(newCount);
+            isFirstLoad.current = false;
+          } catch {}
+        };
+        fetchPedidosCount();
+        const interval = setInterval(fetchPedidosCount, 15000); // agora 15s só fallback, realtime faz o resto
+        return () => { clearInterval(interval); };
     }, []);
-    useEffect(() => { localStorage.setItem(`${moduleId}_tab`, activeTab); setSearchTab(activeTab); setSearch(""); if (activeTab === "vendas") { const token = localStorage.getItem("access_token"); fetch(`${API_BASE}/caixa/status`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).then(d => { if (!d.aberto) setActiveTab("caixa"); }).catch(() => setActiveTab("caixa")); } }, [activeTab, moduleId, setSearchTab, setSearch]);
-    const can = useMemo(() => (tab: string) => { const a = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS["funcionario"]; return a.includes("*") || a.includes(tab); }, [role]);
-    useEffect(() => { if (role && !can(activeTab)) setActiveTab("home"); }, [role, activeTab, can]);
+
+    useEffect(() => {
+      localStorage.setItem(`${moduleId}_tab`, activeTab);
+      setSearchTab(activeTab);
+      setSearch("");
+      if (activeTab === "vendas") {
+        getCaixaStatus().then((d:any)=> { if (!d.aberto) setActiveTab("caixa"); }).catch(()=> setActiveTab("caixa"));
+      }
+    }, [activeTab, moduleId, setSearchTab, setSearch]);
+
+    const can = useMemo(() => (tab: string) => {
+      const a = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS["funcionario"];
+      return a.includes("*") || a.includes(tab);
+    }, [role]);
+
+    useEffect(() => { if (role &&!can(activeTab)) setActiveTab("home"); }, [role, activeTab, can]);
+
     const logout = () => { localStorage.clear(); router.push("/login"); };
     const isVendasOpen = activeTab === "vendas";
     const meta = TAB_META[activeTab] || { title: "Painel", desc: "Visão geral" };
-    const headerTitle = showWelcome ? `Bem-vindo, ${user?.nome || empresa?.nome_fantasia || "Francisco Dala"}!` : meta.title;
-    const headerDesc = showWelcome ? `Explore as informações e atividades do seu restaurante` : meta.desc;
+    const headerTitle = showWelcome? `Bem-vindo, ${user?.nome || empresa?.nome_fantasia || "Francisco Dala"}!` : meta.title;
+    const headerDesc = showWelcome? `Explore as informações e atividades do seu restaurante` : meta.desc;
 
     return (
         <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId, role, can, pedidosCount, setPedidosCount }}>
             <div className="h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-0 md:p-[14px] md:gap-[14px]" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
                 <Toasts toasts={toasts} setToasts={setToasts} />
                 <div className="hidden md:flex shrink-0"><Sidebar activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} onOpenConfig={() => setShowConfig(true)} /></div>
-                {!isVendasOpen && (<div className={`fixed inset-0 z-[300] md:hidden transition ${isMobileOpen ? "visible" : "invisible"}`}><div className={`absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity ${isMobileOpen ? "opacity-100" : "opacity-0"}`} onClick={() => setIsMobileOpen(false)} /><div className={`absolute left-0 top-0 h-full w-[84%] max-w-[330px] bg-[#EDEBE6] p-4 shadow-[8px_0_30px_rgba(0,0,0,0.15)] transition-transform duration-300 overflow-y-auto no-scrollbar ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}`}><div className="flex justify-between items-center mb-6"><div className="flex items-center gap-2">{empresaLogo ? <img src={empresaLogo} className="w-8 h-8 rounded-full object-cover border" /> : <div className="w-8 h-8 bg-black text-white rounded-full grid place-items-center text-[10px] font-black">JD</div>}<div className="leading-none"><p className="text-[12px] font-black truncate">{empresa?.nome_fantasia || "Menu"}</p><p className="text-[10px] text-[#8A8A8A] capitalize">{role.replace('_', ' ')}</p></div></div><button onClick={() => setIsMobileOpen(false)} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center active:scale-95"><X size={16} /></button></div><Sidebar isMobile={true} activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} onOpenConfig={() => { setIsMobileOpen(false); setShowConfig(true) }} /></div></div>)}
+                {!isVendasOpen && (<div className={`fixed inset-0 z-[300] md:hidden transition ${isMobileOpen? "visible" : "invisible"}`}><div className={`absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity ${isMobileOpen? "opacity-100" : "opacity-0"}`} onClick={() => setIsMobileOpen(false)} /><div className={`absolute left-0 top-0 h-full w-[84%] max-w-[330px] bg-[#EDEBE6] p-4 shadow-[8px_0_30px_rgba(0,0,0,0.15)] transition-transform duration-300 overflow-y-auto no-scrollbar ${isMobileOpen? "translate-x-0" : "-translate-x-full"}`}><div className="flex justify-between items-center mb-6"><div className="flex items-center gap-2">{empresaLogo? <img src={empresaLogo} className="w-8 h-8 rounded-full object-cover border" /> : <div className="w-8 h-8 bg-black text-white rounded-full grid place-items-center text-[10px] font-black">JD</div>}<div className="leading-none"><p className="text-[12px] font-black truncate">{empresa?.nome_fantasia || "Menu"}</p><p className="text-[10px] text-[#8A8A8A] capitalize">{role.replace('_', ' ')}</p></div></div><button onClick={() => setIsMobileOpen(false)} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center active:scale-95"><X size={16} /></button></div><Sidebar isMobile={true} activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} onOpenConfig={() => { setIsMobileOpen(false); setShowConfig(true) }} /></div></div>)}
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                     {!isVendasOpen && (
                         <div className="flex items-center justify-between gap-3 px-4 md:px-0 py-3 shrink-0 bg-[#EDEBE6] md:bg-transparent border-b md:border-0 border-black/5">
@@ -150,15 +279,12 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                                     </div>
                                 </div>
                                 <button className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5 text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED] transition active:scale-95"><MessageCircle size={20} strokeWidth={2} /></button>
-
                                 <div className="relative">
-                                    <button id="btn-notif" onClick={() => setShowNotifications(v => !v)} className={`relative w-11 h-11 rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5 transition active:scale-95 ${showNotifications ? 'bg-black text-white' : 'bg-white text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED]'}`}><Bell size={20} strokeWidth={2} />{pedidosCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#EDEBE6] animate-pulse">{pedidosCount > 9 ? "9+" : pedidosCount}</span>}</button>
+                                    <button id="btn-notif" onClick={() => setShowNotifications(v =>!v)} className={`relative w-11 h-11 rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5 transition active:scale-95 ${showNotifications? 'bg-black text-white' : 'bg-white text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED]'}`}><Bell size={20} strokeWidth={2} />{pedidosCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#EDEBE6] animate-pulse">{pedidosCount > 9? "9+" : pedidosCount}</span>}</button>
                                     <NotificationsModal open={showNotifications} onClose={() => setShowNotifications(false)} pedidosCount={pedidosCount} onGoPedidos={() => setActiveTab("pedidos")} />
                                 </div>
-
-                                {/* LOGO DA EMPRESA NO HEADER */}
                                 <div className="bg-white rounded-full pl-1 pr-3 py-1 flex items-center gap-2 shadow-[0_1px_6px_rgba(0,0,0,0.05)] h-11 ml-1 border border-black/5">
-                                    {empresaLogo ? (
+                                    {empresaLogo? (
                                         <img src={empresaLogo} className="w-8 h-8 rounded-full object-cover" alt="logo empresa" />
                                     ) : (
                                         <div className="w-8 h-8 rounded-full bg-black text-white grid place-items-center text-[10px] font-black">{empresa?.nome_fantasia?.[0] || user?.nome?.[0] || "F"}</div>

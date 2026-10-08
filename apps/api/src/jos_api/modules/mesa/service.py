@@ -1,20 +1,55 @@
 import uuid
 import secrets
+import asyncio
+import logging
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from.models import Mesa, MesaReserva, MesaStatus, ReservaStatus
+from jos_api.core.realtime import manager
+
+logger = logging.getLogger(__name__)
 
 def _gen_token():
-    return secrets.token_urlsafe(6).upper()[:8] # ex: A8F3K9
+    return secrets.token_urlsafe(6).upper()[:8]
+
+def _safe_iso(dt):
+    if dt is None:
+        return None
+    try:
+        return dt.isoformat()
+    except:
+        return str(dt) if dt else None
+
+def _broadcast_safe(empresa_id, payload: dict):
+    try:
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(manager.broadcast(str(empresa_id), payload))
+        except RuntimeError:
+            asyncio.run(manager.broadcast(str(empresa_id), payload))
+    except Exception as e:
+        logger.warning(f"[WS] mesa broadcast fail {e} {payload.get('type')}")
 
 def _to_dict(m):
     return {
-        "id": m.id, "empresa_id": m.empresa_id, "numero": m.numero, "capacidade": m.capacidade,
-        "zona": m.zona, "status": m.status, "venda_atual_id": m.venda_atual_id,
-        "garcom_id": m.garcom_id, "aberta_em": m.aberta_em, "pessoas_atual": m.pessoas_atual or 0,
-        "pos_x": m.pos_x or 0, "pos_y": m.pos_y or 0, "ativa": m.ativa,
-        "qr_token": getattr(m, 'qr_token', None), "created_at": m.created_at, "updated_at": m.updated_at,
+        "id": m.id,
+        "empresa_id": m.empresa_id,
+        "numero": m.numero,
+        "capacidade": m.capacidade,
+        "zona": m.zona,
+        "status": m.status,
+        "venda_atual_id": m.venda_atual_id,
+        "garcom_id": m.garcom_id,
+        "aberta_em": m.aberta_em,
+        "pessoas_atual": m.pessoas_atual or 0,
+        "pos_x": m.pos_x or 0,
+        "pos_y": m.pos_y or 0,
+        "ativa": m.ativa,
+        "qr_token": getattr(m, 'qr_token', None),
+        "qr_token_criado_em": getattr(m, 'qr_token_criado_em', None),
+        "created_at": m.created_at,
+        "updated_at": m.updated_at,
     }
 
 def list_mesas(db: Session, empresa_id: uuid.UUID, status: str = "", zona: str = "", search: str = ""):
@@ -54,6 +89,10 @@ def create_mesa(db: Session, empresa_id: uuid.UUID, data: dict):
     data["numero"] = data["numero"].upper().strip()
     mesa = Mesa(empresa_id=empresa_id, **data)
     db.add(mesa); db.commit(); db.refresh(mesa)
+    try:
+        status_val = mesa.status.value if hasattr(mesa.status, 'value') else str(mesa.status)
+        _broadcast_safe(empresa_id, {"type": "mesa:update", "data": {"id": str(mesa.id), "numero": mesa.numero, "status": status_val, "acao": "created"}})
+    except: pass
     return mesa
 
 def reservar(db: Session, empresa_id: uuid.UUID, payload):
@@ -63,6 +102,7 @@ def reservar(db: Session, empresa_id: uuid.UUID, payload):
     reserva = MesaReserva(empresa_id=empresa_id, mesa_id=payload.mesa_id, cliente_nome=payload.cliente_nome, cliente_telefone=payload.cliente_telefone, pessoas=payload.pessoas, data_reserva=payload.data_reserva)
     mesa.status = MesaStatus.RESERVADA
     db.add(reserva); db.commit(); db.refresh(reserva)
+    _broadcast_safe(empresa_id, {"type": "mesa:update", "data": {"id": str(mesa.id), "numero": mesa.numero, "status": "RESERVADA"}})
     return reserva
 
 def ocupar(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID, venda_id: uuid.UUID | None, garcom_id: uuid.UUID | None, pessoas: int | None = None):
@@ -75,10 +115,10 @@ def ocupar(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID, venda_id: uui
     mesa.garcom_id = garcom_id
     mesa.aberta_em = datetime.utcnow()
     mesa.pessoas_atual = pessoas or mesa.capacidade
-    # GERA TOKEN NOVO
     mesa.qr_token = _gen_token()
     mesa.qr_token_criado_em = datetime.utcnow()
     db.commit(); db.refresh(mesa)
+    _broadcast_safe(empresa_id, {"type": "mesa:update", "data": {"id": str(mesa.id), "numero": mesa.numero, "status": "OCUPADA", "venda_atual_id": str(mesa.venda_atual_id) if mesa.venda_atual_id else None, "qr_token": mesa.qr_token}})
     return mesa
 
 def liberar(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID, limpar: bool = False):
@@ -89,10 +129,11 @@ def liberar(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID, limpar: bool
     mesa.garcom_id = None
     mesa.aberta_em = None
     mesa.pessoas_atual = 0
-    # EXPIRA TOKEN
     mesa.qr_token = None
     mesa.qr_token_criado_em = None
     db.commit(); db.refresh(mesa)
+    status_val = mesa.status.value if hasattr(mesa.status, 'value') else str(mesa.status)
+    _broadcast_safe(empresa_id, {"type": "mesa:update", "data": {"id": str(mesa.id), "numero": mesa.numero, "status": status_val}})
     return mesa
 
 def rotacionar_token(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID):
@@ -101,7 +142,16 @@ def rotacionar_token(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID):
     mesa.qr_token = _gen_token()
     mesa.qr_token_criado_em = datetime.utcnow()
     db.commit(); db.refresh(mesa)
-    return mesa
+    try:
+        status_val = mesa.status.value if hasattr(mesa.status, 'value') else str(mesa.status)
+        _broadcast_safe(empresa_id, {"type": "mesa:update", "data": {"id": str(mesa.id), "numero": mesa.numero, "qr_token": mesa.qr_token, "status": status_val}})
+    except: pass
+    return {
+        "id": str(mesa.id),
+        "numero": mesa.numero,
+        "qr_token": mesa.qr_token,
+        "qr_token_criado_em": _safe_iso(mesa.qr_token_criado_em)
+    }
 
 def update_mesa(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID, data: dict):
     mesa = db.query(Mesa).filter(Mesa.id == mesa_id, Mesa.empresa_id == empresa_id).first()
@@ -109,6 +159,10 @@ def update_mesa(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID, data: di
     for k,v in data.items():
         if v is not None: setattr(mesa, k, v)
     db.commit(); db.refresh(mesa)
+    try:
+        status_val = mesa.status.value if hasattr(mesa.status, 'value') else str(mesa.status)
+        _broadcast_safe(empresa_id, {"type": "mesa:update", "data": {"id": str(mesa.id), "numero": mesa.numero, "status": status_val}})
+    except: pass
     return mesa
 
 def delete_mesa(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID):
@@ -116,6 +170,7 @@ def delete_mesa(db: Session, empresa_id: uuid.UUID, mesa_id: uuid.UUID):
     if not mesa: raise ValueError("Mesa não encontrada")
     mesa.ativa = False
     db.commit()
+    _broadcast_safe(empresa_id, {"type": "mesa:update", "data": {"id": str(mesa.id), "deleted": True}})
     return True
 
 def zonas_lista(db: Session, empresa_id: uuid.UUID):

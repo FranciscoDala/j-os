@@ -1,6 +1,9 @@
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const BASE = `${API_URL}/api/v1`;
-export const WS_URL = API_URL.replace(/^http/, "ws") + "/api/v1/realtime/ws";
+
+// WSS - corrige http->ws e https->wss
+export const WS_URL = API_URL.replace(/^https/, "wss").replace(/^http/, "ws") + "/api/v1/realtime/ws";
+
 import type { Empresa } from "./types";
 
 function getAuthHeaders(): Record<string, string> {
@@ -49,7 +52,7 @@ export const getEmpresa = (id: string): Promise<Empresa> => apiFetch(`/empresas/
 export const getEntidades = (empresa_id: string, tipo?: string) => apiFetch(`/entidades/${empresa_id}${tipo? `?tipo=${tipo}` : ''}`);
 export const getPerfis = (empresa_id: string) => apiFetch(`/entidades/${empresa_id}/perfis`);
 
-// STORAGE TIPADO
+// STORAGE
 export const getEmpresaData = (): Empresa | null => {
     if (typeof window === 'undefined') return null;
     try { return JSON.parse(localStorage.getItem("empresa_data") || "null"); } catch { return null; }

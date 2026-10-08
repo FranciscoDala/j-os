@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { X, Plus, CheckCircle, AlertTriangle, Info, ChevronDown } from "lucide-react";
 import { ProdutoCard } from "./cards/produto";
 import { ProdutoDeleteModal } from "./modals/apagar";
@@ -74,7 +74,7 @@ export function ProdutosTab() {
         prep_time: "", kitchen_station: "", is_modifiable: false, service_duration: "", imagem_url: ""
     });
 
-    const fetchProds = async () => {
+    const fetchProds = useCallback(async () => {
         try {
             const qs = new URLSearchParams({ skip: "0", limit: "20", search: globalSearch, categoria: cat });
             const r = await fetch(`${API_BASE}/?${qs}`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
@@ -82,18 +82,71 @@ export function ProdutosTab() {
             if (r.ok) { setItems(data.items || []); setTotal(data.total || 0); }
             else { if (r.status === 403) pushToast(data.detail || "Empresa inválida", "error"); else pushToast(data.detail || "Erro ao listar", "error"); }
         } catch { pushToast("Falha de conexão ao listar produtos", "error") }
-    };
-    const fetchCats = async () => { try { const r = await fetch(`${API_BASE}/categorias/lista`, { headers: getAuthHeaders() as any, cache: "no-store" as any }); if (r.ok) setCats(await r.json()); } catch {} };
-    useEffect(() => { fetchProds(); fetchCats(); }, [globalSearch, cat]);
+    }, [globalSearch, cat]);
+
+    const fetchCats = useCallback(async () => { try { const r = await fetch(`${API_BASE}/categorias/lista`, { headers: getAuthHeaders() as any, cache: "no-store" as any }); if (r.ok) setCats(await r.json()); } catch {} }, []);
+
+    useEffect(() => { fetchProds(); fetchCats(); }, [fetchProds, fetchCats]);
 
     useEffect(() => {
-        const onUpdate = (e: any) => { const p = e.detail; if (!p?.id) return; setItems(prev => { const exists = prev.some(x => x.id === p.id); if (!exists) return prev; return prev.map(x => x.id === p.id? {...x,...p } : x); }); };
-        const onCreated = (e: any) => { const p = e.detail; if (!p?.id) return; if (!globalSearch && (!cat || (p.categoria || "").toLowerCase() === cat.toLowerCase())) { setItems(prev => { if (prev.some(x => x.id === p.id)) return prev; return [p,...prev].slice(0, 20); }); setTotal(t => t + 1); } };
-        const onVenda = (e: any) => { const venda = e.detail; const itens = venda?.itens || venda?.data?.itens || venda?.produtos || []; if (!itens.length) return; itens.forEach((it: any) => { const pid = it.produto_id || it.produto?.id || it.id; const qtd = Number(it.quantidade || 1); setItems(prev => prev.map(p => p.id === pid && p.controlar_stock? {...p, stock_atual: Number(p.stock_atual || 0) - qtd } : p)); }); };
-        const onDelete = (e: any) => { const d = e.detail; const id = d?.id || d?.produto_id; if (!id) return; setItems(prev => prev.filter(x => x.id!== id)); setTotal(t => Math.max(0, t - 1)); };
-        window.addEventListener("produto:update" as any, onUpdate); window.addEventListener("produto:atualizado" as any, onUpdate); window.addEventListener("produto:created" as any, onCreated); window.addEventListener("produto:deleted" as any, onDelete); window.addEventListener("venda:nova" as any, onVenda); window.addEventListener("venda:fechada" as any, onVenda);
-        return () => { window.removeEventListener("produto:update" as any, onUpdate); window.removeEventListener("produto:atualizado" as any, onUpdate); window.removeEventListener("produto:created" as any, onCreated); window.removeEventListener("produto:deleted" as any, onDelete); window.removeEventListener("venda:nova" as any, onVenda); window.removeEventListener("venda:fechada" as any, onVenda); };
-    }, [globalSearch, cat]);
+        const getData = (e:any) => e.detail?.data || e.detail;
+
+        const onUpdate = (e: any) => {
+            const p = getData(e);
+            if (!p?.id) return;
+            setItems(prev => prev.map(x => x.id === p.id? {...x,...p } : x));
+        };
+        const onCreated = (e: any) => {
+            const p = getData(e);
+            if (!p?.id) { fetchProds(); return; }
+            if (!globalSearch && (!cat || (p.categoria || "").toLowerCase() === cat.toLowerCase())) {
+                setItems(prev => { if (prev.some(x => x.id === p.id)) return prev; return [p,...prev].slice(0, 20); });
+                setTotal(t => t + 1);
+                if (p.categoria &&!cats.includes(p.categoria)) setCats(c=> [...c, p.categoria]);
+            } else {
+                fetchProds();
+            }
+        };
+        const onVenda = (e: any) => {
+            const venda = getData(e);
+            const itens = venda?.itens || venda?.data?.itens || venda?.produtos || [];
+            if (!itens.length) { fetchProds(); return; }
+            itens.forEach((it: any) => {
+                const pid = it.produto_id || it.produto?.id || it.id;
+                const qtd = Number(it.quantidade || 1);
+                setItems(prev => prev.map(p => p.id === pid && p.controlar_stock? {...p, stock_atual: Number(p.stock_atual || 0) - qtd } : p));
+            });
+        };
+        const onDelete = (e: any) => {
+            const d = getData(e);
+            const id = d?.id || d?.produto_id;
+            if (!id) { fetchProds(); return; }
+            setItems(prev => prev.filter(x => x.id!== id));
+            setTotal(t => Math.max(0, t - 1));
+        };
+
+        window.addEventListener("produto:update" as any, onUpdate);
+        window.addEventListener("produto:atualizado" as any, onUpdate);
+        window.addEventListener("produto.updated" as any, onUpdate);
+        window.addEventListener("produto:created" as any, onCreated);
+        window.addEventListener("stock.updated" as any, onUpdate);
+        window.addEventListener("produto:deleted" as any, onDelete);
+        window.addEventListener("venda:nova" as any, onVenda);
+        window.addEventListener("venda:fechada" as any, onVenda);
+        window.addEventListener("venda:update" as any, onVenda);
+
+        return () => {
+            window.removeEventListener("produto:update" as any, onUpdate);
+            window.removeEventListener("produto:atualizado" as any, onUpdate);
+            window.removeEventListener("produto.updated" as any, onUpdate);
+            window.removeEventListener("produto:created" as any, onCreated);
+            window.removeEventListener("stock.updated" as any, onUpdate);
+            window.removeEventListener("produto:deleted" as any, onDelete);
+            window.removeEventListener("venda:nova" as any, onVenda);
+            window.removeEventListener("venda:fechada" as any, onVenda);
+            window.removeEventListener("venda:update" as any, onVenda);
+        };
+    }, [globalSearch, cat, cats, fetchProds]);
 
     const genCode = () => `P-${Date.now().toString().slice(-6)}`;
     const resetForm = () => { setForm({ nome: "", codigo: genCode(), preco_venda: "", preco_custo: "0", tipo: "RESTAURANT_DISH", unidade: "UNIT", categoria: "", descricao: "", codigo_barras: "", codigo_qr: "", iva: "0", tem_iva: false, peso: "", ativo: true, controlar_stock: true, allow_negative: false, stock_atual: "0", stock_minimo: "0", prep_time: "", kitchen_station: "", is_modifiable: false, service_duration: "", imagem_url: "" }); setImgFile(null); setPreview(""); setEditId(null); setTab("Geral"); };
@@ -111,7 +164,14 @@ export function ProdutosTab() {
     };
     const confirmDelete = async () => {
         if(!canManage) return pushToast("Sem permissão", "error");
-        if (!deleteModal) return; const r = await fetch(`${API_BASE}/${deleteModal.id}`, { method: "DELETE", headers: getAuthHeaders() as any }); if (r.ok) { pushToast("Produto apagado", "success"); fetchProds(); setDeleteModal(null); } else pushToast("Erro ao apagar", "error");
+        if (!deleteModal) return;
+        const r = await fetch(`${API_BASE}/${deleteModal.id}`, { method: "DELETE", headers: getAuthHeaders() as any });
+        if (r.ok) {
+            pushToast("Produto apagado", "success");
+            setItems(prev=> prev.filter(x=> x.id!== deleteModal.id));
+            setTotal(t=> Math.max(0, t-1));
+            setDeleteModal(null);
+        } else pushToast("Erro ao apagar", "error");
     };
 
     return (

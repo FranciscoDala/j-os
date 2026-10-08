@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "J-OS"
@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     CLOUDINARY_CLOUD_NAME: str = "d7dtiurw"
     CLOUDINARY_API_KEY: str = "598914546743518"
     CLOUDINARY_API_SECRET: str = "GxBW2UtKsSr2nDDc0WwztUWU3w8"
+
+    # === FALTAVA ISSO ===
+    REDIS_URL: Optional[str] = None
 
     @property
     def origins_list(self) -> List[str]:

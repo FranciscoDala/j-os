@@ -30,20 +30,32 @@ def _get_caixa_aberto_dep(db: Session = Depends(get_db), current_user: User = De
     if not caixa: raise HTTPException(400, "Nenhum caixa aberto")
     return caixa
 
+#... seu código igual, só troca o ws_vendas por esse:
 @router.websocket("/ws")
 async def ws_vendas(ws: WebSocket, token: str = Query(...), db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         empresa_id = payload.get("empresa_id")
-        if not empresa_id: await ws.close(code=1008); return
-    except: await ws.close(code=1008); return
+        if not empresa_id:
+            await ws.close(code=1008)
+            return
+    except Exception as e:
+        print(f"[WS] token invalido: {e}")
+        await ws.close(code=1008)
+        return
     await manager.connect(str(empresa_id), ws)
     try:
         reservas = service.get_reservas_ativas(db, uuid.UUID(empresa_id))
         await ws.send_text(json.dumps({"type": "reserva:init", "data": [{"produto_id": str(r.produto_id), "user_id": str(r.user_id), "quantidade": str(r.quantidade)} for r in reservas]}, default=str))
-        while True: await ws.receive_text()
-    except WebSocketDisconnect: manager.disconnect(str(empresa_id), ws)
+        while True:
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(str(empresa_id), ws)
+    except Exception as e:
+        print(f"[WS] erro: {e}")
+        manager.disconnect(str(empresa_id), ws)
 
+        
 @router.post("/reservas")
 def reservar(dados: schemas.ReservaRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), x_empresa_id: str = Header(None, alias="X-Empresa-ID")):
     empresa_id = _get_empresa_id_from_user(current_user, x_empresa_id)
