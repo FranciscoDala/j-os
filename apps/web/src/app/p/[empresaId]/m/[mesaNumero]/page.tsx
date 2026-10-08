@@ -45,23 +45,21 @@ function PedirMesaInner() {
 
     const onTouchStart = (e: any) => {
         dragging.current = true;
-        const cx = e.touches? e.touches[0].clientX : e.clientX;
-        const cy = e.touches? e.touches[0].clientY : e.clientY;
+        const cx = e.touches?.[0].clientX?? e.clientX;
+        const cy = e.touches?.[0].clientY?? e.clientY;
         offset.current = { x: cx - pos.x, y: cy - pos.y };
     };
     const onTouchMove = (e: any) => {
         if (!dragging.current) return;
-        const cx = e.touches? e.touches[0].clientX : e.clientX;
-        const cy = e.touches? e.touches[0].clientY : e.clientY;
+        const cx = e.touches?.[0].clientX?? e.clientX;
+        const cy = e.touches?.[0].clientY?? e.clientY;
         setPos({ x: cx - offset.current.x, y: cy - offset.current.y });
     };
     const onTouchEnd = () => { dragging.current = false; };
 
     useEffect(() => {
         let viewport = document.querySelector('meta[name="viewport"]');
-        if (viewport) {
-            viewport.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0');
-        }
+        if (viewport) viewport.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0');
     }, []);
 
     const fetchCardapio = useCallback(async (isPolling = false) => {
@@ -69,7 +67,7 @@ function PedirMesaInner() {
         const effectiveToken = mesaQrToken || tokenParam;
         const url = `${API_URL}/api/v1/public/${empresaId}/cardapio?mesa=${mesaNumero}&t=${effectiveToken}`;
         try {
-            const r = await fetch(url);
+            const r = await fetch(url, { cache: "no-store" as any });
             const text = await r.text();
             let data: any = {};
             try { data = JSON.parse(text); } catch { }
@@ -77,15 +75,12 @@ function PedirMesaInner() {
             if (!r.ok) throw new Error(data.detail || "Cardápio não encontrado");
             if (data.mesa && data.mesa.token_valido === false) throw new Error("EXPIRADO");
 
-            if (data.mesa?.qr_token) {
-                setMesaQrToken(data.mesa.qr_token);
-            }
+            if (data.mesa?.qr_token) setMesaQrToken(data.mesa.qr_token);
             setMesaData(data.mesa || null);
 
+            // ATUALIZA STOCK SEMPRE
             setProdutos(data.produtos || []);
-            if (!isPolling) {
-                setCats(["All",...(data.categorias || [])]);
-            }
+            if (!isPolling) setCats(["All",...(data.categorias || [])]);
 
             if (data.mesa?.bloqueada &&!data.mesa?.venda_atual_id) {
                 setBloqueada(true);
@@ -94,7 +89,6 @@ function PedirMesaInner() {
                 setBloqueada(false);
                 if (!data.mesa?.ocupada_por_outro) setClienteBloqueio("");
             }
-
             setLoading(false);
             return data;
         } catch (e: any) {
@@ -111,16 +105,20 @@ function PedirMesaInner() {
         fetchCardapio(false);
     }, [fetchCardapio]);
 
+    // FIX: POLLING SEMPRE PARA ATUALIZAR STOCK DEPOIS DE VENDA
+    useEffect(() => {
+        const interval = setInterval(() => {
+            fetchCardapio(true);
+        }, 8000); // 8s atualiza stock
+        return () => clearInterval(interval);
+    }, [fetchCardapio]);
+
     useEffect(() => {
         if (!bloqueada &&!enviado) return;
         const interval = setInterval(() => {
             fetchCardapio(true).then(d => {
-                if (d &&!d.mesa?.bloqueada && enviado) {
-                    setEnviado(false);
-                }
-                if (d && d.mesa?.ocupada_por_outro && d.mesa?.bloqueada === false) {
-                    setBloqueada(false);
-                }
+                if (d &&!d.mesa?.bloqueada && enviado) setEnviado(false);
+                if (d && d.mesa?.ocupada_por_outro && d.mesa?.bloqueada === false) setBloqueada(false);
             });
         }, 4000);
         return () => clearInterval(interval);
@@ -136,28 +134,17 @@ function PedirMesaInner() {
         return "ok";
     };
 
-    // === SOMA AUTOMÁTICA IGUAL OUTRAS PAGES ===
     const add = (p: any) => {
         const state = getStockState(p);
         if (state === "zero" || p.ativo === false) return;
         setCart(prev => {
             const ex = prev.find(c => c.id === p.id);
-            if (ex) {
-                return prev.map(c => c.id === p.id? {...c, qtd: Number(c.qtd) + 1 } : c);
-            }
-            return [...prev, {
-                id: p.id,
-                nome: p.nome,
-                preco: Number(p.preco || p.preco_venda),
-                qtd: 1,
-                imagem_url: p.imagem_url || p.imagem
-            }];
+            if (ex) return prev.map(c => c.id === p.id? {...c, qtd: Number(c.qtd) + 1 } : c);
+            return [...prev, { id: p.id, nome: p.nome, preco: Number(p.preco || p.preco_venda), qtd: 1, imagem_url: p.imagem_url || p.imagem }];
         });
     };
 
-    const inc = (id: string) => {
-        setCart(prev => prev.map(c => c.id === id? {...c, qtd: Number(c.qtd) + 1 } : c));
-    };
+    const inc = (id: string) => setCart(prev => prev.map(c => c.id === id? {...c, qtd: Number(c.qtd) + 1 } : c));
     const dec = (id: string) => {
         setCart(prev => {
             const item = prev.find(c => c.id === id);
@@ -167,7 +154,6 @@ function PedirMesaInner() {
         });
     };
     const remove = (id: string) => setCart(prev => prev.filter(c => c.id!== id));
-
     const getQty = (id: string) => cart.find(c => c.id === id)?.qtd || 0;
 
     const handleCardTap = (p: any) => {
@@ -180,7 +166,6 @@ function PedirMesaInner() {
         }
     };
 
-    // === TOTAL COM MAP IGUAL VENDAS TAB ===
     const total = useMemo(() => {
         const map = new Map<string, any>();
         for (const c of cart) {
@@ -204,7 +189,6 @@ function PedirMesaInner() {
         setEnviando(true);
         try {
             const effectiveToken = mesaQrToken || tokenParam;
-            // === SOMA AUTOMÁTICA IGUAL BALCÃO/MESA ===
             const mapCart = new Map<string, any>();
             for (const c of cart) {
                 const key = String(c.id);
@@ -212,12 +196,7 @@ function PedirMesaInner() {
                 else mapCart.set(key, { id: c.id, qtd: Number(c.qtd || 1) });
             }
             const itensUnicos = Array.from(mapCart.values()).map((c: any) => ({ produto_id: c.id, quantidade: c.qtd }));
-
-            if (itensUnicos.length === 0) {
-                setErroModal("Toque 2x nos pratos para adicionar");
-                setEnviando(false);
-                return;
-            }
+            if (itensUnicos.length === 0) { setErroModal("Toque 2x nos pratos para adicionar"); setEnviando(false); return; }
 
             const r = await fetch(`${API_URL}/api/v1/public/${empresaId}/pedido`, {
                 method: "POST", headers: { "Content-Type": "application/json" },
@@ -233,10 +212,7 @@ function PedirMesaInner() {
             }
             if (!r.ok) {
                 try { const j = JSON.parse(txt); throw new Error(j.detail || txt); }
-                catch (e: any) {
-                    if (e.message && e.message!== txt) throw e;
-                    throw new Error(txt);
-                }
+                catch (e: any) { if (e.message && e.message!== txt) throw e; throw new Error(txt); }
             }
             setEnviado(true);
             setCart([]);
@@ -251,15 +227,9 @@ function PedirMesaInner() {
     if (expirado) return (
         <div className="min-h-[100dvh] flex items-center justify-center bg-[#F0F9FF] p-6">
             <div className="bg-white/90 backdrop-blur-xl rounded-[24px] p-6 shadow-[0_20px_60px_rgba(14,165,233,0.15)] border border-white max-w-[340px] w-full text-center">
-                <div className="w-14 h-14 bg-gradient-to-br from-sky-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-sky-200">
-                    <QrCode size={22} className="text-sky-600" />
-                </div>
+                <div className="w-14 h-14 bg-gradient-to-br from-sky-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-sky-200"><QrCode size={22} className="text-sky-600" /></div>
                 <h1 className="font-black text-[13px] text-zinc-900 leading-tight">Mesa {mesaLabel} encerrada</h1>
                 <p className="text-[11px] text-zinc-500 mt-2 leading-[1.4]">Este link expirou porque a conta foi fechada ou a mesa foi liberada.</p>
-                <div className="mt-4 bg-sky-50 border border-sky-100 rounded-xl p-2.5 flex items-center gap-2 text-left">
-                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm"><Clock3 size={14} className="text-sky-600" /></div>
-                    <div><p className="text-[11px] font-bold text-zinc-800">O que fazer?</p><p className="text-[10px] text-zinc-500">Escaneie novamente o QR</p></div>
-                </div>
             </div>
         </div>
     );
@@ -267,29 +237,9 @@ function PedirMesaInner() {
     if (mesaData?.ocupada_por_outro) return (
         <div className="min-h-[100dvh] flex items-center justify-center bg-[#F0F9FF] p-6 text-center">
             <div className="bg-white rounded-[24px] p-6 shadow-[0_20px_60px_rgba(14,165,233,0.15)] max-w-[360px] w-full border border-white">
-                <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-200">
-                    <Users size={22} className="text-orange-600" />
-                </div>
-                <h1 className="font-black text-[13px] text-zinc-900 leading-tight">Mesa {mesaLabel} ocupada</h1>
-                <p className="text-[11px] text-zinc-600 mt-2 leading-[1.4]">Essa mesa está com pedido de <b>{mesaData.cliente_atual || clienteBloqueio}</b> aguardando aprovação do garçom.</p>
-                <p className="text-[10px] text-zinc-400 mt-2">Procure outra mesa livre ou aguarde liberar.</p>
-                {mesaData.mesas_livres && mesaData.mesas_livres.length > 0 && (
-                    <div className="mt-5 text-left">
-                        <p className="text-[10px] font-black text-zinc-700 mb-2">Mesas livres agora:</p>
-                        <div className="grid grid-cols-3 gap-2">
-                            {mesaData.mesas_livres.map((m: any) => (
-                                <button key={m.numero} onClick={() => router.push(`/pedir/${empresaId}/${m.numero}`)} className="bg-[#F5F7FB] hover:bg-black hover:text-white border border-zinc-100 rounded-xl p-2.5 transition-all active:scale-[0.97]">
-                                    <p className="font-black text-[12px]">{m.numero}</p>
-                                    <p className="text-[9px] opacity-70">{m.capacidade}p {m.zona? `• ${m.zona}` : ''}</p>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                <div className="mt-5 bg-orange-50 border border-orange-100 rounded-xl p-3 flex items-center gap-2.5 text-left">
-                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm"><Clock3 size={14} className="text-orange-600" /></div>
-                    <div className="flex-1"><p className="text-[11px] font-bold text-zinc-800">Dica</p><p className="text-[10px] text-zinc-500">Se você é do mesmo grupo, aguarde o garçom aprovar que todos poderão pedir junto</p></div>
-                </div>
+                <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-200"><Users size={22} className="text-orange-600" /></div>
+                <h1 className="font-black text-[13px] text-zinc-900">Mesa {mesaLabel} ocupada</h1>
+                <p className="text-[11px] text-zinc-600 mt-2">Essa mesa está com pedido de <b>{mesaData.cliente_atual || clienteBloqueio}</b> aguardando aprovação.</p>
             </div>
         </div>
     );
@@ -298,15 +248,8 @@ function PedirMesaInner() {
         <div className="min-h-[100dvh] flex items-center justify-center bg-[#F0F9FF] p-6 text-center">
             <div className="bg-white rounded-[24px] p-6 shadow-[0_20px_60px_rgba(14,165,233,0.15)] max-w-[340px] w-full border border-white">
                 <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-200 animate-pulse"><Hourglass size={22} className="text-amber-600" /></div>
-                <h1 className="font-black text-[13px] text-zinc-900 leading-tight">Pedido em análise</h1>
-                <p className="text-[11px] text-zinc-600 mt-2 leading-[1.4]">Mesa <b>{mesaLabel}</b> aguardando garçom aprovar o pedido de <b>{clienteBloqueio || nome || "você"}</b>.</p>
-                <p className="text-[10px] text-zinc-400 mt-2">Depois que aprovar, você e seus amigos poderão mandar vários pedidos juntos na mesma conta.</p>
-                <div className="mt-5 bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-center gap-2.5 text-left">
-                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm"><Clock3 size={14} className="text-amber-600" /></div>
-                    <div className="flex-1"><p className="text-[11px] font-bold text-zinc-800">Atualizando automaticamente</p><p className="text-[10px] text-zinc-500">Vamos liberar assim que aprovar</p></div>
-                    <div className="w-5 h-5 border-2 border-amber-300 border-t-amber-600 rounded-full animate-spin"></div>
-                </div>
-                <p className="text-[9px] text-zinc-400 mt-4">Token: {(mesaQrToken || tokenParam || "").slice(0, 8)}... válido para esta ocupação</p>
+                <h1 className="font-black text-[13px] text-zinc-900">Pedido em análise</h1>
+                <p className="text-[11px] text-zinc-600 mt-2">Mesa <b>{mesaLabel}</b> aguardando garçom aprovar o pedido de <b>{clienteBloqueio || nome || "você"}</b>.</p>
             </div>
         </div>
     );
@@ -317,7 +260,6 @@ function PedirMesaInner() {
                 <div className="w-12 h-12 bg-sky-100 rounded-full flex items-center justify-center mx-auto mb-3 text-[14px]">✓</div>
                 <h1 className="font-black text-[12px]">Pedido enviado!</h1>
                 <p className="text-[11px] text-zinc-500 mt-1">Mesa {mesaLabel} - o garçom já recebeu</p>
-                <p className="text-[9px] text-zinc-400 mt-2">Aguardando aprovação para liberar novos pedidos...</p>
                 <button onClick={() => { setEnviado(false); fetchCardapio(true); }} className="mt-4 w-full bg-black text-white rounded-full h-9 text-[11px] font-bold">Atualizar status</button>
             </div>
         </div>
@@ -326,14 +268,7 @@ function PedirMesaInner() {
 
     return (
         <div className="h-[100dvh] flex flex-col bg-[#F5F7FB] overflow-hidden">
-            <style>{`
-      .hide-scrollbar::-webkit-scrollbar{display:none}
-      .hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
-          input, textarea, select { font-size: 16px!important; -webkit-text-size-adjust: 100%; }
-      .input-visual { font-size: 11px!important; }
-          @supports (-webkit-touch-callout: none) { input, textarea, select { font-size: 16px!important; } }
-          html { touch-action: manipulation; }
-            `}</style>
+            <style>{`.hide-scrollbar::-webkit-scrollbar{display:none}.hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none} input,textarea,select{font-size:16px!important}.input-visual{font-size:11px!important}`}</style>
 
             <div className="bg-white border-b shrink-0 z-20">
                 <div className="p-3 pb-2">
@@ -342,13 +277,12 @@ function PedirMesaInner() {
                         <span className="bg-black text-white text-[8px] font-bold px-2.5 py-1 rounded-full">QR • PEDIDO NA MESA</span>
                     </div>
                     <div className="mt-2.5 flex gap-2 overflow-x-auto hide-scrollbar snap-x snap-mandatory">
-                        <input value={nome} onChange={e => setNome(e.target.value)} placeholder="Seu nome*" className="input-visual min-w-[100%] snap-center bg-[#F5F7FB] rounded-full px-4 h-9 font-bold outline-none focus:ring-2 focus:ring-sky-400" style={{ fontSize: '16px' }} />
-                        <input value={tel} onChange={e => setTel(e.target.value)} placeholder="WhatsApp" className="input-visual min-w-[100%] snap-center bg-[#F5F7FB] rounded-full px-4 h-9 outline-none focus:ring-2 focus:ring-sky-400" style={{ fontSize: '16px' }} />
+                        <input value={nome} onChange={e => setNome(e.target.value)} placeholder="Seu nome*" className="input-visual min-w-[100%] snap-center bg-[#F5F7FB] rounded-full px-4 h-9 font-bold outline-none focus:ring-2 focus:ring-sky-400" />
+                        <input value={tel} onChange={e => setTel(e.target.value)} placeholder="WhatsApp" className="input-visual min-w-[100%] snap-center bg-[#F5F7FB] rounded-full px-4 h-9 outline-none focus:ring-2 focus:ring-sky-400" />
                     </div>
-                    <p className="text-[9px] text-zinc-400 mt-1.5 ml-1">← arraste para o lado →</p>
                 </div>
                 <div className="flex gap-2 overflow-auto px-3 py-2 hide-scrollbar">
-                    {cats.map(c => <button key={c} onClick={() => setCatAtiva(c)} className={`px-3 h-7 rounded-full text-[11px] font-bold whitespace-nowrap border transition-all ${catAtiva === c? "bg-black text-white border-black" : "bg-white"}`}>{c}</button>)}
+                    {cats.map(c => <button key={c} onClick={() => setCatAtiva(c)} className={`px-3 h-7 rounded-full text-[11px] font-bold whitespace-nowrap border ${catAtiva === c? "bg-black text-white border-black" : "bg-white"}`}>{c}</button>)}
                 </div>
             </div>
 
@@ -362,52 +296,33 @@ function PedirMesaInner() {
                         const controlsStock = p.controlar_stock === true;
                         const qtd = getQty(p.id);
                         const isSelected = qtd > 0;
-
                         let borderBg = isZero? "bg-red-200" : isLow? "bg-amber-200" : "bg-[#F5E6D3]";
                         let qtyCircleBg = isZero? "bg-[#C62828] text-white" : isLow? "bg-[#EF6C00] text-white" : "bg-black text-white";
                         let priceBg = isZero? "bg-zinc-400" : isLow? "bg-[#A67C52]" : "bg-black";
                         let cardWrap = isZero? "bg-[#FFF5F5] border-2 border-red-200" : isLow? "bg-[#FFFBEB] border-2 border-amber-200" : "bg-white border border-white shadow-[0_8px_24px_rgba(0,0,0,0.06)]";
-
-                        if (isSelected) {
-                            cardWrap = "bg-sky-50/80 backdrop-blur-xl border-2 border-sky-300 shadow-[0_12px_32px_rgba(14,165,233,0.18)]";
-                            borderBg = "bg-sky-200";
-                            priceBg = "bg-sky-500";
-                        }
+                        if (isSelected) { cardWrap = "bg-sky-50/80 border-2 border-sky-300 shadow-[0_12px_32px_rgba(14,165,233,0.18)]"; borderBg = "bg-sky-200"; priceBg = "bg-sky-500"; }
 
                         return (
-                            <div key={p.id} onClick={() =>!isZero && handleCardTap(p)} className={`group relative rounded-[16px] p-2.5 pt-3 pb-3 flex flex-col items-center text-center w-full select-none cursor-pointer transition-all ${cardWrap} ${isZero? "opacity-60 pointer-events-none" : "active:scale-[0.97]"}`}>
-                                {isSelected && (
-                                    <button onClick={(e) => { e.stopPropagation(); remove(p.id); }} className="absolute top-2 right-2 w-6 h-6 bg-white/90 backdrop-blur border border-sky-200 text-sky-600 rounded-full flex items-center justify-center shadow-md z-20">
-                                        <X size={10} strokeWidth={3} />
-                                    </button>
-                                )}
+                            <div key={p.id} onClick={() =>!isZero && handleCardTap(p)} className={`relative rounded-[16px] p-2.5 flex flex-col items-center text-center w-full select-none cursor-pointer ${cardWrap} ${isZero? "opacity-60 pointer-events-none" : "active:scale-[0.97]"}`}>
+                                {isSelected && <button onClick={(e) => { e.stopPropagation(); remove(p.id); }} className="absolute top-2 right-2 w-6 h-6 bg-white/90 border border-sky-200 text-sky-600 rounded-full flex items-center justify-center shadow-md z-20"><X size={10} strokeWidth={3} /></button>}
                                 <div className="relative w-[84px] h-[84px] shrink-0">
-                                    <div className={`w-full h-full rounded-full p-[2px] shadow-inner ${borderBg}`}>
-                                        <img src={getImgUrl(p.imagem_url || p.imagem)} onError={(e) => (e.currentTarget.src = FALLBACK_IMG)} className={`w-full h-full rounded-full object-cover ${isZero? "grayscale" : ""}`} alt={p.nome} />
-                                    </div>
-                                    {controlsStock && (
-                                        <div className={`absolute -top-1 -left-1 w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold border-2 border-white shadow-md ${qtyCircleBg}`}>{atual}</div>
-                                    )}
+                                    <div className={`w-full h-full rounded-full p-[2px] ${borderBg}`}><img src={getImgUrl(p.imagem_url || p.imagem)} onError={(e) => (e.currentTarget.src = FALLBACK_IMG)} className={`w-full h-full rounded-full object-cover ${isZero? "grayscale" : ""}`} alt={p.nome} /></div>
+                                    {controlsStock && <div className={`absolute -top-1 -left-1 w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold border-2 border-white ${qtyCircleBg}`}>{atual}</div>}
                                     {isLow &&!isZero && <div className="absolute top-[28px] -left-1 bg-[#FFE0B2] text-[#A65C00] text-[7px] font-bold px-2 py-0.5 rounded-full border border-white flex gap-0.5"><AlertTriangle size={8} /> BAIXO</div>}
                                     {isZero && <div className="absolute top-[28px] -left-1 bg-[#C62828] text-white text-[7px] font-bold px-2 py-0.5 rounded-full border border-white flex gap-0.5"><Ban size={8} /> ESGOTADO</div>}
                                     {isSelected && <div className="absolute bottom-0 right-0 bg-sky-500 text-white text-[8px] font-bold px-2.5 py-0.5 rounded-full border-2 border-white shadow">{qtd}x</div>}
                                 </div>
                                 <h3 className={`mt-2.5 font-bold text-[11px] leading-[1.1] line-clamp-2 min-h-[26px] px-1 ${isSelected? "text-sky-900" : "text-black"}`}>{p.nome}</h3>
                                 <p className={`mt-1 text-[9px] font-bold h-[20px] line-clamp-2 px-1 ${isSelected? "text-sky-700/70" : "text-[#6B6B6B]"}`}>{p.categoria}</p>
-
-                                {/* CONTADOR IGUAL OUTRAS PAGES */}
                                 {isSelected? (
                                     <div className="mt-2 flex items-center gap-2 bg-black rounded-full px-1 py-1">
-                                        <button onClick={(e)=>{ e.stopPropagation(); dec(p.id); }} className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center active:scale-90"><Minus size={10} className="text-white" /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); dec(p.id); }} className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center"><Minus size={10} className="text-white" /></button>
                                         <span className="text-[11px] font-black text-white min-w-[20px] text-center">{qtd}</span>
-                                        <button onClick={(e)=>{ e.stopPropagation(); inc(p.id); }} className="w-6 h-6 bg-white text-black rounded-full flex items-center justify-center active:scale-90"><Plus size={10} /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); inc(p.id); }} className="w-6 h-6 bg-white text-black rounded-full flex items-center justify-center"><Plus size={10} /></button>
                                     </div>
                                 ) : (
-                                    <div className={`mt-2 rounded-full px-3 py-1 flex gap-0.5 shadow-sm ${priceBg} text-white`}>
-                                        <span className="text-[7px] font-bold opacity-80">Kz</span><span className="text-[11px] font-bold">{Number(p.preco || p.preco_venda).toLocaleString('de-DE')}</span>
-                                    </div>
+                                    <div className={`mt-2 rounded-full px-3 py-1 flex gap-0.5 shadow-sm ${priceBg} text-white`}><span className="text-[7px] font-bold opacity-80">Kz</span><span className="text-[11px] font-bold">{Number(p.preco || p.preco_venda).toLocaleString('de-DE')}</span></div>
                                 )}
-
                                 {isZero && <span className="mt-1.5 text-[8px] font-bold text-red-500">Sem stock</span>}
                             </div>
                         )
@@ -422,31 +337,23 @@ function PedirMesaInner() {
             {buscaOpen && (
                 <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-3 pt-[20%]">
                     <div className="bg-white rounded-[16px] w-full max-w-[340px] p-3 shadow-2xl">
-                        <div className="flex items-center gap-2 bg-[#F5F7FB] rounded-full px-3 h-9">
-                            <Search size={14} className="text-zinc-400" />
-                            <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar prato..." className="flex-1 bg-transparent outline-none font-bold input-visual" style={{ fontSize: '16px' }} />
-                            <button onClick={() => { setQuery(""); setBuscaOpen(false) }} className="w-6 h-6 bg-black text-white rounded-full flex items-center justify-center"><X size={10} /></button>
-                        </div>
+                        <div className="flex items-center gap-2 bg-[#F5F7FB] rounded-full px-3 h-9"><Search size={14} className="text-zinc-400" /><input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar prato..." className="flex-1 bg-transparent outline-none font-bold input-visual" /><button onClick={() => { setQuery(""); setBuscaOpen(false) }} className="w-6 h-6 bg-black text-white rounded-full flex items-center justify-center"><X size={10} /></button></div>
                         <button onClick={() => setBuscaOpen(false)} className="mt-2.5 w-full bg-black text-white rounded-full h-9 font-bold text-[11px]">Ver {filtrados.length} resultados</button>
                     </div>
                 </div>
             )}
 
-            {/* CARRINHO COM CONTADOR IGUAL OUTRAS PAGES */}
             {cart.length > 0 && (
                 <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t p-3 rounded-t-[20px] shadow-[0_-10px_40px_rgba(0,0,0,0.12)] z-30">
                     <div className="max-h-[22vh] overflow-y-auto hide-scrollbar mb-2 space-y-2">
                         {cart.map(c => (
                             <div key={c.id} className="flex items-center justify-between bg-[#F5F7FB] rounded-full px-3 py-1.5">
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                    <img src={getImgUrl(c.imagem_url)} className="w-7 h-7 rounded-full object-cover" alt="" />
-                                    <span className="text-[11px] font-bold truncate">{c.nome}</span>
-                                </div>
+                                <div className="flex items-center gap-2 min-w-0 flex-1"><img src={getImgUrl(c.imagem_url)} className="w-7 h-7 rounded-full object-cover" alt="" /><span className="text-[11px] font-bold truncate">{c.nome}</span></div>
                                 <div className="flex items-center gap-2 ml-2">
-                                    <button onClick={()=>dec(c.id)} className="w-6 h-6 bg-white border rounded-full flex items-center justify-center"><Minus size={10} /></button>
+                                    <button onClick={() => dec(c.id)} className="w-6 h-6 bg-white border rounded-full flex items-center justify-center"><Minus size={10} /></button>
                                     <span className="text-[11px] font-black min-w-[14px] text-center">{c.qtd}</span>
-                                    <button onClick={()=>inc(c.id)} className="w-6 h-6 bg-black text-white rounded-full flex items-center justify-center"><Plus size={10} /></button>
-                                    <button onClick={()=>remove(c.id)} className="w-6 h-6 bg-red-100 text-red-600 rounded-full flex items-center justify-center ml-1"><X size={10} /></button>
+                                    <button onClick={() => inc(c.id)} className="w-6 h-6 bg-black text-white rounded-full flex items-center justify-center"><Plus size={10} /></button>
+                                    <button onClick={() => remove(c.id)} className="w-6 h-6 bg-red-100 text-red-600 rounded-full flex items-center justify-center ml-1"><X size={10} /></button>
                                 </div>
                             </div>
                         ))}
@@ -456,19 +363,11 @@ function PedirMesaInner() {
                 </div>
             )}
 
-            {erroModal && (
-                <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-6">
-                    <div className="bg-white rounded-[16px] p-5 max-w-[300px] w-full shadow-2xl"><p className="text-[11px] text-zinc-600">{erroModal}</p><button onClick={() => setErroModal("")} className="mt-4 w-full bg-black text-white rounded-full h-9 font-bold text-[11px]">Entendi</button></div>
-                </div>
-            )}
+            {erroModal && <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-6"><div className="bg-white rounded-[16px] p-5 max-w-[300px] w-full shadow-2xl"><p className="text-[11px] text-zinc-600">{erroModal}</p><button onClick={() => setErroModal("")} className="mt-4 w-full bg-black text-white rounded-full h-9 font-bold text-[11px]">Entendi</button></div></div>}
         </div>
     );
 }
 
 export default function PedirMesaPage() {
-    return (
-        <Suspense fallback={<div className="p-8 text-center text-[11px]">Carregando...</div>}>
-            <PedirMesaInner />
-        </Suspense>
-    );
+    return <Suspense fallback={<div className="p-8 text-center text-[11px]">Carregando...</div>}><PedirMesaInner /></Suspense>;
 }
