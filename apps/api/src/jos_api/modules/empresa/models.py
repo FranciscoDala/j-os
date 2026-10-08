@@ -45,6 +45,10 @@ class Empresa(Base):
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # NOVO: controle WhatsApp Evolution
+    whatsapp_instance: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    whatsapp_conectado: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     nif_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     nif_agt_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     tipo_agt: Mapped[str | None] = mapped_column(String(50), nullable=True)

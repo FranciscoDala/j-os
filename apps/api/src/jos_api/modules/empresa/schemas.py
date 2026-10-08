@@ -49,6 +49,8 @@ class UpdateEmpresaRequest(BaseModel):
     residente_fiscal: Optional[str] = None
     nif_agt_name: Optional[str] = None
     nif_verified: Optional[bool] = None
+    whatsapp_instance: Optional[str] = None
+    whatsapp_conectado: Optional[bool] = None
 
     @field_validator('email', mode='before')
     @classmethod
@@ -75,6 +77,8 @@ class EmpresaOut(BaseModel):
     banco2: Optional[str] = None
     logo_url: Optional[str] = None
     image_url: Optional[str] = None
+    whatsapp_instance: Optional[str] = None
+    whatsapp_conectado: bool = False
     nif_verified: Optional[bool] = None
     nif_agt_name: Optional[str] = None
     tipo_agt: Optional[str] = None

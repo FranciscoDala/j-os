@@ -7,8 +7,12 @@ from jos_api.core.deps import get_current_user
 from jos_api.modules.auth.models import User
 from. import schemas, service
 from jos_api.core.uploadImagem import upload_image
+import os, httpx
 
 router = APIRouter(prefix="/empresas", tags=["empresas"])
+
+EVO_URL = os.getenv("EVOLUTION_API_URL", "https://evolution-api-v2-2-3-2uk4.onrender.com")
+EVO_KEY = os.getenv("EVOLUTION_API_KEY", "j-os-super-secret-key-2026")
 
 async def _try_upload(imagem: UploadFile | None, empresa_id: UUID) -> str | None:
     if not imagem or not imagem.filename:
@@ -68,6 +72,40 @@ async def upload_logo(empresa_id: UUID, logo: UploadFile = File(...), db: Sessio
     url = await _try_upload(logo, empresa_id)
     if not url: raise HTTPException(400, "Falha no upload")
     return service.atualizar_empresa(db, empresa_id, schemas.UpdateEmpresaRequest(logo_url=url))
+
+# === WHATSAPP EVOLUTION ===
+@router.get("/{empresa_id}/whatsapp/qr")
+def whatsapp_qr(empresa_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    instance = f"empresa_{str(empresa_id)[:8]}"
+    try:
+        with httpx.Client(timeout=10) as c:
+            c.post(f"{EVO_URL}/instance/create", headers={"apikey": EVO_KEY}, json={"instanceName": instance, "qrcode": True, "integration": "WHATSAPP-BAILEYS"})
+            r = c.get(f"{EVO_URL}/instance/connect/{instance}", headers={"apikey": EVO_KEY})
+            data = r.json()
+            # salva instance na empresa
+            emp = service.get_empresa(db, empresa_id)
+            emp.whatsapp_instance = instance
+            db.commit()
+            return data
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+@router.get("/{empresa_id}/whatsapp/status")
+def whatsapp_status(empresa_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    instance = f"empresa_{str(empresa_id)[:8]}"
+    try:
+        with httpx.Client(timeout=10) as c:
+            r = c.get(f"{EVO_URL}/instance/connectionState/{instance}", headers={"apikey": EVO_KEY})
+            estado = r.json().get("state") or r.json().get("instance", {}).get("state")
+            conectado = estado == "open"
+            # atualiza DB
+            emp = service.get_empresa(db, empresa_id)
+            emp.whatsapp_conectado = conectado
+            emp.whatsapp_instance = instance
+            db.commit()
+            return {"conectado": conectado, "state": estado, "instance": instance, "raw": r.json()}
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 @router.delete("/{empresa_id}")
 def deletar_empresa(empresa_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):

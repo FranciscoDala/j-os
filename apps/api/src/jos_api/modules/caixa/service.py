@@ -46,7 +46,7 @@ def _get_dono_phone_sync(db: Session, empresa_id: uuid.UUID) -> str:
         from jos_api.modules.empresa.models import Empresa
         emp = db.query(Empresa).filter(Empresa.id == empresa_id).first()
         if emp:
-            print(f"[WA-DEBUG] empresa encontrada phone='{getattr(emp,'phone',None)}'")
+            print(f"[WA-DEBUG] empresa encontrada phone='{getattr(emp,'phone',None)}' instance='{getattr(emp,'whatsapp_instance',None)}'")
             if emp.phone:
                 num = emp.phone.strip().replace("+","").replace(" ","").replace("-","")
                 if len(num)==9: num="244"+num
@@ -54,12 +54,9 @@ def _get_dono_phone_sync(db: Session, empresa_id: uuid.UUID) -> str:
                 return num
     except Exception as e:
         print(f"[WA-DEBUG] erro ao buscar empresa {e}")
-
     env_num = os.getenv("WHATSAPP_DONO_NUMERO","")
-    print(f"[WA-DEBUG] WHATSAPP_DONO_NUMERO env='{env_num}'")
     clean = env_num.replace("+","").replace(" ","").replace("-","")
     if len(clean)==9: clean="244"+clean
-    print(f"[WA-DEBUG] numero final limpo='{clean}'")
     return clean
 
 def get_caixa_aberto(db: Session, empresa_id: uuid.UUID) -> Caixa | None:
@@ -101,7 +98,7 @@ def abrir_caixa(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nom
         if numero:
             from jos_api.core.whatsapp import enviar_abertura_caixa as wa_abrir
             aberto_em_safe = novo.aberto_em or datetime.now(timezone.utc)
-            _whatsapp_async(wa_abrir, numero, novo.aberto_por_nome, novo.saldo_inicial, aberto_em_safe)
+            _whatsapp_async(wa_abrir, numero, novo.aberto_por_nome, novo.saldo_inicial, aberto_em_safe, str(empresa_id))
         else:
             print("[WA-DEBUG] abrir_caixa numero VAZIO, nao enviou")
     except Exception as e:
@@ -129,8 +126,8 @@ def forcar_abertura(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, user
             qtd_vendas = sum(1 for m in movs if "VENDA" in str(m.tipo).upper())
             aberto_safe = caixa_antigo.aberto_em or datetime.now(timezone.utc)
             dados = {"aberto_por_nome": caixa_antigo.aberto_por_nome, "aberto": aberto_safe.astimezone(TZ_LUANDA).strftime("%H:%M"), "fechado": datetime.now(TZ_LUANDA).strftime("%H:%M"), "duracao": "", "total_ent": total_ent, "total_sai": Decimal("0"), "qtd_vendas": qtd_vendas, "saldo_entregar": saldo_esperado, "divergencia": Decimal("0"), "status_div": "✅", "qtd_hoje": 1, "fechado_por_nome": user_nome}
-            _whatsapp_async(enviar_fechamento_caixa, numero, dados)
-            _whatsapp_async(enviar_abertura_caixa, numero, novo.aberto_por_nome, novo.saldo_inicial, novo.aberto_em or datetime.now(timezone.utc))
+            _whatsapp_async(enviar_fechamento_caixa, numero, dados, str(empresa_id))
+            _whatsapp_async(enviar_abertura_caixa, numero, novo.aberto_por_nome, novo.saldo_inicial, novo.aberto_em or datetime.now(timezone.utc), str(empresa_id))
     except Exception as e:
         print(f"[WA-DEBUG] forcar fail {e}")
     payload = {"id": str(novo.id), "status": "ABERTO", "aberto_por_nome": novo.aberto_por_nome, "antigo_id": str(caixa_antigo.id)}
@@ -172,7 +169,7 @@ def fechar_caixa(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, saldo_i
             dados = {"aberto_por_nome": caixa.aberto_por_nome, "aberto": aberto, "fechado": fechado, "duracao": duracao, "total_ent": total_ent, "total_sai": abs(total_sai), "qtd_vendas": qtd_vendas, "saldo_entregar": caixa.saldo_final_esperado or Decimal("0"), "divergencia": caixa.divergencia or Decimal("0"), "status_div": "✅" if (caixa.divergencia or 0)==0 else "⚠️", "qtd_hoje": 1, "fechado_por_nome": fechado_por_nome}
             print(f"[WA-DEBUG] dados preparados {dados}")
             from jos_api.core.whatsapp import enviar_fechamento_caixa
-            _whatsapp_async(enviar_fechamento_caixa, numero, dados)
+            _whatsapp_async(enviar_fechamento_caixa, numero, dados, str(empresa_id))
     except Exception as e:
         print(f"[WA-DEBUG] fechar fail {e}")
         logger.warning(f"whatsapp fechamento fail {e}", exc_info=True)
