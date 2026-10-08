@@ -7,6 +7,7 @@ import { VendasTab } from "@/app/dashboard/restaurante/components/tabs/venda/ven
 import { useGlobalSearch } from "@/features/search/context";
 import { Menu, X } from "lucide-react";
 import ModalEmpresa from "./modal_empresa";
+import { NotificationsModal } from "./modal_notificacoes";
 import { Toasts } from "@/app/dashboard/restaurante/components/tabs/venda/modals/venda";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
@@ -29,6 +30,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     const [role, setRole] = useState("funcionario");
     const [showWelcome, setShowWelcome] = useState(true);
     const [showConfig, setShowConfig] = useState(false);
+    const [showNotifications, setShowNotifications] = useState(false);
     const [empresaData, setEmpresaData] = useState<any>(null);
     const [savingEmpresa, setSavingEmpresa] = useState(false);
     const [toasts, setToasts] = useState<Toast[]>([]);
@@ -140,7 +142,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                                     </div>
                                 </div>
                                 <div className="w-9 h-9 bg-white rounded-full hidden sm:flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)]">💬</div>
-                                <div className="relative w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)]">🔔{pedidosCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#EDEBE6] animate-pulse">{pedidosCount > 9? "9+" : pedidosCount}</span>}</div>
+                                <button onClick={() => setShowNotifications(true)} className="relative w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)] active:scale-95">🔔{pedidosCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#EDEBE6] animate-pulse">{pedidosCount > 9? "9+" : pedidosCount}</span>}</button>
                                 <div className="bg-white rounded-full pl-1 pr-3 py-1 flex items-center gap-2 shadow-[0_1px_6px_rgba(0,0,0,0.05)] h-9 ml-1"><img src="https://i.pravatar.cc/100?img=33" className="w-7 h-7 rounded-full" alt="user" /><div className="hidden md:block leading-none"><p className="text-[11px] font-bold">{user?.nome || "Francisco"}</p><p className="text-[9px] text-[#9A9A9A] capitalize">{role.replace('_', ' ')}</p></div></div>
                             </div>
                         </div>
@@ -150,6 +152,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                 {isVendasOpen && <div className="absolute inset-0 z-[100] bg-[#EDEBE6] flex flex-col overflow-hidden"><div className="flex-1 overflow-hidden p-0 md:p-[14px]"><VendasTab onClose={() => setActiveTab("home")} /></div></div>}
             </div>
             {empresaData && <ModalEmpresa open={showConfig} initialData={empresaData} saving={savingEmpresa} onClose={() => setShowConfig(false)} onSave={handleSaveEmpresa} />}
+            <NotificationsModal open={showNotifications} onClose={() => setShowNotifications(false)} pedidosCount={pedidosCount} onGoPedidos={() => setActiveTab("pedidos")} />
             <style jsx global>{`html,body{height:100%;overflow:hidden;background:#EDEBE6;scrollbar-width:none}::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
         </DashboardCtx.Provider>
     );
