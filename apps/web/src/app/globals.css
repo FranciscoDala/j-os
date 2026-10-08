@@ -9,17 +9,13 @@ body {
     height: 100%;
     background: #5A8AD4;
     font-family: "Zalando Sans Expanded", sans-serif;
-
-    height: 100%;
     overflow: hidden;
     overscroll-behavior: none;
-
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
 
 /* ESCONDE TODO SCROLL DO SISTEMA */
-
 html::-webkit-scrollbar,
 body::-webkit-scrollbar {
     display: none;
@@ -36,4 +32,39 @@ body::-webkit-scrollbar {
 .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+}
+
+/* ===== FIX ZOOM iOS - REGRA DE OURO ===== */
+input,
+select,
+textarea {
+    font-size: 16px !important;
+}
+
+@media screen and (min-width: 768px) {
+    input,
+    select,
+    textarea {
+        font-size: 11px !important;
+    }
+}
+
+/* Garante que no foco não dê zoom */
+input:focus,
+select:focus,
+textarea:focus {
+    font-size: 16px !important;
+}
+
+@media screen and (min-width: 768px) {
+    input:focus,
+    select:focus,
+    textarea:focus {
+        font-size: 11px !important;
+    }
+}
+
+/* Previne double-tap zoom */
+button, a {
+    touch-action: manipulation;
 }

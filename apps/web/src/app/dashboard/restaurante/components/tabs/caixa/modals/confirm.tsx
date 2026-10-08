@@ -3,8 +3,8 @@ import { AlertTriangle } from "lucide-react";
 
 export function JConfirm({ open, title, desc, type, onClose, onConfirm }: { open: boolean, title: string, desc: string, type: "black" | "green" | "red", onClose: () => void, onConfirm: () => void }) {
     if (!open) return null;
-    const accent = type === "green" ? "bg-[#0CC06B]" : type === "red" ? "bg-[#E53935]" : "bg-black";
-    const iconBg = type === "green" ? "bg-[#0CC06B]/10 text-[#0CC06B]" : type === "red" ? "bg-[#E53935]/10 text-[#E53935]" : "bg-black text-white";
+    const accent = type === "green"? "bg-[#0CC06B]" : type === "red"? "bg-[#E53935]" : "bg-black";
+    const iconBg = type === "green"? "bg-[#0CC06B]/10 text-[#0CC06B]" : type === "red"? "bg-[#E53935]/10 text-[#E53935]" : "bg-black text-white";
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" onClick={onClose} />
