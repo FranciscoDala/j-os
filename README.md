@@ -125,3 +125,23 @@ pnpm start
 
     # 8. Sobe
         git push -u origin main
+
+
+
+
+Phone ID: 1345657271964982
+WABA ID: 1617603576478072
+Token: EAAe6InauFCoBSgD3JUQcJzXuINuZARxWZCAiDcWD4PS2vK8CJBmxZBykoNudQBH9V6FZB2GZCeUfdsLncYi3DN6OkPObYMHB2lIkK9wTqdKZCrUgeevvZBd1NxdKHFzL7ZBzHInpAWTkD5C2DXQCOxJhfwHHZBYufKTzOURiSbf6C8MfHtgPZCDndWFfcaItMhimcJZCjpnLvlE6eZCuAVQzW97nz2bLodZCFCbrdPvwCW0eLZBZBipy2hehjd2PHDZBfDfKkwfEY2xhOlJDpRZC0TiAyfKxo
+Número de teste: +1 555 654 9394
+Destinatários: +244940799954, +244930438947
+
+
+curl -i -X POST `
+     https://graph.facebook.com/v25.0/1345657271964982/messages `
+     -H 'Authorization: Bearer EAAe6InauFCoBSgD3JUQcJzXuINuZARxWZCAiDcWD4PS2vK8CJBmxZBykoNudQBH9V6FZB2GZCeUfdsLncYi3DN6OkPObYMHB2lIkK9wTqdKZCrUgeevvZBd1NxdKHFzL7ZBzHInpAWTkD5C2DXQCOxJhfwHHZBYufKTzOURiSbf6C8MfHtgPZCDndWFfcaItMhimcJZCjpnLvlE6eZCuAVQzW97nz2bLodZCFCbrdPvwCW0eLZBZBipy2hehjd2PHDZBfDfKkwfEY2xhOlJDpRZC0TiAyfKxo' `
+     -H 'Content-Type: application/json' `
+     -d '{ \"messaging_product\": \"whatsapp\",
+     \"to\": \"244930438947\",
+     \"type\": \"template\",
+     \"template\": { \"name\": \"hello_world\",
+     \"language\": { \"code\": \"en_US\" } } }'
