@@ -29,6 +29,7 @@ def _check_and_emit_stock_alert(empresa_id: uuid.UUID, prod: models.Product):
     if not prod.controlar_stock:
         return
 
+    img = prod.imagem_url or ""
     base_data = {
         "id": str(prod.id),
         "nome": prod.nome,
@@ -38,7 +39,10 @@ def _check_and_emit_stock_alert(empresa_id: uuid.UUID, prod: models.Product):
         "stock_minimo": str(prod.stock_minimo),
         "minimo": float(prod.stock_minimo) if prod.stock_minimo else 0,
         "categoria": prod.categoria,
-        "imagem_url": prod.imagem_url, # <-- AGORA COM IMAGEM
+        "imagem_url": img,
+        "imagem": img,
+        "produto_imagem_url": img,
+        "imagens": [img] if img else [],
         "preco_venda": str(prod.preco_venda),
     }
 
@@ -56,7 +60,8 @@ def _check_and_emit_stock_alert(empresa_id: uuid.UUID, prod: models.Product):
                 "desc": f"Stock chegou a 0",
                 "time": "agora",
                 "produto_id": str(prod.id),
-                "imagem_url": prod.imagem_url,
+                "imagem_url": img,
+                "imagens": [img] if img else [],
                 "severity": "critical",
                 **base_data
             }
@@ -75,7 +80,8 @@ def _check_and_emit_stock_alert(empresa_id: uuid.UUID, prod: models.Product):
                 "desc": f"Restam {prod.stock_atual} (mín: {prod.stock_minimo})",
                 "time": "agora",
                 "produto_id": str(prod.id),
-                "imagem_url": prod.imagem_url,
+                "imagem_url": img,
+                "imagens": [img] if img else [],
                 "severity": "warning",
                 **base_data
             }
@@ -122,8 +128,7 @@ def create_produto(db: Session, produto: schemas.ProdutoCreateRequest, empresa_i
         db.add(db_prod); db.flush()
         registrar_atividade(db, empresa_id=empresa_id, modulo="PRODUTO", acao="CRIAR", descricao=f"Criou produto '{db_prod.nome}' ({db_prod.codigo})", entidade="Product", entidade_id=db_prod.id, entidade_nome=db_prod.nome, user_id=created_by, user_nome=criado_por_nome, detalhes=data, ip=ip, commit=False)
         db.commit(); db.refresh(db_prod)
-
-        payload = {"id": str(db_prod.id), "nome": db_prod.nome, "codigo": db_prod.codigo, "preco_venda": str(db_prod.preco_venda), "stock_atual": str(db_prod.stock_atual), "stock_minimo": str(db_prod.stock_minimo), "controlar_stock": db_prod.controlar_stock, "ativo": db_prod.ativo, "categoria": db_prod.categoria, "tem_iva": db_prod.tem_iva, "iva": str(db_prod.iva), "imagem_url": db_prod.imagem_url}
+        payload = {"id": str(db_prod.id), "nome": db_prod.nome, "codigo": db_prod.codigo, "preco_venda": str(db_prod.preco_venda), "stock_atual": str(db_prod.stock_atual), "stock_minimo": str(db_prod.stock_minimo), "controlar_stock": db_prod.controlar_stock, "ativo": db_prod.ativo, "categoria": db_prod.categoria, "tem_iva": db_prod.tem_iva, "iva": str(db_prod.iva), "imagem_url": db_prod.imagem_url, "imagem": db_prod.imagem_url, "produto_imagem_url": db_prod.imagem_url, "imagens": [db_prod.imagem_url] if db_prod.imagem_url else []}
         emit(str(empresa_id), "produto:created", data=payload)
         _broadcast_safe(empresa_id, {"type": "produto:created", "data": payload})
         _broadcast_safe(empresa_id, {"type": "stock.updated", "produto_id": str(db_prod.id), "nome_produto": db_prod.nome, "novo_estoque": str(db_prod.stock_atual), "stock_atual": str(db_prod.stock_atual), "imagem_url": db_prod.imagem_url})
@@ -152,11 +157,10 @@ def update_produto(db: Session, produto_id: uuid.UUID, update: schemas.ProdutoUp
     db.flush()
     registrar_atividade(db, empresa_id=empresa_id, modulo="PRODUTO", acao="EDITAR", descricao=f"Editou produto '{antes}' -> '{prod.nome}'", entidade="Product", entidade_id=prod.id, entidade_nome=prod.nome, user_id=user_id, user_nome=user_nome, detalhes={"alterado": d, "antes": antes}, ip=ip, commit=False)
     db.commit(); db.refresh(prod)
-
-    payload = {"id": str(prod.id), "nome": prod.nome, "codigo": prod.codigo, "preco_venda": str(prod.preco_venda), "stock_atual": str(prod.stock_atual), "stock_minimo": str(prod.stock_minimo), "controlar_stock": prod.controlar_stock, "ativo": prod.ativo, "categoria": prod.categoria, "tem_iva": prod.tem_iva, "iva": str(prod.iva), "imagem_url": prod.imagem_url}
+    payload = {"id": str(prod.id), "nome": prod.nome, "codigo": prod.codigo, "preco_venda": str(prod.preco_venda), "stock_atual": str(prod.stock_atual), "stock_minimo": str(prod.stock_minimo), "controlar_stock": prod.controlar_stock, "ativo": prod.ativo, "categoria": prod.categoria, "tem_iva": prod.tem_iva, "iva": str(prod.iva), "imagem_url": prod.imagem_url, "imagem": prod.imagem_url, "produto_imagem_url": prod.imagem_url, "imagens": [prod.imagem_url] if prod.imagem_url else []}
     emit(str(empresa_id), "produto:update", data=payload)
     _broadcast_safe(empresa_id, {"type": "produto:update", "data": payload})
-    _broadcast_safe(empresa_id, {"type": "stock.updated", "produto_id": str(prod.id), "nome_produto": prod.nome, "novo_estoque": str(prod.stock_atual), "stock_atual": str(prod.stock_atual), "imagem_url": prod.imagem_url})
+    _broadcast_safe(empresa_id, {"type": "stock.updated", "produto_id": str(prod.id), "nome_produto": prod.nome, "novo_estoque": str(prod.stock_atual), "stock_atual": str(prod.stock_atual), "imagem_url": prod.imagem_url, "imagens": [prod.imagem_url] if prod.imagem_url else []})
     _check_and_emit_stock_alert(empresa_id, prod)
     return prod
 
@@ -180,10 +184,9 @@ def baixar_stock(db: Session, produto_id: uuid.UUID, qtd: Decimal, empresa_id: u
     if not prod.controlar_stock: return prod
     if prod.stock_atual < qtd and not prod.allow_negative: raise ValueError(f"Stock insuficiente: {prod.stock_atual}")
     prod.stock_atual -= qtd; db.commit(); db.refresh(prod)
-
-    payload = {"id": str(prod.id), "nome": prod.nome, "stock_atual": str(prod.stock_atual), "stock_minimo": str(prod.stock_minimo), "codigo": prod.codigo, "imagem_url": prod.imagem_url}
+    payload = {"id": str(prod.id), "nome": prod.nome, "stock_atual": str(prod.stock_atual), "stock_minimo": str(prod.stock_minimo), "codigo": prod.codigo, "imagem_url": prod.imagem_url, "imagem": prod.imagem_url, "produto_imagem_url": prod.imagem_url, "imagens": [prod.imagem_url] if prod.imagem_url else []}
     emit(str(empresa_id), "produto:update", data=payload)
-    _broadcast_safe(empresa_id, {"type": "stock.updated", "produto_id": str(prod.id), "nome_produto": prod.nome, "novo_estoque": str(prod.stock_atual), "stock_atual": str(prod.stock_atual), "imagem_url": prod.imagem_url})
+    _broadcast_safe(empresa_id, {"type": "stock.updated", "produto_id": str(prod.id), "nome_produto": prod.nome, "novo_estoque": str(prod.stock_atual), "stock_atual": str(prod.stock_atual), "imagem_url": prod.imagem_url, "imagens": [prod.imagem_url] if prod.imagem_url else []})
     _broadcast_safe(empresa_id, {"type": "produto:update", "data": payload})
     _check_and_emit_stock_alert(empresa_id, prod)
     return prod

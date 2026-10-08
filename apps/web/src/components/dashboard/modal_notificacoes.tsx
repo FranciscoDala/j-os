@@ -6,29 +6,30 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com"
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const FALLBACK = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=200";
 
-// pega img de qualquer formato igual PedidosTab
 const getImgUrl = (url?: string) => {
-  if (!url || url === "null" || url === "undefined") return "";
-  if (url.startsWith("blob:")) return url;
-  if (url.startsWith("http")) return url;
-  if (url.startsWith("/media") || url.startsWith("media")) {
-    return url.startsWith("/")? `${API_URL}${url}` : `${API_URL}/${url}`;
+  if (!url || url === "null" || url === "undefined" || url.trim() === "") return FALLBACK;
+  const u = url.trim();
+  if (u.startsWith("blob:")) return u;
+  if (u.startsWith("http")) return u;
+  if (u.startsWith("/media") || u.startsWith("media")) {
+    return u.startsWith("/")? `${API_URL}${u}` : `${API_URL}/${u}`;
   }
-  if (url.startsWith("/")) return `${API_URL}${url}`;
-  return url;
+  if (u.startsWith("/")) return `${API_URL}${u}`;
+  return u;
 };
 
 const getProdutoImg = (p: any): string => {
-  return (
-    p.imagem_url ||
-    p.imagem ||
-    p.image_url ||
-    p.foto_url ||
-    p.foto ||
-    p.produto_imagem_url ||
-    p.produto?.imagem ||
-    ""
-  );
+  const raw =
+    p?.imagem_url ||
+    p?.imagem ||
+    p?.image_url ||
+    p?.foto_url ||
+    p?.foto ||
+    p?.produto_imagem_url ||
+    p?.produto?.imagem_url ||
+    p?.produto?.imagem ||
+    "";
+  return raw? raw : "";
 };
 
 type Notificacao = {
@@ -94,19 +95,16 @@ export function NotificationsModal({ open, onClose, pedidosCount, stockAlerts = 
             if (r.ok) {
               const pedidos = await r.json();
               if (Array.isArray(pedidos) && pedidos.length > 0) {
-                // pega TODAS as imagens de TODOS os pedidos pendentes, igual PedidosTab
                 const todasImgs: string[] = [];
                 pedidos.forEach((ped: any) => {
-                  const itens = ped.itens || ped.produtos || [];
-                  itens.forEach((it: any) => {
+                  (ped.itens || ped.produtos || []).forEach((it: any) => {
                     const img = getProdutoImg(it);
                     if (img) todasImgs.push(img);
                   });
                 });
                 const primeiro = pedidos[0];
                 const itens = primeiro.itens || primeiro.produtos || [];
-                const qtdItens = itens.reduce((s: number, it: any) => s + Number(it.quantidade || 1), 0);
-
+                const qtdItens = itens.reduce((s: number, it: any) => s + Number(it.quantidade || it.qtd || 1), 0);
                 novas.push({
                   id: "pedidos-pendentes",
                   tipo: "PEDIDO_NOVO",
@@ -115,7 +113,7 @@ export function NotificationsModal({ open, onClose, pedidosCount, stockAlerts = 
                   time: "agora",
                   lida: false,
                   imagem_url: todasImgs[0] || "",
-                  imagens: todasImgs.slice(0, 3)
+                  imagens: todasImgs.slice(0, 3),
                 });
               } else {
                 novas.push({ id: "pedidos-pendentes", tipo: "PEDIDO_NOVO", titulo: `${pedidosCount} pedido(s) novo(s)`, desc: "Pedidos QR aguardando aprovação", time: "agora", lida: false });
@@ -126,12 +124,10 @@ export function NotificationsModal({ open, onClose, pedidosCount, stockAlerts = 
           }
         }
 
-        // stockAlerts que vem do header - já tem que vir com imagem do WS
         if (stockAlerts && stockAlerts.length > 0) {
           stockAlerts.forEach((p: any) => {
             const atual = Number(p.estoque?? p.stock_atual?? p.quantidade?? 0);
             const isZero = atual <= 0;
-            const img = getProdutoImg(p);
             novas.push({
               id: isZero? `zero-${p.id}` : `baixo-${p.id}`,
               tipo: isZero? "STOCK_ZERADO" : "STOCK_BAIXO",
@@ -140,7 +136,7 @@ export function NotificationsModal({ open, onClose, pedidosCount, stockAlerts = 
               time: "agora",
               lida: false,
               produto_id: p.id,
-              imagem_url: img
+              imagem_url: getProdutoImg(p),
             });
           });
         } else {
@@ -150,16 +146,15 @@ export function NotificationsModal({ open, onClose, pedidosCount, stockAlerts = 
               const data = await r.json();
               (data || []).forEach((p: any) => {
                 const atual = Number(p.stock_atual || p.estoque || 0);
-                const img = getProdutoImg(p);
                 novas.push({
-                  id: atual===0? `zero-${p.id}` : `baixo-${p.id}`,
-                  tipo: atual===0? "STOCK_ZERADO" : "STOCK_BAIXO",
-                  titulo: atual===0? `${p.nome} zerado` : `${p.nome} stock baixo`,
-                  desc: atual===0? `Stock em 0` : `Restam ${atual}`,
+                  id: atual === 0? `zero-${p.id}` : `baixo-${p.id}`,
+                  tipo: atual === 0? "STOCK_ZERADO" : "STOCK_BAIXO",
+                  titulo: atual === 0? `${p.nome} zerado` : `${p.nome} stock baixo`,
+                  desc: atual === 0? `Stock em 0` : `Restam ${atual}`,
                   time: "hoje",
                   lida: false,
                   produto_id: p.id,
-                  imagem_url: img
+                  imagem_url: getProdutoImg(p),
                 });
               });
             }
@@ -201,23 +196,22 @@ export function NotificationsModal({ open, onClose, pedidosCount, stockAlerts = 
     };
     const onPedido = (e: any) => {
       const p = e.detail?.data || e.detail;
-      if (!p?.id) return;
-      // p pode vir com itens já com imagem igual PedidosTab
+      if (!p?.id &&!p?.pedido_id) return;
+      const realId = p.id || p.pedido_id;
       const itens = p.itens || p.produtos || [];
       const imgs = itens.map((it: any) => getProdutoImg(it)).filter(Boolean);
       const imgPrincipal = getProdutoImg(p) || imgs[0] || p.imagem_url || p.imagens?.[0] || "";
-
       setNotificacoes(prev => {
-        if (prev.some(n => n.id === `pedido-${p.id}` || n.id === "pedidos-pendentes")) return prev;
+        if (prev.some(n => n.id === `pedido-${realId}` || n.id === "pedidos-pendentes")) return prev;
         return [{
-          id: `pedido-${p.id}`,
+          id: `pedido-${realId}`,
           tipo: "PEDIDO_NOVO",
           titulo: `Novo pedido - Mesa ${p.mesa_numero || p.mesa || ''}`,
           desc: `${p.cliente_nome || p.cliente || 'Cliente'} - ${p.qtd_itens || itens.length || ''} itens`,
           time: "agora",
           lida: false,
           imagem_url: imgPrincipal,
-          imagens: imgs.length? imgs.slice(0,3) : (p.imagens || [])
+          imagens: imgs.length? imgs.slice(0, 3) : (p.imagens || []),
         },...prev];
       });
     };
@@ -225,11 +219,12 @@ export function NotificationsModal({ open, onClose, pedidosCount, stockAlerts = 
     window.addEventListener("produto:estoque_baixo" as any, onBaixo);
     window.addEventListener("produto:zerado" as any, onZerado);
     window.addEventListener("pedido_qr:novo" as any, onPedido);
-    window.addEventListener("notificacao:nova" as any, (e:any)=>{
+    window.addEventListener("notificacao:nova" as any, (e: any) => {
       const d = e.detail?.data || e.detail;
-      if(d?.tipo==="PEDIDO_QR" || d?.tipo==="PEDIDO_NOVO" || d?.mesa_numero) onPedido(e);
-      if(d?.tipo==="STOCK_BAIXO") onBaixo(e);
-      if(d?.tipo==="STOCK_ZERADO") onZerado(e);
+      if (!d) return;
+      if (d?.tipo === "PEDIDO_QR" || d?.tipo === "PEDIDO_NOVO" || d?.mesa_numero) onPedido(e);
+      if (d?.tipo === "STOCK_BAIXO") onBaixo(e);
+      if (d?.tipo === "STOCK_ZERADO") onZerado(e);
     });
     return () => {
       window.removeEventListener("produto:estoque_baixo" as any, onBaixo);
@@ -244,22 +239,22 @@ export function NotificationsModal({ open, onClose, pedidosCount, stockAlerts = 
   return (
     <>
       <div className="fixed inset-0 bg-black/20 backdrop-blur-[1px] z-[9998] md:hidden" onClick={onClose} />
-      <div id="notif-dropdown" ref={ref} className="fixed md:absolute top-[64px] md:top-[calc(100%+12px)] left-1/2 md:left-auto right-auto md:right-0 -translate-x-1/2 md:translate-x-0 w-[92vw] md:w-[380px] max-w-[380px] bg-white rounded-[20px] md:rounded-[16px] shadow-[0_12px_40px_rgba(0,0,0,0.20)] border border-black/5 overflow-hidden z-[9999] animate-in fade-in slide-in-from-top-2 duration-200">
+      <div id="notif-dropdown" ref={ref} className="fixed md:absolute top-[64px] md:top-[calc(100%+12px)] left-1/2 md:left-auto right-auto md:right-0 -translate-x-1/2 md:translate-x-0 w-[92vw] md:w-[380px] max-w-[380px] bg-white rounded-[20px] md:rounded-[16px] shadow-[0_12px_40px_rgba(0,0,0,0.20)] border border-black/5 overflow-hidden z-[9999]">
         <div className="hidden md:block absolute -top-[6px] right-[14px] w-3 h-3 bg-white rotate-45 border-l border-t border-black/5" />
-        <div className="p-4 pb-2 flex justify-between items-center bg-white">
-          <h2 className="text-[18px] md:text-[20px] font-black text-black tracking-tight">Notificações</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-zinc-100 flex items-center justify-center text-[18px]">•••</button>
+        <div className="p-4 pb-2 flex justify-between items-center">
+          <h2 className="text-[18px] md:text-[20px] font-black tracking-tight">Notificações</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-zinc-100 flex items-center justify-center">•••</button>
         </div>
-        <div className="px-4 flex gap-2 bg-white">
+        <div className="px-4 flex gap-2">
           <button onClick={() => setFiltro("tudo")} className={`px-3.5 py-1.5 rounded-full text-[13px] font-bold ${filtro === "tudo"? "bg-[#E7F3FF] text-[#0064D1]" : "bg-zinc-100 text-zinc-600"}`}>Tudo</button>
           <button onClick={() => setFiltro("nao_lida")} className={`px-3.5 py-1.5 rounded-full text-[13px] font-bold ${filtro === "nao_lida"? "bg-[#E7F3FF] text-[#0064D1]" : "bg-zinc-100 text-zinc-600"}`}>Não lida(s)</button>
         </div>
-        <div className="px-4 mt-3 flex justify-between items-center bg-white">
-          <p className="text-[14px] md:text-[15px] font-bold">Novas</p>
-          <button onClick={() => setNotificacoes(n => n.map(x => ({...x, lida: true })))} className="text-[12px] text-[#0064D1] font-medium">Ver tudo</button>
+        <div className="px-4 mt-3 flex justify-between items-center">
+          <p className="text-[14px] font-bold">Novas</p>
+          <button onClick={() => setNotificacoes(n => n.map(x => ({...x, lida: true })))} className="text-[12px] text-[#0064D1] font-medium">Marcar como lidas</button>
         </div>
 
-        <div className="mt-2 max-h-[65vh] md:max-h-[60vh] overflow-y-auto bg-white">
+        <div className="mt-2 max-h-[65vh] md:max-h-[60vh] overflow-y-auto">
           {loading? (
             <div className="p-8 text-center"><div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin mx-auto" /></div>
           ) : filtered.length === 0? (
@@ -267,47 +262,40 @@ export function NotificationsModal({ open, onClose, pedidosCount, stockAlerts = 
           ) : (
             <div className="pb-2">
               {filtered.map((n) => {
-                const hasImg =!!n.imagem_url && getImgUrl(n.imagem_url);
-                const isZerado = n.tipo==="STOCK_ZERADO";
-                const isBaixo = n.tipo==="STOCK_BAIXO";
-                const isPedido = n.tipo==="PEDIDO_NOVO";
+                const isZerado = n.tipo === "STOCK_ZERADO";
+                const isBaixo = n.tipo === "STOCK_BAIXO";
+                const isPedido = n.tipo === "PEDIDO_NOVO";
+                const hasImg =!!getProdutoImg(n) ||!!n.imagem_url;
 
-                // CORES ESTILO ALERT
-                const bgCircle = isZerado? "bg-[#FF3B30]" : isBaixo? "bg-[#FF9500]" : "bg-black";
-                const borderColor = isZerado? "border-[#FF3B30]" : isBaixo? "border-[#FF9500]" : "border-black";
-                const badgeColor = isZerado? "bg-[#FF3B30]" : isBaixo? "bg-[#FF9500]" : "bg-[#0CC06B]";
+                const border = isZerado? "border-[#FF3B30]" : isBaixo? "border-[#FF9500]" : "border-black";
+                const badge = isZerado? "bg-[#FF3B30]" : isBaixo? "bg-[#FF9500]" : "bg-[#0CC06B]";
+                const dot = isZerado? "bg-[#FF3B30]" : isBaixo? "bg-[#FF9500]" : "bg-[#0064D1]";
+                const timeColor = isZerado? "text-[#FF3B30]" : isBaixo? "text-[#FF9500]" : "text-[#0064D1]";
 
                 return (
                   <button key={n.id} onClick={() => {
                     if (isPedido && onGoPedidos) { onClose(); onGoPedidos(); }
                     else if ((isBaixo || isZerado) && onGoProdutos) { onClose(); onGoProdutos(); }
-                  }} className="w-full text-left flex gap-3 px-4 py-3 hover:bg-[#F2F4F7] transition-colors">
+                  }} className={`w-full text-left flex gap-3 px-4 py-3 hover:bg-[#F2F4F7] ${isZerado? "bg-[#FFF1F0]" : isBaixo? "bg-[#FFF8E1]" : ""} transition-colors`}>
                     <div className="relative shrink-0">
-                      {hasImg? (
-                        <div className="relative">
-                          <img src={getImgUrl(n.imagem_url)} className={`w-[52px] h-[52px] rounded-full object-cover border-2 ${borderColor} shadow-sm bg-zinc-100`} alt={n.titulo} onError={(e)=>{ (e.currentTarget as any).style.display='none' }} />
-                          {n.imagens && n.imagens.length > 1 && (
-                            <img src={getImgUrl(n.imagens[1])} className="absolute -bottom-1 -right-2 w-7 h-7 rounded-full object-cover border-2 border-white shadow bg-zinc-100" alt="" />
-                          )}
-                          <div className={`absolute -bottom-1 -right-1 w-[22px] h-[22px] rounded-full border-2 border-white flex items-center justify-center shadow-sm ${badgeColor} text-white text-[10px]`}>
-                            {isPedido? "🛒" : isBaixo? "⚠️" : "🚫"}
-                          </div>
-                        </div>
-                      ) : (
-                        // FALLBACK MAS COM COR DE ALERT CERTA
-                        <div className="relative">
-                          <div className={`w-[52px] h-[52px] rounded-full flex items-center justify-center text-white shadow-sm ${bgCircle}`}>
-                            {isPedido? <ShoppingBag size={20} /> : isBaixo? <AlertTriangle size={20} /> : <Ban size={20} />}
-                          </div>
-                          <div className={`absolute -bottom-1 -right-1 w-[22px] h-[22px] rounded-full border-2 border-white flex items-center justify-center text-[10px] ${badgeColor} text-white`}>📦</div>
-                        </div>
+                      <img
+                        src={getImgUrl(n.imagem_url)}
+                        className={`w-[52px] h-[52px] rounded-full object-cover border-2 ${border} shadow-sm bg-zinc-100`}
+                        alt={n.titulo}
+                        onError={(e) => { e.currentTarget.src = FALLBACK; }}
+                      />
+                      {n.imagens && n.imagens.length > 1 && (
+                        <img src={getImgUrl(n.imagens[1])} className="absolute -bottom-1 -right-2 w-7 h-7 rounded-full object-cover border-2 border-white shadow bg-zinc-100" alt="" onError={(e) => { (e.currentTarget as any).style.display = 'none'; }} />
                       )}
+                      <div className={`absolute -bottom-1 -right-1 w-[22px] h-[22px] rounded-full border-2 border-white flex items-center justify-center shadow-sm ${badge} text-white text-[10px]`}>
+                        {isPedido? "🛒" : isBaixo? "⚠️" : "🚫"}
+                      </div>
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
                       <p className="text-[13px] leading-[1.25] text-[#050505]"><span className="font-bold">{n.titulo}</span> <span className="font-normal text-zinc-600"> {n.desc}</span></p>
-                      <p className={`text-[11px] font-medium mt-0.5 ${isZerado? "text-[#FF3B30]" : isBaixo? "text-[#FF9500]" : "text-[#0064D1]"}`}>{n.time} • J-OS</p>
+                      <p className={`text-[11px] font-medium mt-0.5 ${timeColor}`}>{n.time} • J-OS</p>
                     </div>
-                    {!n.lida && <div className={`w-2.5 h-2.5 rounded-full shrink-0 mt-3 ${isZerado? "bg-[#FF3B30]" : isBaixo? "bg-[#FF9500]" : "bg-[#0064D1]"}`} />}
+                    {!n.lida && <div className={`w-2.5 h-2.5 rounded-full shrink-0 mt-3 ${dot}`} />}
                   </button>
                 );
               })}

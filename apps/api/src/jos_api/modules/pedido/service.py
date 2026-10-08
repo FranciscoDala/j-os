@@ -175,25 +175,27 @@ def criar_pedido_qr(db: Session, empresa_id: uuid.UUID, dados, ip: str | None):
 
     return pedido
 
-
 def listar_pendentes(db: Session, empresa_id: uuid.UUID):
     pedidos = db.query(PedidoQr).filter(PedidoQr.empresa_id == empresa_id, PedidoQr.status == PedidoQrStatus.AGUARDANDO_APROVACAO).order_by(PedidoQr.created_at.asc()).all()
     for ped in pedidos:
         itens_enriquecidos = []
         for it in (ped.itens or []):
-            prod_id = it.get("produto_id") if isinstance(it, dict) else getattr(it, 'produto_id', None)
+            prod_id = it.get("produto_id") if isinstance(it, dict) else None
             prod = None
             if prod_id:
                 try: prod = db.query(Product).filter(Product.id == uuid.UUID(prod_id)).first()
-                except: prod = None
-            img = it.get("imagem_url") or it.get("imagem") if isinstance(it, dict) else None
+                except: pass
+            img = (it.get("imagem_url") or it.get("imagem") or it.get("produto_imagem_url")) if isinstance(it, dict) else None
             if not img and prod: img = prod.imagem_url
             if isinstance(it, dict):
-                it["imagem_url"] = img; it["imagem"] = img; it["produto_imagem_url"] = img; it["produto_nome"] = it.get("produto_nome") or it.get("nome") or (prod.nome if prod else "Produto")
+                it["imagem_url"] = img
+                it["imagem"] = img
+                it["produto_imagem_url"] = img
+                it["produto_nome"] = it.get("produto_nome") or it.get("nome") or (prod.nome if prod else "Produto")
                 itens_enriquecidos.append(it)
-            else: itens_enriquecidos.append(it)
         ped.itens = itens_enriquecidos
     return pedidos
+
 
 def aprovar_pedido(db: Session, pedido_id: uuid.UUID, empresa_id: uuid.UUID, user_id: uuid.UUID, caixa):
     pedido = db.query(PedidoQr).filter(PedidoQr.id == pedido_id, PedidoQr.empresa_id == empresa_id).with_for_update().first()
