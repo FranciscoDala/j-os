@@ -99,18 +99,82 @@ def criar_pedido_qr(db: Session, empresa_id: uuid.UUID, dados, ip: str | None):
             if stock <= 0: raise HTTPException(400, f"{prod.nome} esgotado")
             if stock < it.quantidade: raise HTTPException(400, f"{prod.nome} só tem {stock}")
         total += prod.preco_venda * it.quantidade
-        itens_norm.append({"produto_id": str(it.produto_id), "nome": prod.nome, "produto_nome": prod.nome, "quantidade": str(it.quantidade), "preco": str(prod.preco_venda), "imagem_url": prod.imagem_url, "imagem": prod.imagem_url, "produto_imagem_url": prod.imagem_url, "observacao": it.observacao})
+        itens_norm.append({
+            "produto_id": str(it.produto_id),
+            "nome": prod.nome,
+            "produto_nome": prod.nome,
+            "quantidade": str(it.quantidade),
+            "preco": str(prod.preco_venda),
+            "imagem_url": prod.imagem_url,
+            "imagem": prod.imagem_url,
+            "produto_imagem_url": prod.imagem_url,
+            "observacao": it.observacao
+        })
 
-    pedido = PedidoQr(empresa_id=empresa_id, mesa_id=mesa.id, mesa_numero=mesa.numero, cliente_nome=dados.cliente_nome[:100], cliente_telefone=dados.cliente_telefone, itens=itens_norm, total_estimado=total, status=PedidoQrStatus.AGUARDANDO_APROVACAO, ip_cliente=ip, qr_token=mesa.qr_token)
+    pedido = PedidoQr(
+        empresa_id=empresa_id,
+        mesa_id=mesa.id,
+        mesa_numero=mesa.numero,
+        cliente_nome=dados.cliente_nome[:100],
+        cliente_telefone=dados.cliente_telefone,
+        itens=itens_norm,
+        total_estimado=total,
+        status=PedidoQrStatus.AGUARDANDO_APROVACAO,
+        ip_cliente=ip,
+        qr_token=mesa.qr_token
+    )
     db.add(pedido); db.commit(); db.refresh(pedido)
 
-    # === WS IGUAL STOCKBOT ===
-    emit(str(empresa_id), "pedido_qr:novo", data={"id": str(pedido.id), "mesa": pedido.mesa_numero, "cliente": pedido.cliente_nome, "total": str(total)})
-    _broadcast_safe(empresa_id, {"type": "pedido_qr:novo", "data": {"id": str(pedido.id), "mesa_numero": pedido.mesa_numero, "cliente_nome": pedido.cliente_nome, "total_estimado": float(total), "created_at": pedido.created_at.isoformat(), "itens": itens_norm}})
-    _broadcast_safe(empresa_id, {"type": "notificacao:nova", "data": {"id": str(pedido.id), "tipo": "PEDIDO_QR", "titulo": f"Novo pedido - Mesa {pedido.mesa_numero}", "desc": f"{pedido.cliente_nome} - Kz {total}", "time": "agora", "mesa_numero": pedido.mesa_numero, "pedido_id": str(pedido.id)}})
+    # === PEGA IMAGENS PARA NOTIFICAÇÃO ===
+    imagens_pedido = [it.get("imagem_url") or it.get("imagem") or it.get("produto_imagem_url") for it in itens_norm if it.get("imagem_url") or it.get("imagem") or it.get("produto_imagem_url")][:3]
+    primeira_img = imagens_pedido[0] if imagens_pedido else None
+    nomes_itens = ", ".join([f"{it['quantidade']}x {it['nome']}" for it in itens_norm[:2]])
+    if len(itens_norm) > 2:
+        nomes_itens += f" +{len(itens_norm)-2}"
+
+    # === WS IGUAL STOCKBOT - AGORA COM IMAGEM ===
+    emit(str(empresa_id), "pedido_qr:novo", data={
+        "id": str(pedido.id),
+        "mesa": pedido.mesa_numero,
+        "cliente": pedido.cliente_nome,
+        "total": str(total),
+        "imagem_url": primeira_img,
+        "imagens": imagens_pedido
+    })
+    _broadcast_safe(empresa_id, {
+        "type": "pedido_qr:novo",
+        "data": {
+            "id": str(pedido.id),
+            "mesa_numero": pedido.mesa_numero,
+            "cliente_nome": pedido.cliente_nome,
+            "total_estimado": float(total),
+            "created_at": pedido.created_at.isoformat(),
+            "itens": itens_norm,
+            "imagem_url": primeira_img,
+            "imagens": imagens_pedido
+        }
+    })
+    _broadcast_safe(empresa_id, {
+        "type": "notificacao:nova",
+        "data": {
+            "id": f"pedido-{pedido.id}",
+            "tipo": "PEDIDO_QR",
+            "titulo": f"Novo pedido - Mesa {pedido.mesa_numero}",
+            "desc": f"{pedido.cliente_nome} - {nomes_itens} - Kz {total}",
+            "time": "agora",
+            "mesa_numero": pedido.mesa_numero,
+            "pedido_id": str(pedido.id),
+            "imagem_url": primeira_img,
+            "imagens": imagens_pedido,
+            "total": str(total),
+            "cliente_nome": pedido.cliente_nome,
+            "qtd_itens": len(itens_norm)
+        }
+    })
     _broadcast_safe(empresa_id, {"type": "stats.updated", "acao": "pedido_qr_novo"})
 
     return pedido
+
 
 def listar_pendentes(db: Session, empresa_id: uuid.UUID):
     pedidos = db.query(PedidoQr).filter(PedidoQr.empresa_id == empresa_id, PedidoQr.status == PedidoQrStatus.AGUARDANDO_APROVACAO).order_by(PedidoQr.created_at.asc()).all()

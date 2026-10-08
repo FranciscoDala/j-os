@@ -94,7 +94,7 @@ export function ProdutosTab() {
         const onUpdate = (e: any) => {
             const p = getData(e);
             if (!p?.id) return;
-            setItems(prev => prev.map(x => x.id === p.id? {...x,...p } : x));
+            setItems(prev => prev.map(x => x.id === p.id? {...x,...p, _alerta: undefined } : x));
         };
         const onCreated = (e: any) => {
             const p = getData(e);
@@ -125,26 +125,51 @@ export function ProdutosTab() {
             setTotal(t => Math.max(0, t - 1));
         };
 
+        // NOVOS EVENTOS DE ESTOQUE
+        const onStockBaixo = (e: any) => {
+            const p = getData(e);
+            if (!p?.id) return;
+            setItems(prev => prev.map(x => x.id === p.id? {...x, stock_atual: p.stock_atual?? p.estoque?? x.stock_atual, _alerta: "baixo", _anim: Date.now() } : x));
+            pushToast(`Stock baixo: ${p.nome} - restam ${p.estoque?? p.stock_atual}`, "info");
+        };
+        const onStockZerado = (e: any) => {
+            const p = getData(e);
+            if (!p?.id) return;
+            setItems(prev => prev.map(x => x.id === p.id? {...x, stock_atual: 0, _alerta: "zerado", _anim: Date.now() } : x));
+            pushToast(`ZERADO: ${p.nome} esgotado!`, "error");
+        };
+        const onStockUpdated = (e: any) => {
+            const p = getData(e);
+            const id = p?.produto_id || p?.id;
+            const novo = p?.novo_estoque?? p?.stock_atual;
+            if (!id || novo === undefined) return;
+            setItems(prev => prev.map(x => x.id === id? {...x, stock_atual: novo } : x));
+        };
+
         window.addEventListener("produto:update" as any, onUpdate);
         window.addEventListener("produto:atualizado" as any, onUpdate);
         window.addEventListener("produto.updated" as any, onUpdate);
         window.addEventListener("produto:created" as any, onCreated);
-        window.addEventListener("stock.updated" as any, onUpdate);
+        window.addEventListener("stock.updated" as any, onStockUpdated);
         window.addEventListener("produto:deleted" as any, onDelete);
         window.addEventListener("venda:nova" as any, onVenda);
         window.addEventListener("venda:fechada" as any, onVenda);
         window.addEventListener("venda:update" as any, onVenda);
+        window.addEventListener("produto:estoque_baixo" as any, onStockBaixo);
+        window.addEventListener("produto:zerado" as any, onStockZerado);
 
         return () => {
             window.removeEventListener("produto:update" as any, onUpdate);
             window.removeEventListener("produto:atualizado" as any, onUpdate);
             window.removeEventListener("produto.updated" as any, onUpdate);
             window.removeEventListener("produto:created" as any, onCreated);
-            window.removeEventListener("stock.updated" as any, onUpdate);
+            window.removeEventListener("stock.updated" as any, onStockUpdated);
             window.removeEventListener("produto:deleted" as any, onDelete);
             window.removeEventListener("venda:nova" as any, onVenda);
             window.removeEventListener("venda:fechada" as any, onVenda);
             window.removeEventListener("venda:update" as any, onVenda);
+            window.removeEventListener("produto:estoque_baixo" as any, onStockBaixo);
+            window.removeEventListener("produto:zerado" as any, onStockZerado);
         };
     }, [globalSearch, cat, cats, fetchProds]);
 
@@ -199,7 +224,7 @@ export function ProdutosTab() {
 
             <div className="grid gap-2.5 md:gap-3 grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {items.map(p => (
-                    <ProdutoCard key={p.id} p={p} canManage={canManage} onView={setViewProduto} onEdit={openEdit} onDelete={(prod) => { if(!canManage) return pushToast("Sem permissão", "error"); setDeleteModal({ id: prod.id, nome: prod.nome, img: prod.imagem_url }); }} />
+                    <ProdutoCard key={`${p.id}-${p._anim||''}`} p={p} canManage={canManage} onView={setViewProduto} onEdit={openEdit} onDelete={(prod) => { if(!canManage) return pushToast("Sem permissão", "error"); setDeleteModal({ id: prod.id, nome: prod.nome, img: prod.imagem_url }); }} />
                 ))}
             </div>
 

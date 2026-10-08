@@ -59,7 +59,32 @@ def registrar_movimento(db: Session, caixa: Caixa, tipo: TipoMovimento, valor: D
         _broadcast_safe(caixa.empresa_id, {"type": "caixa.updated", "data": payload})
         _broadcast_safe(caixa.empresa_id, {"type": "caixa:atualizado", "data": payload})
         _broadcast_safe(caixa.empresa_id, {"type": "stats.updated", "acao": "caixa_movimento"})
+
+        # NOVO: NOTIFICAÇÃO DE SANGRIA / SUPRIMENTO / VENDA GRANDE
+        tipo_str = _tipo_str(mov.tipo).upper()
+        if tipo_str in ["SANGRIA", "SUPRIMENTO"] or abs(float(mov.valor)) >= 50000: # notifica saída grande
+            _broadcast_safe(caixa.empresa_id, {
+                "type": "notificacao:nova",
+                "data": {
+                    "id": f"caixa-{mov.id}",
+                    "tipo": "CAIXA_SANGRIA" if "SANGRIA" in tipo_str else "CAIXA_SUPRIMENTO" if "SUPRIMENTO" in tipo_str else "CAIXA_MOV",
+                    "titulo": f"{tipo_str.title()}: Kz {abs(float(mov.valor)):.2f}",
+                    "desc": mov.descricao,
+                    "time": "agora",
+                    "valor": str(mov.valor),
+                    "criado_por_nome": user_nome,
+                    "caixa_id": str(caixa.id),
+                    "severity": "warning" if "SANGRIA" in tipo_str else "info"
+                }
+            })
+            # também evento dedicado
+            _broadcast_safe(caixa.empresa_id, {
+                "type": "caixa:movimento_alto" if abs(float(mov.valor)) >= 50000 else f"caixa:{tipo_str.lower()}",
+                "data": payload
+            })
+
     return mov
+
 
 def abrir_caixa(db: Session, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, saldo_inicial: Decimal, ip: str | None = None) -> Caixa:
     caixa_existente = get_caixa_aberto(db, empresa_id)

@@ -23,11 +23,14 @@ type Props = {
 
 export function ProdutoCard({ p, onEdit, onDelete, onAdd, onView, cartQty = 0, canManage = false }: Props) {
     const getStockState = () => {
+        if (p._alerta === "zerado") return "zero";
+        if (p._alerta === "baixo") return "low";
         if (!p.controlar_stock) return "ok";
         const atual = Number(p.stock_atual?? 0);
         const minimo = Number(p.stock_minimo?? 0);
         if (atual <= 0) return "zero";
-        if (atual <= minimo || atual <= 5) return "low";
+        if (minimo > 0 && atual <= minimo) return "low";
+        if (atual <= 5) return "low";
         return "ok";
     };
     const stockState = getStockState();
@@ -45,7 +48,7 @@ export function ProdutoCard({ p, onEdit, onDelete, onAdd, onView, cartQty = 0, c
         <div
             onDoubleClick={() =>!isZero && onAdd?.(p)}
             onClick={() => { if (isPDV && window.innerWidth < 768 &&!isZero) onAdd?.(p) }}
-            className={`group relative w-full rounded-[18px] md:rounded-[22px] overflow-hidden border shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] md:hover:-translate-y-0.5 transition-all duration-300 flex flex-col ${cardBg} ${cardBorder}`}
+            className={`group relative w-full rounded-[18px] md:rounded-[22px] overflow-hidden border shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] md:hover:-translate-y-0.5 transition-all duration-300 flex flex-col ${cardBg} ${cardBorder} ${p._anim? "animate-pulse" : ""}`}
         >
             {isPDV && cartQty > 0 && (
                 <div className="absolute top-2.5 right-2.5 bg-black text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shadow-md z-20">
@@ -68,8 +71,8 @@ export function ProdutoCard({ p, onEdit, onDelete, onAdd, onView, cartQty = 0, c
                 {p.controlar_stock && (
                     <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shadow-md border-2 border-white z-10 ${qtyBg}`}>{atual}</div>
                 )}
-                {isLow &&!isZero && <div className="absolute bottom-2 left-2 bg-[#FFE0B2] text-[#A65C00] text-[7px] md:text-[8px] font-black px-2 py-0.5 rounded-full border border-white flex items-center gap-0.5 shadow"><AlertTriangle size={10} /> BAIXO</div>}
-                {isZero && <div className="absolute bottom-2 left-2 bg-[#C62828] text-white text-[7px] md:text-[8px] font-black px-2 py-0.5 rounded-full border border-white flex items-center gap-0.5 shadow"><Ban size={10} /> ESGOTADO</div>}
+                {isLow &&!isZero && <div className="absolute bottom-2 left-2 bg-[#FFE0B2] text-[#A65C00] text-[7px] md:text-[8px] font-black px-2 py-0.5 rounded-full border border-white flex items-center gap-0.5 shadow animate-pulse"><AlertTriangle size={10} /> BAIXO</div>}
+                {isZero && <div className="absolute bottom-2 left-2 bg-[#C62828] text-white text-[7px] md:text-[8px] font-black px-2 py-0.5 rounded-full border border-white flex items-center gap-0.5 shadow animate-pulse"><Ban size={10} /> ESGOTADO</div>}
             </div>
 
             <div className="px-3 md:px-3.5 py-2.5 md:py-3 flex flex-col flex-1">

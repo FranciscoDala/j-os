@@ -5,7 +5,7 @@ import { Sidebar } from "./Sidebar";
 import { ModuleId } from "./menu_config";
 import { VendasTab } from "@/app/dashboard/restaurante/components/tabs/venda/venda";
 import { useGlobalSearch } from "@/features/search/context";
-import { Menu, X, Search, MessageCircle, Bell } from "lucide-react";
+import { Menu, X, Search, MessageCircle, Bell, AlertTriangle } from "lucide-react";
 import ModalEmpresa from "./modal_empresa";
 import { NotificationsModal } from "./modal_notificacoes";
 import { Toasts } from "@/app/dashboard/restaurante/components/tabs/venda/modals/venda";
@@ -15,7 +15,7 @@ import { getCaixaStatus } from "@/lib/api";
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 type Toast = { id: string; msg: string; type: "success" | "error" | "info" | "warning" };
-type Ctx = { activeTab: string; setActiveTab: (t: string) => void; user: any; moduleId: ModuleId; role: string; can: (p: string) => boolean; pedidosCount: number; setPedidosCount: (n: number) => void; };
+type Ctx = { activeTab: string; setActiveTab: (t: string) => void; user: any; moduleId: ModuleId; role: string; can: (p: string) => boolean; pedidosCount: number; setPedidosCount: (n: number) => void; stockAlerts: number; setStockAlerts: (n:number)=>void; };
 const DashboardCtx = createContext<Ctx>(null as any);
 export const useDashboard = () => useContext(DashboardCtx);
 
@@ -64,9 +64,12 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     const [toasts, setToasts] = useState<Toast[]>([]);
     const { search, setSearch, setActiveTab: setSearchTab } = useGlobalSearch();
     const [pedidosCount, setPedidosCount] = useState(0);
+    const [stockAlerts, setStockAlerts] = useState(0);
+    const [stockList, setStockList] = useState<any[]>([]);
     const prevCountRef = useRef(0);
     const isFirstLoad = useRef(true);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const alertRef = useRef<HTMLAudioElement | null>(null);
     const { empresa, refreshEmpresa } = useEmpresa() as any;
 
     const empresaLogo = getLogoSrc(empresa?.logo_url);
@@ -100,7 +103,6 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
       return () => clearTimeout(t);
     }, [user]);
 
-    // carrega empresa na modal + sync com context
     useEffect(() => {
         if (empresa) {
             setEmpresaData((prev:any) => ({...prev,...empresa, companyName: empresa.nome_fantasia || empresa.companyName}));
@@ -141,7 +143,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
         if(!empresa) load();
     }, [showConfig, empresa]);
 
-    // realtime listeners para header
+    // realtime listeners para header - COM ESTOQUE
     useEffect(() => {
         const onEmpresaUpdate = (e:any) => {
             const detail = e.detail || {};
@@ -151,8 +153,6 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
             }
         };
         const onPedidoQr = (e:any) => {
-            const newCount = e.detail?.length?? (pedidosCount+1);
-            // se for evento de lista, usa length, se for unitário, incrementa
             if(Array.isArray(e.detail)) {
                 setPedidosCount(e.detail.length);
                 prevCountRef.current = e.detail.length;
@@ -160,9 +160,31 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                 setPedidosCount(c=> c+1);
             }
         };
-        const onPedidoAprovado = (e:any) => {
+        const onPedidoAprovado = () => {
             setPedidosCount(c => Math.max(0, c-1));
             prevCountRef.current = Math.max(0, prevCountRef.current-1);
+        };
+
+        const onStockBaixo = (e:any) => {
+            const d = e.detail || {};
+            setStockAlerts(c => c+1);
+            setStockList(prev => {
+                const exists = prev.find(x=> x.id === d.id);
+                if(exists) return prev.map(x=> x.id===d.id? d : x);
+                return [d,...prev].slice(0, 20);
+            });
+            pushToast(`Stock baixo: ${d.nome || "produto"} - restam ${d.estoque?? d.stock_atual}`, "warning");
+        };
+        const onStockZerado = (e:any) => {
+            const d = e.detail || {};
+            setStockAlerts(c => c+1);
+            setStockList(prev => {
+                const exists = prev.find(x=> x.id === d.id);
+                if(exists) return prev.map(x=> x.id===d.id? d : x);
+                return [d,...prev].slice(0, 20);
+            });
+            pushToast(`SEM STOCK: ${d.nome || "produto"} zerado!`, "error");
+            try { alertRef.current?.play().catch(()=>{}); } catch {}
         };
 
         window.addEventListener("empresa:updated" as any, onEmpresaUpdate);
@@ -171,6 +193,10 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
         window.addEventListener("pedido-qr:aprovado" as any, onPedidoAprovado);
         window.addEventListener("pedido-qr:recusado" as any, onPedidoAprovado);
         window.addEventListener("pedido_qr:remover" as any, onPedidoAprovado);
+        window.addEventListener("produto:estoque_baixo" as any, onStockBaixo);
+        window.addEventListener("produto:zerado" as any, onStockZerado);
+        window.addEventListener("produto:stock_baixo" as any, onStockBaixo);
+
         return () => {
             window.removeEventListener("empresa:updated" as any, onEmpresaUpdate);
             window.removeEventListener("empresa:update" as any, onEmpresaUpdate);
@@ -178,6 +204,9 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
             window.removeEventListener("pedido-qr:aprovado" as any, onPedidoAprovado);
             window.removeEventListener("pedido-qr:recusado" as any, onPedidoAprovado);
             window.removeEventListener("pedido_qr:remover" as any, onPedidoAprovado);
+            window.removeEventListener("produto:estoque_baixo" as any, onStockBaixo);
+            window.removeEventListener("produto:zerado" as any, onStockZerado);
+            window.removeEventListener("produto:stock_baixo" as any, onStockBaixo);
         };
     }, [refreshEmpresa, pedidosCount]);
 
@@ -208,10 +237,12 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
         } finally { setSavingEmpresa(false) }
     }
 
-    // pedidos count inicial + fallback polling leve
+    // pedidos + stock count inicial
     useEffect(() => {
         audioRef.current = new Audio("/sounds/new-order.wav");
         audioRef.current.volume = 0.8;
+        alertRef.current = new Audio("/sounds/alert.mp3");
+        alertRef.current.volume = 0.9;
         const fetchPedidosCount = async () => {
           try {
             const token = localStorage.getItem("access_token") || "";
@@ -229,10 +260,20 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
             prevCountRef.current = newCount;
             setPedidosCount(newCount);
             isFirstLoad.current = false;
+
+            // fetch stock baixo inicial
+            const r2 = await fetch(`${API_URL}/api/v1/produtos/alerta/stock-baixo`, { headers: { Authorization: `Bearer ${token}`, "X-Empresa-ID": emp }, cache: "no-store" as any });
+            if(r2.ok){
+              const stockData = await r2.json();
+              if(Array.isArray(stockData)){
+                setStockAlerts(stockData.length);
+                setStockList(stockData.map((p:any)=>({ id: p.id, nome: p.nome, estoque: Number(p.stock_atual), minimo: Number(p.stock_minimo), codigo: p.codigo })));
+              }
+            }
           } catch {}
         };
         fetchPedidosCount();
-        const interval = setInterval(fetchPedidosCount, 15000); // agora 15s só fallback, realtime faz o resto
+        const interval = setInterval(fetchPedidosCount, 30000);
         return () => { clearInterval(interval); };
     }, []);
 
@@ -257,9 +298,10 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
     const meta = TAB_META[activeTab] || { title: "Painel", desc: "Visão geral" };
     const headerTitle = showWelcome? `Bem-vindo, ${user?.nome || empresa?.nome_fantasia || "Francisco Dala"}!` : meta.title;
     const headerDesc = showWelcome? `Explore as informações e atividades do seu restaurante` : meta.desc;
+    const totalNotifs = pedidosCount + stockAlerts;
 
     return (
-        <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId, role, can, pedidosCount, setPedidosCount }}>
+        <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId, role, can, pedidosCount, setPedidosCount, stockAlerts, setStockAlerts }}>
             <div className="h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-0 md:p-[14px] md:gap-[14px]" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
                 <Toasts toasts={toasts} setToasts={setToasts} />
                 <div className="hidden md:flex shrink-0"><Sidebar activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} onOpenConfig={() => setShowConfig(true)} /></div>
@@ -280,8 +322,11 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                                 </div>
                                 <button className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5 text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED] transition active:scale-95"><MessageCircle size={20} strokeWidth={2} /></button>
                                 <div className="relative">
-                                    <button id="btn-notif" onClick={() => setShowNotifications(v =>!v)} className={`relative w-11 h-11 rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5 transition active:scale-95 ${showNotifications? 'bg-black text-white' : 'bg-white text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED]'}`}><Bell size={20} strokeWidth={2} />{pedidosCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#EDEBE6] animate-pulse">{pedidosCount > 9? "9+" : pedidosCount}</span>}</button>
-                                    <NotificationsModal open={showNotifications} onClose={() => setShowNotifications(false)} pedidosCount={pedidosCount} onGoPedidos={() => setActiveTab("pedidos")} />
+                                    <button id="btn-notif" onClick={() => setShowNotifications(v =>!v)} className={`relative w-11 h-11 rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5 transition active:scale-95 ${showNotifications? 'bg-black text-white' : stockAlerts > 0? 'bg-red-50 text-red-600 border-red-200' : 'bg-white text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED]'}`}>
+                                        {stockAlerts > 0? <AlertTriangle size={20} strokeWidth={2} /> : <Bell size={20} strokeWidth={2} />}
+                                        {totalNotifs > 0 && <span className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#EDEBE6] animate-pulse ${stockAlerts>0? 'bg-red-500' : 'bg-black'}`}>{totalNotifs > 9? "9+" : totalNotifs}</span>}
+                                    </button>
+                                    <NotificationsModal open={showNotifications} onClose={() => { setShowNotifications(false); setStockAlerts(0); }} pedidosCount={pedidosCount} stockAlerts={stockList} onGoPedidos={() => setActiveTab("pedidos")} onGoProdutos={() => setActiveTab("produtos")} />
                                 </div>
                                 <div className="bg-white rounded-full pl-1 pr-3 py-1 flex items-center gap-2 shadow-[0_1px_6px_rgba(0,0,0,0.05)] h-11 ml-1 border border-black/5">
                                     {empresaLogo? (

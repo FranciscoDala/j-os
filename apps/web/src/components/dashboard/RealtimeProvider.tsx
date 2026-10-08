@@ -1,11 +1,13 @@
 "use client";
 import { createContext, useEffect, useRef } from "react";
 import { useRealtime } from "@/hooks/useRealtime";
+import { toast } from "sonner";
 
 const Ctx = createContext({});
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const alertRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
         console.log("[RT_PROVIDER] montado, token:", typeof window!== "undefined" &&!!localStorage.getItem("access_token"));
@@ -13,13 +15,15 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             audioRef.current = new Audio("/sounds/new-order.wav");
             audioRef.current.volume = 0.8;
             audioRef.current.preload = "auto";
+
+            alertRef.current = new Audio("/sounds/alert.mp3");
+            alertRef.current.volume = 0.9;
+            alertRef.current.preload = "auto";
         } catch {}
     }, []);
 
     useRealtime((ev) => {
         if (!ev?.type || ev.type === "__RECONNECT__") return;
-
-        // console.log("[RT]", ev.type, ev);
         const detail = ev.data?? ev;
 
         // 1. Evento original
@@ -33,6 +37,37 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         }
         if (ev.type === "produto:created" || ev.type === "produto:deleted") {
             window.dispatchEvent(new CustomEvent("produto:update", { detail }));
+        }
+
+        // 3. NOVOS EVENTOS DE ESTOQUE - CRÍTICO
+        if (ev.type === "produto:estoque_baixo") {
+            const d = ev.data || {};
+            window.dispatchEvent(new CustomEvent("produto:estoque_baixo", { detail: d }));
+            window.dispatchEvent(new CustomEvent("notificacao:nova", { detail: {...d, tipo: "STOCK_BAIXO" } }));
+
+            toast.warning(`Stock baixo: ${d.nome || d.nome_produto}`, {
+                description: `Restam ${d.estoque?? d.stock_atual} (mín: ${d.minimo?? d.stock_minimo})`,
+                duration: 6000,
+            });
+            try {
+                alertRef.current?.play().catch(()=>{});
+                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            } catch {}
+        }
+
+        if (ev.type === "produto:zerado") {
+            const d = ev.data || {};
+            window.dispatchEvent(new CustomEvent("produto:zerado", { detail: d }));
+            window.dispatchEvent(new CustomEvent("notificacao:nova", { detail: {...d, tipo: "STOCK_ZERADO" } }));
+
+            toast.error(`SEM STOCK: ${d.nome || d.nome_produto}`, {
+                description: "Produto esgotado! Repor urgente.",
+                duration: 8000,
+            });
+            try {
+                alertRef.current?.play().catch(()=>{});
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+            } catch {}
         }
 
         if (ev.type.startsWith("venda:")) {
@@ -59,7 +94,6 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             window.dispatchEvent(new CustomEvent("mesa:atualizado", { detail }));
         }
 
-        // entidade / usuario / empresa / atividade - NOVOS
         if (ev.type.startsWith("entidade:")) {
             window.dispatchEvent(new CustomEvent("entidade:update", { detail }));
             window.dispatchEvent(new CustomEvent(ev.type, { detail }));
