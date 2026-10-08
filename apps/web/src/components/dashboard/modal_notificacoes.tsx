@@ -35,6 +35,8 @@ export function NotificationsModal({ open, onClose, pedidosCount, onGoPedidos }:
     useEffect(() => {
         if (!open) return;
         const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('#btn-notif')) return; // não fecha se clicar no sino
             if (ref.current && !ref.current.contains(e.target as Node)) {
                 onClose();
             }
