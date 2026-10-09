@@ -24,37 +24,53 @@ export function ExtratoList({ movimentos, selectedDate, statusCaixa }: { movimen
     const showPagination = movimentos.length > perPage;
 
     return (
-        <div className="bg-white rounded-[16px] border overflow-hidden">
-            <div className="flex justify-between items-center px-4 h-[42px] border-b bg-zinc-50/50">
-                <h3 className="font-black text-[11px] tracking-widest">EXTRATO • {movimentos.length} • {selectedDate.split('-').reverse().join('/')}</h3>
+        <div className="w-full bg-[#EDEBE6] border border-black/10 rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col">
+
+            {/* HEADER */}
+            <div className="bg-white m-[6px] rounded-[18px] p-3 flex justify-between items-center border border-black/5 shrink-0">
+                <div>
+                    <p className="font-black text-[13px] leading-none text-black">
+                        EXTRATO • {movimentos.length}
+                    </p>
+                    <p className="text-[11px] text-zinc-600 mt-1 font-bold">
+                        {selectedDate.split('-').reverse().join('/')}
+                    </p>
+                </div>
                 {statusCaixa?.caixa_atual?.aberto_por_nome && (
-                    <span className="text-[10px] font-bold text-zinc-600">
-                        {statusCaixa.aberto? 'Aberto' : 'Fechado'} por: {statusCaixa.caixa_atual.aberto_por_nome} • {formatFull(statusCaixa.caixa_atual.aberto_em)}
-                    </span>
+                    <div className="text-right max-w-[160px]">
+                        <p className="text-[10px] font-black tracking-widest text-zinc-500 leading-none">
+                            {statusCaixa.aberto? 'ABERTO' : 'FECHADO'}
+                        </p>
+                        <p className="text-[10px] font-bold text-zinc-700 mt-1 leading-tight truncate">
+                            {statusCaixa.caixa_atual.aberto_por_nome}
+                        </p>
+                        <p className="text-[9px] text-zinc-500 leading-tight">
+                            {formatFull(statusCaixa.caixa_atual.aberto_em)}
+                        </p>
+                    </div>
                 )}
             </div>
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-[#FAFAFA] border-b">
-                            <th className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-4 py-2">Descrição</th>
-                            <th className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 py-2">Tipo</th>
-                            <th className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-4 py-2 text-right">Valor</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {!movimentos.length? (
-                            <tr><td colSpan={3} className="text-[12px] text-gray-400 text-center py-10">Sem movimentos em {selectedDate.split('-').reverse().join('/')}</td></tr>
-                        ) : paginados.map((m: any) => {
+            {/* LISTA */}
+            <div className="bg-white m-[6px] mt-0 rounded-[18px] border border-black/5 overflow-hidden flex flex-col flex-1">
+                <div className="flex text-[10px] tracking-widest text-zinc-500 px-3 py-2.5 border-b border-black/10 shrink-0">
+                    <span className="flex-1">DESCRIÇÃO</span>
+                    <span className="w-[60px] text-center">TIPO</span>
+                    <span className="w-[90px] text-right">VALOR</span>
+                </div>
+
+                <div className="flex-1">
+                    {!movimentos.length? (
+                        <p className="text-center text-[12px] text-gray-400 py-16">Sem movimentos em {selectedDate.split('-').reverse().join('/')}</p>
+                    ) : (
+                        paginados.map((m: any) => {
                             const isPos = Number(m.valor) > 0;
                             const responsavel = m.criado_por_nome || m.aberto_por_nome || m.usuario_nome || "";
                             return (
-                                <tr key={m.id} className="border-b last:border-0 hover:bg-zinc-50/50">
-                                    <td className="px-4 py-2.5">
-                                        <p className="text-[11px] font-bold text-black leading-tight">{cleanDesc(m.descricao)}</p>
-                                        {/* MESMA LINHA - Data/Hora completa + Responsavel */}
-                                        <p className="text-[9px] text-gray-500 leading-none mt-1 flex items-center gap-1.5 flex-wrap">
+                                <div key={m.id} className="flex items-center px-3 py-3 border-b border-dashed border-black/10 last:border-0 hover:bg-zinc-50/50">
+                                    <div className="flex-1 min-w-0 pr-2">
+                                        <p className="text-[13px] font-medium text-black leading-[16px] break-words">{cleanDesc(m.descricao)}</p>
+                                        <p className="text-[9px] text-gray-500 leading-none mt-1.5 flex items-center gap-1.5 flex-wrap">
                                             <span>{formatFull(m.criado_em || m.data)}</span>
                                             {responsavel && (
                                                 <>
@@ -63,27 +79,33 @@ export function ExtratoList({ movimentos, selectedDate, statusCaixa }: { movimen
                                                 </>
                                             )}
                                         </p>
-                                    </td>
-                                    <td className={`px-2 py-2 text-[10px] font-black capitalize ${isPos? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>
+                                    </div>
+                                    <span className={`w-[60px] shrink-0 text-center text-[10px] font-black capitalize ${isPos? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>
                                         {String(m.tipo).toLowerCase()}
-                                    </td>
-                                    <td className={`px-4 py-2 text-right text-[11px] font-black ${isPos? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>
+                                    </span>
+                                    <span className={`w-[90px] shrink-0 text-right text-[13px] font-bold ${isPos? 'text-[#0CC06B]' : 'text-[#E53935]'}`}>
                                         {fmt(Number(m.valor))}
-                                    </td>
-                                </tr>
+                                    </span>
+                                </div>
                             )
-                        })}
-                    </tbody>
-                </table>
-            </div>
-
-            {showPagination && (
-                <div className="flex justify-end items-center gap-2 px-4 h-[40px] border-t">
-                    <span className="text-[10px] font-bold text-gray-400">{page}/{totalPages}</span>
-                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="w-6 h-6 rounded-full border flex items-center justify-center disabled:opacity-30"><ChevronLeft size={12} /></button>
-                    <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="w-6 h-6 rounded-full border flex items-center justify-center disabled:opacity-30"><ChevronRight size={12} /></button>
+                        })
+                    )}
                 </div>
-            )}
+
+                {showPagination && (
+                    <div className="flex justify-between items-center px-3 h-[48px] border-t bg-white shrink-0">
+                        <span className="text-[11px] font-bold text-zinc-500">{page}/{totalPages}</span>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center disabled:opacity-30 hover:bg-zinc-200 active:scale-95">
+                                <ChevronLeft size={14} />
+                            </button>
+                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center disabled:opacity-30 hover:bg-zinc-200 active:scale-95">
+                                <ChevronRight size={14} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     )
 }
