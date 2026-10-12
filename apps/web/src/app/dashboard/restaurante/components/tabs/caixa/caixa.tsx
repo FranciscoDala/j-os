@@ -32,11 +32,6 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 }
 const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const todayISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' });
-const sevenDaysAgoISO = () => {
-    const d = new Date();
-    d.setDate(d.getDate() - 6);
-    return d.toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' });
-};
 const STORAGE_KEY = "j-os:mostrar_extrato";
 const formatDateTimeFull = (iso: string) => {
     try { if (!iso) return "--"; return new Date(iso).toLocaleString('pt-PT', { timeZone: 'Africa/Luanda', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return iso; }
@@ -46,7 +41,7 @@ export function CaixaTab() {
     const [status, setStatus] = useState<any>(null);
     const [extrato, setExtrato] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [inicio, setInicio] = useState(sevenDaysAgoISO());
+    const [inicio, setInicio] = useState(todayISO());
     const [fim, setFim] = useState(todayISO());
     const [showExtrato, setShowExtrato] = useState(false);
     const [produtosDb, setProdutosDb] = useState<any[]>([]);
@@ -58,7 +53,6 @@ export function CaixaTab() {
     const [sangriaOpen, setSangriaOpen] = useState(false);
     const [sangriaTipo, setSangriaTipo] = useState<"SANGRIA" | "SUPRIMENTO">("SANGRIA");
     const [menuOpen, setMenuOpen] = useState(false);
-    const [showDateModal, setShowDateModal] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const menuRefMobile = useRef<HTMLDivElement>(null);
     const [confirm, setConfirm] = useState<{ open: boolean, title: string, desc: string, type: "black" | "green" | "red", action: () => void }>({ open: false, title: "", desc: "", type: "black", action: () => { } });
@@ -101,6 +95,7 @@ export function CaixaTab() {
                     const vendas = dV.items || dV.vendas || dV || [];
                     const map = new Map<string, any>();
                     const mapDia = new Map<string, any>();
+                    // Gera todos os dias do periodo selecionado (se inicio=fim = hoje, gera só 1 dia)
                     gerarDiasDoPeriodo(inicio, fim).forEach(d => mapDia.set(d.dia, d));
                     for (const v of vendas) {
                         if (v.status && v.status!== "CONCLUIDA") continue;
@@ -158,7 +153,6 @@ export function CaixaTab() {
     return (
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
-            {/* INPUTS COM TAMANHO ORIGINAL QUE ESTAVA */}
             <div className="hidden md:flex items-center justify-between">
                 <div className="flex gap-2 w-[calc((100%-32px)/3)]"><div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={inicio} onChange={setInicio} /></div><div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={fim} onChange={setFim} /></div></div>
                 <div className="relative" ref={menuRef}><button onClick={() => setMenuOpen(o =>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">≡</button>{menuOpen && (<div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-50"><button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button><button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button></div>)}</div>
@@ -181,11 +175,11 @@ export function CaixaTab() {
                         <div className="space-y-2.5">
                             <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white">
                                 <div className="flex -space-x-2">{top4.slice(0, 2).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-10 h-10 rounded-full object-cover border-2 border-white" />))}</div>
-                                <div><div className="text-[12px] font-black leading-none">Top-Selling Products</div><div className="text-[10px] text-zinc-500 mt-1 leading-tight">{top4[0]?.nome || "Sem vendas no período"}</div></div>
+                                <div><div className="text-[12px] font-black leading-none">Top-Selling Products</div><div className="text-[10px] text-zinc-500 mt-1 leading-tight">{top4[0]?.nome || "Sem vendas hoje"}</div></div>
                             </div>
                             <div className="flex items-center gap-3 p-3 rounded-[16px] bg-[#8B6A5A] text-white shadow-lg -mx-1">
                                 <div className="flex -space-x-2">{top4.slice(0, 3).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-[#8B6A5A]" />))}</div>
-                                <div><div className="text-[12px] font-black leading-none">Trending Now</div><div className="text-[10px] opacity-80 mt-1">"{top4[0]?.qtd_vendida || 0} vendidos ✨"</div></div>
+                                <div><div className="text-[12px] font-black leading-none">Trending Now</div><div className="text-[10px] opacity-80 mt-1">"{top4[0]?.qtd_vendida || 0} vendidos hoje ✨"</div></div>
                             </div>
                             <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white">
                                 <div className="flex -space-x-2">{top4.slice(0, 4).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-white" />))}</div>
@@ -207,7 +201,7 @@ export function CaixaTab() {
                 </div>
 
                 <div className="grid gap-2.5 md:gap-3 grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                    {top4.length === 0? (<div className="col-span-4 py-10 text-center bg-white rounded-[22px] border text-[12px] text-zinc-400">Nenhuma venda neste período de {inicio} a {fim}</div>) : (top4.map((p: any) => (<ProdutoMaisVendidoCard key={p.produto_id || p.id} p={p} />)))}
+                    {top4.length === 0? (<div className="col-span-4 py-10 text-center bg-white rounded-[22px] border text-[12px] text-zinc-400">Nenhuma venda hoje ({fim})</div>) : (top4.map((p: any) => (<ProdutoMaisVendidoCard key={p.produto_id || p.id} p={p} />)))}
                 </div>
             </div>
 
