@@ -218,11 +218,7 @@ export function CaixaTab() {
                 </div>
 
                 <div className="space-y-2">
-                    <div className="w-full bg-white border rounded-full px-4 py-3 flex items-center justify-center gap-3 text-[12px] font-black shadow-sm">
-                        <span className="whitespace-nowrap">📅 {inicio}</span>
-                        <span className="opacity-30">To</span>
-                        <span className="whitespace-nowrap">📅 {fim}</span>
-                    </div>
+                    
                     <div className="text-[11px] font-bold text-zinc-400 text-left px-1">
                         {vendasPorDia.length} dias • {maisVendidos.length} produtos • Período dinâmico
                     </div>
