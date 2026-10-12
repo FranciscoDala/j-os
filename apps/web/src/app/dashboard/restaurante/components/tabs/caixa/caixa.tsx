@@ -1,54 +1,52 @@
 "use client";
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { CaixaModal } from "./modals/open_close";
 import { SangriaModal } from "./modals/saida";
 import { MasterCard, EntradasCard, SaidasCard } from "./cards/cards_master";
 import { JCalendarPicker } from "./cards/date-picker";
 import { JConfirm } from "./modals/confirm";
 import { ExtratoList } from "./table/extrato-list";
-import { JSelect } from "./select/j-select";
-import { ProdutosReport } from "./reports/produtos-report";
 import { toast } from "sonner";
-import { TrendingUp } from "lucide-react";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
-const BASE = `${API_URL}/api/v1`;
-const API_PROD = `${BASE}/produtos`;
-const API_VENDAS = `${BASE}/vendas`;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com";
+const BASE = `${API_URL.replace(/\/$/, "")}/api/v1`;
 
 function getAuthHeaders() {
-    const token = typeof window!== "undefined"? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null;
-    const empresa_id = typeof window!== "undefined"? localStorage.getItem("empresa_id") : null;
+    const token = typeof window !== "undefined" ? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null;
+    const empresa_id = typeof window !== "undefined" ? localStorage.getItem("empresa_id") : null;
     const h: Record<string, string> = {};
     if (token) h["Authorization"] = `Bearer ${token}`;
     if (empresa_id) h["X-Empresa-ID"] = empresa_id;
     return h;
 }
+
 async function apiFetch(path: string, options: RequestInit = {}) {
-    const headers: any = { "Content-Type": "application/json",...getAuthHeaders(),...(options.headers || {}) };
+    const headers: any = { "Content-Type": "application/json", ...getAuthHeaders(), ...(options.headers || {}) };
     if (options.body instanceof FormData) delete headers["Content-Type"];
-    const res = await fetch(`${BASE}${path}`, {...options, headers, cache: "no-store" as any });
+    const res = await fetch(`${BASE}${path}`, { ...options, headers, cache: "no-store" as any });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) throw d;
     return d;
 }
+
 const fmt = (v: number) => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const todayISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' });
 const STORAGE_KEY = "j-os:mostrar_extrato";
-const TAB_KEY = "j-os:caixa_tab";
-const formatDateTimeFull = (iso: string) => { try { if (!iso) return "--"; return new Date(iso).toLocaleString('pt-PT', { timeZone: 'Africa/Luanda', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return iso; } };
-const formatDia = (iso: string) => { try { return new Date(iso).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' }); } catch { return iso; } };
+
+const formatDateTimeFull = (iso: string) => {
+    try {
+        if (!iso) return "--";
+        return new Date(iso).toLocaleString('pt-PT', { timeZone: 'Africa/Luanda', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch { return iso; }
+};
 
 export function CaixaTab() {
     const [status, setStatus] = useState<any>(null);
     const [extrato, setExtrato] = useState<any>(null);
-    const [dbProducts, setDbProducts] = useState<any[]>([]);
-    const [produtosRank, setProdutosRank] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [inicio, setInicio] = useState(todayISO());
     const [fim, setFim] = useState(todayISO());
-    const [showExtrato, setShowExtrato] = useState(true);
-    const [activeTab, setActiveTab] = useState<any>("produtos");
+    const [showExtrato, setShowExtrato] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<"abrir" | "fechar" | "forcar">("abrir");
     const [sangriaOpen, setSangriaOpen] = useState(false);
@@ -56,12 +54,12 @@ export function CaixaTab() {
     const [menuOpen, setMenuOpen] = useState(false);
     const [showDateModal, setShowDateModal] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
-    const [confirm, setConfirm] = useState<{ open: boolean, title: string, desc: string, type: "black" | "green" | "red", action: () => void }>({ open: false, title: "", desc: "", type: "black", action: () => {} });
+    const menuRefMobile = useRef<HTMLDivElement>(null);
+    const [confirm, setConfirm] = useState<{ open: boolean, title: string, desc: string, type: "black" | "green" | "red", action: () => void }>({ open: false, title: "", desc: "", type: "black", action: () => { } });
 
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            // 1. CAIXA
             const s = await apiFetch("/caixa/status").catch(() => null);
             setStatus(s);
             const hoje = todayISO();
@@ -69,80 +67,6 @@ export function CaixaTab() {
             if (inicio === hoje && fim === hoje && s?.aberto) ext = await apiFetch("/caixa/extrato");
             else ext = await apiFetch(`/caixa/extrato-por-periodo?inicio=${inicio}&fim=${fim}`);
             setExtrato(ext);
-
-            // 2. PRODUTOS DO BANCO - IGUAL NA VENDAS TAB
-            const qsProd = new URLSearchParams({ skip: "0", limit: "1000" });
-            const rProd = await fetch(`${API_PROD}/?${qsProd}`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
-            const dataProd = await rProd.json();
-            const produtosDb = (dataProd.items || dataProd || []).filter((p: any) => p.ativo!== false);
-            setDbProducts(produtosDb);
-
-            // 3. RANKING - tenta pegar do backend, se não existir calcula com vendas
-            try {
-                const prod = await apiFetch(`/relatorios/produtos?inicio=${inicio}&fim=${fim}`);
-                const raw = Array.isArray(prod)? prod : prod?.ranking || prod?.mais_vendidos || prod?.produtos || [];
-                if (raw.length>0) {
-                    const enriched = raw.map((p:any)=>{
-                        const db = produtosDb.find((x:any)=> String(x.id)===String(p.produto_id||p.id));
-                        return {
-                            id: p.produto_id || p.id,
-                            nome: db?.nome || p.nome || p.nome_produto,
-                            nome_produto: db?.nome || p.nome,
-                            preco: db?.preco_venda || p.preco_venda || 0,
-                            imagem_url: db?.imagem_url || p.imagem_url,
-                            img: db?.imagem_url? `${API_URL}${db.imagem_url}` : (p.imagem_url? `${API_URL}${p.imagem_url}` : null),
-                            qtd_vendida: p.qtd_vendida || p.quantidade || 0,
-                            total: p.total_vendido || p.total || 0
-                        };
-                    });
-                    setProdutosRank(enriched);
-                } else {
-                    // sem endpoint, mostra produtos do banco com stock
-                    setProdutosRank(produtosDb.map((p:any)=> ({
-                        id: p.id, nome: p.nome, nome_produto: p.nome, preco: p.preco_venda,
-                        imagem_url: p.imagem_url, img: p.imagem_url? `${API_URL}${p.imagem_url}` : null,
-                        qtd_vendida: 0, total: 0, stock_atual: p.stock_atual
-                    })));
-                }
-            } catch {
-                // fallback: calcula a partir de /vendas
-                try {
-                    const qsV = new URLSearchParams({ inicio, fim, skip: "0", limit: "500" });
-                    const rV = await fetch(`${API_VENDAS}/?${qsV}`, { headers: getAuthHeaders() as any });
-                    const dV = await rV.json();
-                    const vendas = dV.items || dV.vendas || dV || [];
-                    const map = new Map<string, { qtd:number, total:number }>();
-                    for (const v of vendas) {
-                        for (const it of (v.itens||[])) {
-                            const pid = String(it.produto_id);
-                            const q = Number(it.quantidade||1);
-                            const tot = Number(it.total||it.subtotal||0);
-                            if (map.has(pid)) { const c=map.get(pid)!; c.qtd+=q; c.total+=tot; }
-                            else map.set(pid, { qtd:q, total:tot });
-                        }
-                    }
-                    const ranking = Array.from(map.entries()).map(([pid, agg])=>{
-                        const db = produtosDb.find((p:any)=> String(p.id)===pid);
-                        return {
-                            id: pid, nome: db?.nome||"Produto", nome_produto: db?.nome,
-                            preco: db?.preco_venda||0, imagem_url: db?.imagem_url,
-                            img: db?.imagem_url? `${API_URL}${db.imagem_url}` : null,
-                            qtd_vendida: agg.qtd, total: agg.total
-                        };
-                    }).sort((a,b)=>b.qtd_vendida-a.qtd_vendida);
-                    setProdutosRank(ranking.length? ranking : produtosDb.slice(0,8).map((p:any)=>({
-                        id:p.id, nome:p.nome, nome_produto:p.nome, preco:p.preco_venda,
-                        imagem_url:p.imagem_url, img: p.imagem_url? `${API_URL}${p.imagem_url}` : null,
-                        qtd_vendida:0, total:0
-                    })));
-                } catch {
-                    setProdutosRank(produtosDb.slice(0,8).map((p:any)=>({
-                        id:p.id, nome:p.nome, nome_produto:p.nome, preco:p.preco_venda,
-                        imagem_url:p.imagem_url, img: p.imagem_url? `${API_URL}${p.imagem_url}` : null,
-                        qtd_vendida:0, total:0
-                    })));
-                }
-            }
         } catch {
             setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0, total_entradas: 0, total_saidas: 0, qtd_caixas: 0, periodo_inicio: inicio, periodo_fim: fim });
         }
@@ -151,73 +75,203 @@ export function CaixaTab() {
 
     useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved!==null) setShowExtrato(saved==="true");
-        const t = localStorage.getItem(TAB_KEY);
-        if (t) setActiveTab(t);
+        if (saved !== null) setShowExtrato(saved === "true");
+        else setShowExtrato(false);
     }, []);
-    useEffect(()=>{ load(); },[load]);
-    useEffect(()=>{ const h=(e:MouseEvent)=>{ if(menuRef.current &&!menuRef.current.contains(e.target as Node)) setMenuOpen(false); }; document.addEventListener("mousedown",h); return()=>document.removeEventListener("mousedown",h); },[]);
+
+    useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        const h = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+            if (menuRefMobile.current && !menuRefMobile.current.contains(e.target as Node)) setMenuOpen(false);
+        };
+        document.addEventListener("mousedown", h);
+        return () => document.removeEventListener("mousedown", h);
+    }, []);
+
+    useEffect(() => {
+        const hoje = todayISO();
+        const isHoje = inicio === hoje && fim === hoje;
+
+        const onExtratoPush = (e: any) => {
+            if (!isHoje) { load(); return; }
+            const m = e.detail?.data || e.detail;
+            if (!m) return;
+            const valor = Number(m.valor ?? m.total_venda ?? m.total ?? 0);
+            if (!m.id && valor === 0) return;
+
+            setExtrato((prev: any) => {
+                if (!prev) return prev;
+                if (m.id && prev.movimentos?.some((x: any) => x.id === m.id)) return prev;
+                if (m.venda_id && prev.movimentos?.some((x: any) => x.venda_id === m.venda_id)) return prev;
+
+                const novoMovs = [m, ...(prev.movimentos || [])];
+                return {
+                    ...prev,
+                    movimentos: novoMovs,
+                    saldo_atual: Number(prev.saldo_atual || 0) + valor,
+                    total_entradas: valor > 0 ? Number(prev.total_entradas || 0) + valor : prev.total_entradas,
+                    total_saidas: valor < 0 ? Number(prev.total_saidas || 0) + valor : prev.total_saidas,
+                };
+            });
+        };
+
+        const onCaixaFullUpdate = () => load();
+
+        window.addEventListener("caixa:extrato" as any, onExtratoPush);
+        window.addEventListener("caixa:update" as any, onCaixaFullUpdate);
+        window.addEventListener("caixa.updated" as any, onCaixaFullUpdate);
+        window.addEventListener("caixa:atualizado" as any, onCaixaFullUpdate);
+        window.addEventListener("venda:nova" as any, onExtratoPush);
+        window.addEventListener("venda:fechada" as any, onExtratoPush);
+        window.addEventListener("venda:update" as any, onExtratoPush);
+
+        return () => {
+            window.removeEventListener("caixa:extrato" as any, onExtratoPush);
+            window.removeEventListener("caixa:update" as any, onCaixaFullUpdate);
+            window.removeEventListener("caixa.updated" as any, onCaixaFullUpdate);
+            window.removeEventListener("caixa:atualizado" as any, onCaixaFullUpdate);
+            window.removeEventListener("venda:nova" as any, onExtratoPush);
+            window.removeEventListener("venda:fechada" as any, onExtratoPush);
+            window.removeEventListener("venda:update" as any, onExtratoPush);
+        };
+    }, [inicio, fim, load]);
 
     const movs = extrato?.movimentos || [];
     const entradas = Number(extrato?.total_entradas || 0);
     const saidas = Math.abs(Number(extrato?.total_saidas || 0));
-    const atual = Number(extrato?.saldo_atual??0);
-    const vendasPorDia = useMemo(()=>{
-        const map: Record<string, number> = {};
-        movs.filter((m:any)=>(m.tipo||"").toUpperCase().includes("VENDA")||Number(m.valor)>0).forEach((m:any)=>{
-            const d=(m.criado_em||m.data||"").slice(0,10); if(!d) return;
-            map[d]=(map[d]||0)+Math.abs(Number(m.valor||0));
-        });
-        return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0])).map(([dia,total])=>({ dia, total, label: formatDia(dia) }));
-    },[movs]);
-    const maxVendas = Math.max(...vendasPorDia.map(v=>v.total),1);
-    const maisVendidos = useMemo(()=>[...produtosRank].sort((a,b)=>(b.qtd_vendida||0)-(a.qtd_vendida||0)),[produtosRank]);
+    const atual = Number(extrato?.saldo_atual ?? 0);
 
-    const handleCardClick = (type:any)=>{
-        if(type==="master"){
-            if(status?.aberto) setConfirm({ open:true, title:"Fechar caixa?", desc:`Saldo Kz ${fmt(atual)}. Fechar?`, type:"black", action:()=>{ setModalMode("fechar"); setModalOpen(true); }});
-            else setConfirm({ open:true, title:"Abrir caixa?", desc:"Iniciar novo turno.", type:"black", action:()=>{ setModalMode("abrir"); setModalOpen(true); }});
+    const handleCardClick = (type: "master" | "entradas" | "saidas") => {
+        if (type === "master") {
+            if (status?.aberto) setConfirm({ open: true, title: "Fechar caixa?", desc: `Saldo Kz ${fmt(atual)}. Fechar?`, type: "black", action: () => { setModalMode("fechar"); setModalOpen(true); } });
+            else setConfirm({ open: true, title: "Abrir caixa?", desc: "Iniciar novo turno.", type: "black", action: () => { setModalMode("abrir"); setModalOpen(true); } });
         }
-        if(type==="entradas"){ if(!status?.aberto){ toast.error("Abre o caixa primeiro!"); return; } setConfirm({ open:true, title:"Suprimento?", desc:"Adicionar?", type:"green", action:()=>{ setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true); }});}
-        if(type==="saidas"){ if(!status?.aberto){ toast.error("Abre o caixa primeiro!"); return; } setConfirm({ open:true, title:"Sangria?", desc:"Retirar?", type:"red", action:()=>{ setSangriaTipo("SANGRIA"); setSangriaOpen(true); }});}
+        if (type === "entradas") {
+            if (!status?.aberto) { toast.error("ATT: você não podes adicionar valores sem antes abrir um caixa, porfavor abra o seu caixa para prosseguir!"); return; }
+            setConfirm({ open: true, title: "Suprimento?", desc: "Adicionar?", type: "green", action: () => { setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true); } });
+        }
+        if (type === "saidas") {
+            if (!status?.aberto) { toast.error("ATT: você não podes fazer uma saída sem antes abrir um caixa, porfavor abra o seu caixa para prosseguir!"); return; }
+            setConfirm({ open: true, title: "Sangria?", desc: "Retirar?", type: "red", action: () => { setSangriaTipo("SANGRIA"); setSangriaOpen(true); } });
+        }
     };
-    const handleBaixar=()=>{ setMenuOpen(false); const linhas=[["Data","Tipo","Valor","Descricao"]]; movs.forEach((m:any)=>{ linhas.push([formatDateTimeFull(m.criado_em),m.tipo,String(m.valor),(m.descricao||"").replace(/;/g,",")]); }); const csv=linhas.map(r=>r.join(";")).join("\n"); const blob=new Blob(["\uFEFF"+csv],{type:"text/csv"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=`relatorio-${activeTab}-${inicio}_a_${fim}.csv`; a.click(); URL.revokeObjectURL(url); };
 
-    if(loading &&!extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
-    const caixaAtual=status?.caixa_atual;
-    const dataAberturaFull=caixaAtual?.aberto_em? formatDateTimeFull(caixaAtual.aberto_em) : "";
+    const handleBaixar = () => {
+        setMenuOpen(false);
+        const linhas = [["Data", "Tipo", "Valor", "Descricao", "Responsavel"]];
+        movs.forEach((m: any) => {
+            const data = formatDateTimeFull(m.criado_em || m.data);
+            linhas.push([data, m.tipo, String(m.valor), (m.descricao || "").replace(/;/g, ","), m.criado_por_nome || m.aberto_por_nome || ""]);
+        });
+        linhas.push([]); linhas.push(["Periodo", `${inicio} ate ${fim}`]);
+        linhas.push(["Caixa", status?.aberto ? `Aberto por ${status?.caixa_atual?.aberto_por_nome} em ${formatDateTimeFull(status?.caixa_atual?.aberto_em)}` : "Fechado"]);
+        const csv = linhas.map(r => r.join(";")).join("\n");
+        const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a"); a.href = url; a.download = `relatorio-caixa-${inicio}_a_${fim}.csv`; a.click();
+        URL.revokeObjectURL(url);
+    };
+    const handleImprimir = () => {
+        setMenuOpen(false);
+        const win = window.open("", "_blank"); if (!win) return;
+        const responsavelCaixa = status?.caixa_atual?.aberto_por_nome ? ` - Aberto por: ${status.caixa_atual.aberto_por_nome} em ${formatDateTimeFull(status.caixa_atual.aberto_em)}` : "";
+        const html = `<html><head><title>Relatorio ${inicio} - ${fim}</title><style>body{font-family:monospace;padding:20px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:6px;font-size:11px} th{background:#000;color:#fff}.info{margin-bottom:10px;font-size:12px}</style></head><body><h2>J-OS - ${inicio} ate ${fim}</h2><div class="info">Caixa: ${status?.aberto ? 'Aberto' : 'Fechado'}${responsavelCaixa}</div><table><thead><tr><th>Data/Hora</th><th>Tipo</th><th>Valor</th><th>Descricao</th><th>Responsavel</th></tr></thead><tbody>${movs.map((m: any) => `<tr><td>${formatDateTimeFull(m.criado_em)}</td><td>${m.tipo}</td><td>${fmt(Number(m.valor))}</td><td>${m.descricao || ''}</td><td>${m.criado_por_nome || m.aberto_por_nome || ''}</td></tr>`).join("")}</tbody></table><script>window.print()</script></body></html>`;
+        win.document.write(html); win.document.close();
+    };
+
+    if (loading && !extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
+
+    const caixaAtual = status?.caixa_atual;
+    const dataAberturaFull = caixaAtual?.aberto_em ? formatDateTimeFull(caixaAtual.aberto_em) : "";
 
     return (
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
-            <div className="hidden md:flex items-center justify-between gap-3">
-                <div className="flex gap-2"><div className="h-[48px] w-[160px]"><JCalendarPicker value={inicio} onChange={setInicio}/></div><div className="h-[48px] w-[160px]"><JCalendarPicker value={fim} onChange={setFim}/></div></div>
-                <div className="flex items-center gap-2"><JSelect value={activeTab} onChange={setActiveTab}/><div className="relative" ref={menuRef}><button onClick={()=>setMenuOpen(o=>!o)} className="h-[48px] w-[48px] bg-black text-white rounded-full flex items-center justify-center">⬇</button>{menuOpen && (<div className="absolute right-0 top-[54px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-50"><button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar CSV</button></div>)}</div></div>
-            </div>
-            <div className="flex md:hidden flex-col gap-3"><JSelect value={activeTab} onChange={setActiveTab}/><div className="flex gap-2"><button onClick={()=>setShowDateModal(true)} className="flex-1 h-[46px] bg-[#EDEBE6] border rounded-full text-[11px] font-black uppercase"> {inicio.slice(5)} até {fim.slice(5)} </button><button onClick={handleBaixar} className="h-[46px] w-[46px] bg-black text-white rounded-full">⬇</button></div></div>
-            {showDateModal && (<div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:hidden"><div className="absolute inset-0 bg-black/50" onClick={()=>setShowDateModal(false)}/><div className="relative w-full max-w-[340px] bg-[#EDEBE6] rounded-[24px] p-1.5"><div className="bg-white rounded-[18px] p-5"><h3 className="text-[14px] font-black uppercase text-center mb-4">Filtrar período</h3><div className="space-y-3"><div className="h-[46px] w-full"><JCalendarPicker value={inicio} onChange={setInicio}/></div><div className="h-[46px] w-full"><JCalendarPicker value={fim} onChange={setFim}/></div></div><button onClick={()=>setShowDateModal(false)} className="mt-5 w-full h-[46px] bg-black text-white rounded-full text-[12px] font-black uppercase">Aplicar</button></div></div></div>)}
-            <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
-                <div onClick={()=>handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition"><MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante={caixaAtual?.aberto_por_nome? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE"} dataAbertura={dataAberturaFull? dataAberturaFull.split(',')[0] : inicio.slice(5)} horaAbertura={dataAberturaFull? dataAberturaFull.split(',').pop()?.trim()||"" : "--:--"} /></div>
-                <div onClick={()=>handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition"><EntradasCard entradas={entradas} nome="J-OS" dataHoje={inicio.slice(5)} qtdVendas={movs.filter((m:any)=>(m.tipo||"").toUpperCase().includes("VENDA")).length} /></div>
-                <div onClick={()=>handleCardClick("saidas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition"><SaidasCard saidas={saidas} nome="J-OS" hora={new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} retirado={saidas>0?'1':'0'} /></div>
-            </div>
-            <div className="flex justify-end"><button onClick={()=>{ const v=!showExtrato; setShowExtrato(v); localStorage.setItem(STORAGE_KEY,String(v)); }}><div className={`w-[44px] h-[26px] rounded-full p-[3px] transition-colors ${showExtrato?'bg-green-500':'bg-zinc-300'}`}><div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-all ${showExtrato?'translate-x-[18px]':''}`} /></div></button></div>
-            {showExtrato && (
-                <>
-                    {activeTab==="extrato" && <ExtratoList movimentos={movs} selectedDate={extrato?.periodo_inicio||inicio} statusCaixa={status} />}
-                    {activeTab==="vendas" && (
-                        <div className="space-y-4">
-                            <div className="bg-[#EDEBE6] border border-black/10 rounded-[24px] p-[6px]"><div className="bg-white rounded-[18px] p-5"><div className="flex items-center justify-between mb-6"><h3 className="font-black text-[12px] uppercase flex items-center gap-2"><TrendingUp size={16}/> Vendas por dia • {dbProducts.length} produtos</h3><span className="text-[11px] text-zinc-500 font-bold">{inicio} até {fim}</span></div>{vendasPorDia.length===0? <div className="py-10 text-center text-[12px] text-zinc-400">Sem vendas</div> : (<div className="flex items-end gap-2 h-[160px] px-2">{vendasPorDia.map((v:any)=>(<div key={v.dia} className="flex-1 flex flex-col items-center gap-2 group"><div className="relative w-full flex justify-center" style={{height:'130px'}}><div className="absolute bottom-0 w-full max-w-[48px] bg-black rounded-t-[10px]" style={{height:`${(v.total/maxVendas)*100}%`}}/><div className="absolute -top-8 opacity-0 group-hover:opacity-100 bg-black text-white text-[10px] font-bold px-2 py-1 rounded-full">Kz {fmt(v.total)}</div></div><span className="text-[10px] font-bold uppercase text-zinc-500">{v.label}</span></div>))}</div>)}</div></div>
-                            <div className="bg-[#EDEBE6] border rounded-[24px] p-[6px]"><div className="bg-white rounded-[18px] divide-y">{movs.filter((m:any)=>(m.tipo||"").toUpperCase().includes("VENDA")).slice(0,20).map((m:any)=>(<div key={m.id||m.venda_id} className="flex items-center justify-between p-4"><div><div className="text-[12px] font-black">{m.descricao||`Venda #${m.venda_id||m.id}`}</div><div className="text-[11px] text-zinc-500">{formatDateTimeFull(m.criado_em)}</div></div><div className="text-[13px] font-black">Kz {fmt(Number(m.valor))}</div></div>))}</div></div>
+
+            <div className="hidden md:flex items-center justify-between">
+                <div className="flex gap-2 w-[calc((100%-32px)/3)]">
+                    <div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
+                    <div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={fim} onChange={setFim} /></div>
+                </div>
+                <div className="relative" ref={menuRef}>
+                    <button onClick={() => setMenuOpen(o => !o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
+                    </button>
+                    {menuOpen && (
+                        <div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-50">
+                            <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button>
+                            <div className="h-[1px] bg-zinc-100" />
+                            <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button>
                         </div>
                     )}
-                    {activeTab==="produtos" && <ProdutosReport produtos={maisVendidos} vendasPorDia={vendasPorDia} inicio={inicio} fim={fim} />}
-                    {activeTab==="geral" && (<div className="bg-[#EDEBE6] border rounded-[24px] p-[6px]"><div className="bg-white rounded-[18px] p-5 space-y-4"><h3 className="font-black text-[12px] uppercase">Resumo Geral - {inicio} até {fim}</h3><div className="grid grid-cols-2 md:grid-cols-4 gap-3"><div className="bg-black text-white rounded-[16px] p-4"><div className="text-[10px] opacity-60 uppercase font-black">Faturamento</div><div className="text-[16px] font-black mt-1">Kz {fmt(entradas)}</div></div><div className="bg-zinc-100 rounded-[16px] p-4"><div className="text-[10px] opacity-60 uppercase font-black">Saídas</div><div className="text-[16px] font-black mt-1">Kz {fmt(saidas)}</div></div><div className="bg-green-500 text-white rounded-[16px] p-4"><div className="text-[10px] opacity-80 uppercase font-black">Lucro</div><div className="text-[16px] font-black mt-1">Kz {fmt(entradas-saidas)}</div></div><div className="bg-white border rounded-[16px] p-4"><div className="text-[10px] opacity-60 uppercase font-black">Ticket Médio</div><div className="text-[16px] font-black mt-1">Kz {fmt(movs.length? entradas/(movs.filter((m:any)=>(m.tipo||"").toUpperCase().includes("VENDA")).length||1) :0)}</div></div></div></div></div>)}
-                </>
+                </div>
+            </div>
+
+            <div className="flex md:hidden justify-end items-center gap-2">
+                <button onClick={() => setShowDateModal(true)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                </button>
+                <div className="relative" ref={menuRefMobile}>
+                    <button onClick={() => setMenuOpen(o => !o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
+                    </button>
+                    {menuOpen && (
+                        <div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-[9999]">
+                            <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button>
+                            <div className="h-[1px] bg-zinc-100" />
+                            <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {showDateModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:hidden">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowDateModal(false)} />
+                    <div className="relative w-full max-w-[340px] bg-white rounded-[24px] p-5 shadow-2xl">
+                        <h3 className="text-[14px] font-black uppercase tracking-widest mb-4 text-center">Filtrar por período</h3>
+                        <div className="space-y-3">
+                            <div className="h-[46px] w-full"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
+                            <div className="h-[46px] w-full"><JCalendarPicker value={fim} onChange={setFim} /></div>
+                        </div>
+                        <button onClick={() => setShowDateModal(false)} className="mt-5 w-full h-[46px] bg-black text-white rounded-full text-[12px] font-black uppercase tracking-widest">Aplicar</button>
+                    </div>
+                </div>
             )}
-            <JConfirm open={confirm.open} title={confirm.title} desc={confirm.desc} type={confirm.type} onClose={()=>setConfirm(s=>({...s, open:false}))} onConfirm={confirm.action} />
-            <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={status?.caixa_atual||extrato} onClose={()=>setModalOpen(false)} onSuccess={async()=>{ await load(); toast.success("Caixa atualizado!"); }} />
-            <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={()=>setSangriaOpen(false)} onSuccess={async()=>{ await load(); toast.success("Movimento registrado!"); }} />
+
+            <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
+                <div onClick={() => handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
+                    <MasterCard
+                        aberto={!!status?.aberto}
+                        atual={atual}
+                        nomeRestaurante={caixaAtual?.aberto_por_nome ? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE"}
+                        dataAbertura={dataAberturaFull ? dataAberturaFull.split(',')[0] || dataAberturaFull.split(' ')[0] : inicio.slice(5).replace("-", "/")}
+                        horaAbertura={dataAberturaFull ? dataAberturaFull.split(',').pop()?.trim() || dataAberturaFull : (movs[0] ? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : "--:--")}
+                    />
+                </div>
+                <div onClick={() => handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
+                    <EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={inicio.slice(5).replace("-", "/")} qtdVendas={movs.filter((m: any) => (m.tipo || "").toUpperCase().includes("VENDA")).length} />
+                </div>
+                <div onClick={() => handleCardClick("saidas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
+                    <SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })} retirado={saidas > 0 ? '1' : '0'} />
+                </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+                <button onClick={() => { const v = !showExtrato; setShowExtrato(v); localStorage.setItem(STORAGE_KEY, String(v)); }} className="flex items-center gap-2">
+                    <div className={`w-[44px] h-[26px] rounded-full p-[3px] transition-colors ${showExtrato ? 'bg-green-500' : 'bg-zinc-300'}`}>
+                        <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-all ${showExtrato ? 'translate-x-[18px]' : 'translate-x-0'}`} />
+                    </div>
+                </button>
+            </div>
+
+            {showExtrato && <ExtratoList movimentos={movs} selectedDate={extrato?.periodo_inicio || inicio} statusCaixa={status} />}
+
+            <JConfirm open={confirm.open} title={confirm.title} desc={confirm.desc} type={confirm.type} onClose={() => setConfirm(s => ({ ...s, open: false }))} onConfirm={confirm.action} />
+            <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={status?.caixa_atual || extrato} onClose={() => setModalOpen(false)} onSuccess={async () => { await load(); toast.success("Caixa atualizado!"); }} />
+            <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={() => setSangriaOpen(false)} onSuccess={async () => { await load(); toast.success("Movimento registrado!"); }} />
         </div>
     )
 }
