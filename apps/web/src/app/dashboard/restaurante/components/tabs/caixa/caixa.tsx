@@ -45,9 +45,10 @@ export function CaixaTab() {
     const [fim, setFim] = useState(todayISO());
     const [showExtrato, setShowExtrato] = useState(false);
     const [produtosDb, setProdutosDb] = useState<any[]>([]);
+    const [vendasBrutas, setVendasBrutas] = useState<any[]>([]);
     const [maisVendidos, setMaisVendidos] = useState<any[]>([]);
     const [vendasPorDia, setVendasPorDia] = useState<any[]>([]);
-    const [filtroSales, setFiltroSales] = useState<"All Sales" | "Pending" | "Completed">("All Sales");
+    const [filtroSales, setFiltroSales] = useState<"Todas" | "Pendentes" | "Concluídas">("Todas");
     const [modalOpen, setModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<"abrir" | "fechar" | "forcar">("abrir");
     const [sangriaOpen, setSangriaOpen] = useState(false);
@@ -93,36 +94,53 @@ export function CaixaTab() {
                 if (rV.ok) {
                     const dV = await rV.json();
                     const vendas = dV.items || dV.vendas || dV || [];
-                    const map = new Map<string, any>();
-                    const mapDia = new Map<string, any>();
-                    gerarDiasDoPeriodo(inicio, fim).forEach(d => mapDia.set(d.dia, d));
-                    for (const v of vendas) {
-                        if (v.status && v.status!== "CONCLUIDA") continue;
-                        const dataV = new Date(v.created_at || v.criado_em);
-                        const diaKey = dataV.toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' });
-                        if (!mapDia.has(diaKey)) continue;
-                        const curDia = mapDia.get(diaKey);
-                        curDia.total += Number(v.total || 0);
-                        curDia.qtd += 1;
-                        curDia.ticket = curDia.qtd > 0? curDia.total / curDia.qtd : 0;
-                        for (const it of (v.itens || [])) {
-                            const pid = String(it.produto_id);
-                            const cur = map.get(pid) || { qtd_vendida: 0, faturamento: 0, nome_produto: it.nome_produto, produto_id: pid };
-                            cur.qtd_vendida += Number(it.quantidade || 0);
-                            cur.faturamento += Number(it.total || 0);
-                            map.set(pid, cur);
-                        }
-                    }
-                    setVendasPorDia(Array.from(mapDia.values()).sort((a, b) => new Date(a.dia).getTime() - new Date(b.dia).getTime()));
-                    let ranking = Array.from(map.values()).map((m: any) => {
-                        const db = items.find((p: any) => String(p.id) === String(m.produto_id));
-                        return {...m,...db, nome: db?.nome || m.nome_produto, imagem_url: db?.imagem_url, preco_venda: db?.preco_venda, stock_atual: db?.stock_atual, controlar_stock: db?.controlar_stock, categoria: db?.categoria };
-                    }).sort((a, b) => b.qtd_vendida - a.qtd_vendida).slice(0, 8).map((p, i) => ({...p, rank: i + 1 }));
-                    setMaisVendidos(ranking.length > 0? ranking : []);
+                    setVendasBrutas(vendas);
                 }
-            } catch { setMaisVendidos([]); }
+            } catch { setVendasBrutas([]); }
         } catch (e) { console.log("erro produtos db", e); }
     }, [inicio, fim]);
+
+    // RECALCULA GRAFICO E PRODUTOS QUANDO MUDA O FILTRO
+    useEffect(() => {
+        const items = produtosDb;
+        const vendas = vendasBrutas;
+
+        const filtradas = vendas.filter((v: any) => {
+            const st = (v.status || "CONCLUIDA").toUpperCase();
+            if (filtroSales === "Todas") return true;
+            if (filtroSales === "Pendentes") return st.includes("PEND");
+            if (filtroSales === "Concluídas") return st.includes("CONCL");
+            return true;
+        });
+
+        const map = new Map<string, any>();
+        const mapDia = new Map<string, any>();
+        gerarDiasDoPeriodo(inicio, fim).forEach(d => mapDia.set(d.dia, d));
+
+        for (const v of filtradas) {
+            const dataV = new Date(v.created_at || v.criado_em);
+            const diaKey = dataV.toLocaleDateString('en-CA', { timeZone: 'Africa/Luanda' });
+            if (!mapDia.has(diaKey)) continue;
+            const curDia = mapDia.get(diaKey);
+            curDia.total += Number(v.total || 0);
+            curDia.qtd += 1;
+            curDia.ticket = curDia.qtd > 0? curDia.total / curDia.qtd : 0;
+            for (const it of (v.itens || [])) {
+                const pid = String(it.produto_id);
+                const cur = map.get(pid) || { qtd_vendida: 0, faturamento: 0, nome_produto: it.nome_produto, produto_id: pid };
+                cur.qtd_vendida += Number(it.quantidade || 0);
+                cur.faturamento += Number(it.total || 0);
+                map.set(pid, cur);
+            }
+        }
+
+        setVendasPorDia(Array.from(mapDia.values()).sort((a, b) => new Date(a.dia).getTime() - new Date(b.dia).getTime()));
+        let ranking = Array.from(map.values()).map((m: any) => {
+            const db = items.find((p: any) => String(p.id) === String(m.produto_id));
+            return {...m,...db, nome: db?.nome || m.nome_produto, imagem_url: db?.imagem_url, preco_venda: db?.preco_venda, stock_atual: db?.stock_atual, controlar_stock: db?.controlar_stock, categoria: db?.categoria };
+        }).sort((a, b) => b.qtd_vendida - a.qtd_vendida).slice(0, 8).map((p, i) => ({...p, rank: i + 1 }));
+        setMaisVendidos(ranking);
+    }, [vendasBrutas, produtosDb, filtroSales, inicio, fim]);
 
     useEffect(() => { const saved = localStorage.getItem(STORAGE_KEY); if (saved!== null) setShowExtrato(saved === "true"); }, []);
     useEffect(() => { load(); loadProdutosDb(); }, [load, loadProdutosDb]);
@@ -152,7 +170,6 @@ export function CaixaTab() {
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
-            {/* VOLTEI OS INPUTS - APARECEM NO MOBILE E DESKTOP */}
             <div className="flex items-center justify-between gap-2">
                 <div className="flex gap-2 flex-1 md:w-[calc((100%-32px)/3)] md:flex-none">
                     <div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
@@ -171,7 +188,18 @@ export function CaixaTab() {
             </div>
 
             <div className="space-y-3">
-                <div className="flex gap-2">{(["All Sales", "Pending", "Completed"] as const).map(t => (<button key={t} onClick={() => setFiltroSales(t)} className={`px-4 py-1.5 rounded-full text-[11px] font-black transition ${filtroSales === t? "bg-[#8B6A5A] text-white" : "bg-white border text-zinc-500"}`}>{t}</button>))}</div>
+                {/* AJUSTADO: WIDTH 100% NO CELULAR + PORTUGUES */}
+                <div className="flex gap-2 w-full">
+                    {(["Todas", "Pendentes", "Concluídas"] as const).map(t => (
+                        <button
+                            key={t}
+                            onClick={() => setFiltroSales(t)}
+                            className={`flex-1 md:flex-none px-4 py-2.5 md:py-1.5 rounded-full text-[12px] md:text-[11px] font-black transition flex justify-center items-center ${filtroSales === t? "bg-[#8B6A5A] text-white shadow-md" : "bg-white border text-zinc-500"}`}
+                        >
+                            {t}
+                        </button>
+                    ))}
+                </div>
 
                 <div className="bg-white rounded-[28px] border border-black/5 p-4 md:p-5 shadow-sm">
                     <div className="grid md:grid-cols-[1.6fr_1fr] gap-6">
@@ -181,15 +209,15 @@ export function CaixaTab() {
                         <div className="space-y-2.5">
                             <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white">
                                 <div className="flex -space-x-2">{top4.slice(0, 2).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-10 h-10 rounded-full object-cover border-2 border-white" />))}</div>
-                                <div><div className="text-[12px] font-black leading-none">Top-Selling Products</div><div className="text-[10px] text-zinc-500 mt-1 leading-tight">{top4[0]?.nome || "Sem vendas hoje"}</div></div>
+                                <div><div className="text-[12px] font-black leading-none">Mais Vendidos</div><div className="text-[10px] text-zinc-500 mt-1 leading-tight">{top4[0]?.nome || `Sem vendas ${filtroSales.toLowerCase()} hoje`}</div></div>
                             </div>
                             <div className="flex items-center gap-3 p-3 rounded-[16px] bg-[#8B6A5A] text-white shadow-lg -mx-1">
                                 <div className="flex -space-x-2">{top4.slice(0, 3).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-[#8B6A5A]" />))}</div>
-                                <div><div className="text-[12px] font-black leading-none">Trending Now</div><div className="text-[10px] opacity-80 mt-1">"{top4[0]?.qtd_vendida || 0} vendidos hoje ✨"</div></div>
+                                <div><div className="text-[12px] font-black leading-none">Em Alta</div><div className="text-[10px] opacity-80 mt-1">"{top4[0]?.qtd_vendida || 0} vendidos ✨"</div></div>
                             </div>
                             <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white">
                                 <div className="flex -space-x-2">{top4.slice(0, 4).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-white" />))}</div>
-                                <div><div className="text-[12px] font-black leading-none">Best sellers</div><div className="text-[10px] text-zinc-500 mt-1 leading-tight">Faturamento Kz {fmt(top4.reduce((a: any, b: any) => a + Number(b.faturamento || 0), 0))}</div></div>
+                                <div><div className="text-[12px] font-black leading-none">Favoritos</div><div className="text-[10px] text-zinc-500 mt-1 leading-tight">Faturamento Kz {fmt(top4.reduce((a: any, b: any) => a + Number(b.faturamento || 0), 0))}</div></div>
                             </div>
                         </div>
                     </div>
@@ -198,16 +226,16 @@ export function CaixaTab() {
                 <div className="space-y-2">
                     <div className="w-full bg-white border rounded-full px-4 py-3 flex items-center justify-center gap-3 text-[12px] font-black shadow-sm">
                         <span className="whitespace-nowrap">📅 {inicio}</span>
-                        <span className="opacity-30">To</span>
+                        <span className="opacity-30">a</span>
                         <span className="whitespace-nowrap">📅 {fim}</span>
                     </div>
                     <div className="text-[11px] font-bold text-zinc-400 text-left px-1">
-                        {vendasPorDia.length} dias • {maisVendidos.length} produtos
+                        {vendasPorDia.length} dias • {maisVendidos.length} produtos • {filtroSales}
                     </div>
                 </div>
 
                 <div className="grid gap-2.5 md:gap-3 grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                    {top4.length === 0? (<div className="col-span-4 py-10 text-center bg-white rounded-[22px] border text-[12px] text-zinc-400">Nenhuma venda hoje ({fim})</div>) : (top4.map((p: any) => (<ProdutoMaisVendidoCard key={p.produto_id || p.id} p={p} />)))}
+                    {top4.length === 0? (<div className="col-span-4 py-10 text-center bg-white rounded-[22px] border text-[12px] text-zinc-400">Nenhuma venda {filtroSales.toLowerCase()} em {inicio} até {fim}</div>) : (top4.map((p: any) => (<ProdutoMaisVendidoCard key={p.produto_id || p.id} p={p} />)))}
                 </div>
             </div>
 
