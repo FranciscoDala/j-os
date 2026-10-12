@@ -166,10 +166,9 @@ export function CaixaTab() {
     const caixaAtual = status?.caixa_atual; const dataAberturaFull = caixaAtual?.aberto_em? formatDateTimeFull(caixaAtual.aberto_em) : "";
 
     return (
-        <div className="w-full max-w-full space-y-4 box-border">
+        <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
-            {/* DESKTOP */}
             <div className="hidden md:flex items-center justify-between">
                 <div className="flex gap-2 w-[calc((100%-32px)/3)]">
                     <div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
@@ -189,7 +188,6 @@ export function CaixaTab() {
                 </div>
             </div>
 
-            {/* MOBILE */}
             <div className="flex md:hidden justify-end items-center gap-2">
                 <button onClick={() => setShowDateModal(true)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
@@ -222,49 +220,47 @@ export function CaixaTab() {
                 </div>
             )}
 
-            {/* MASTER CARD 100% NO CELULAR - IGUAL PRODUTOS */}
-            <div className="w-full max-w-full">
-                {/* Mobile: stack 100% / Desktop: grid 3 */}
-                <div className="flex flex-col gap-3 md:grid md:grid-cols-3 md:gap-4">
-                    <div onClick={() => handleCardClick("master")} className="w-full min-w-0 cursor-pointer active:scale-[0.98] transition">
-                        <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante={caixaAtual?.aberto_por_nome? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE"} dataAbertura={dataAberturaFull} horaAbertura={dataAberturaFull} />
-                    </div>
-                    {/* Outros cards continuam scrollável no mobile se quiseres manter, mas agora 100% também */}
-                    <div className="flex overflow-x-auto scrollbar-hide gap-3 snap-x snap-mandatory md:contents">
-                        <div onClick={() => handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 md:w-full shrink-0 cursor-pointer active:scale-[0.98] transition"><EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={inicio.slice(5).replace("-", "/")} qtdVendas={movs.filter((m: any) => (m.tipo || "").toUpperCase().includes("VENDA")).length} /></div>
-                        <div onClick={() => handleCardClick("saidas")} className="min-w-full w-full snap-center md:min-w-0 md:w-full shrink-0 cursor-pointer active:scale-[0.98] transition"><SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })} retirado={saidas > 0? '1' : '0'} /></div>
-                    </div>
+            {/* CARDS COMO ESTAVAM - SCROLL-X INVISIVEL, 1 NA TELA, 100% WIDTH */}
+            <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
+                <div onClick={() => handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer">
+                    <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante={caixaAtual?.aberto_por_nome? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE"} dataAbertura={dataAberturaFull} horaAbertura={dataAberturaFull} />
+                </div>
+                <div onClick={() => handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer">
+                    <EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={inicio.slice(5).replace("-", "/")} qtdVendas={movs.filter((m: any) => (m.tipo || "").toUpperCase().includes("VENDA")).length} />
+                </div>
+                <div onClick={() => handleCardClick("saidas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer">
+                    <SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })} retirado={saidas > 0? '1' : '0'} />
                 </div>
             </div>
 
-            <div className="w-full max-w-full space-y-3">
-                <div className="w-full max-w-full grid grid-cols-3 gap-2">
+            <div className="space-y-3">
+                <div className="w-full grid grid-cols-3 gap-2">
                     {(["Todas", "Pendentes", "Concluídas"] as const).map(t => (
-                        <button key={t} onClick={() => setFiltroSales(t)} className={`w-full min-w-0 px-2 py-2.5 rounded-full text-[11px] font-black transition truncate ${filtroSales === t? "bg-[#8B6A5A] text-white shadow-md" : "bg-white border text-zinc-500"}`}>{t}</button>
+                        <button key={t} onClick={() => setFiltroSales(t)} className={`w-full px-2 py-2.5 rounded-full text-[11px] font-black transition truncate ${filtroSales === t? "bg-[#8B6A5A] text-white shadow-md" : "bg-white border text-zinc-500"}`}>{t}</button>
                     ))}
                 </div>
 
-                <div className="w-full max-w-full bg-white rounded-[28px] border border-black/5 p-4 md:p-5 shadow-sm overflow-hidden">
-                    <div className="grid md:grid-cols-[1.6fr_1fr] gap-6 w-full max-w-full">
-                        <div className="w-full max-w-full overflow-hidden"><GraficoVendas vendasPorDia={vendasPorDia} filtro={filtroSales} inicio={inicio} fim={fim} /></div>
-                        <div className="space-y-2.5 w-full max-w-full">
-                            <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white w-full overflow-hidden">
-                                <div className="flex -space-x-2 shrink-0">{top4.slice(0, 2).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-10 h-10 rounded-full object-cover border-2 border-white" />))}</div>
+                <div className="bg-white rounded-[28px] border border-black/5 p-4 md:p-5 shadow-sm">
+                    <div className="grid md:grid-cols-[1.6fr_1fr] gap-6">
+                        <div><GraficoVendas vendasPorDia={vendasPorDia} filtro={filtroSales} inicio={inicio} fim={fim} /></div>
+                        <div className="space-y-2.5">
+                            <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white">
+                                <div className="flex -space-x-2">{top4.slice(0, 2).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-10 h-10 rounded-full object-cover border-2 border-white" />))}</div>
                                 <div className="min-w-0 flex-1"><div className="text-[12px] font-black leading-none truncate">Mais Vendidos</div><div className="text-[10px] text-zinc-500 mt-1 truncate">{top4[0]?.nome || `Sem vendas ${filtroSales.toLowerCase()} hoje`}</div></div>
                             </div>
-                            <div className="flex items-center gap-3 p-3 rounded-[16px] bg-[#8B6A5A] text-white shadow-lg w-full overflow-hidden">
-                                <div className="flex -space-x-2 shrink-0">{top4.slice(0, 3).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-[#8B6A5A]" />))}</div>
+                            <div className="flex items-center gap-3 p-3 rounded-[16px] bg-[#8B6A5A] text-white shadow-lg -mx-1">
+                                <div className="flex -space-x-2">{top4.slice(0, 3).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-[#8B6A5A]" />))}</div>
                                 <div className="min-w-0 flex-1"><div className="text-[12px] font-black leading-none">Em Alta</div><div className="text-[10px] opacity-80 mt-1 truncate">"{top4[0]?.qtd_vendida || 0} vendidos ✨"</div></div>
                             </div>
-                            <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white w-full overflow-hidden">
-                                <div className="flex -space-x-2 shrink-0">{top4.slice(0, 4).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-white" />))}</div>
+                            <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white">
+                                <div className="flex -space-x-2">{top4.slice(0, 4).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-white" />))}</div>
                                 <div className="min-w-0 flex-1"><div className="text-[12px] font-black leading-none">Favoritos</div><div className="text-[10px] text-zinc-500 mt-1 truncate">Kz {fmt(top4.reduce((a: any, b: any) => a + Number(b.faturamento || 0), 0))}</div></div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="space-y-2 w-full max-w-full">
+                <div className="space-y-2">
                     <div className="w-full bg-white border rounded-full px-4 py-3 flex items-center justify-center gap-3 text-[12px] font-black shadow-sm">
                         <span className="whitespace-nowrap">📅 {inicio}</span>
                         <span className="opacity-30">a</span>
@@ -273,8 +269,8 @@ export function CaixaTab() {
                     <div className="text-[11px] font-bold text-zinc-400 text-left px-1">{vendasPorDia.length} dias • {maisVendidos.length} produtos • {filtroSales}</div>
                 </div>
 
-                <div className="grid gap-2.5 md:gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 w-full max-w-full">
-                    {top4.length === 0? (<div className="col-span-full py-10 text-center bg-white rounded-[22px] border text-[12px] text-zinc-400 w-full">Nenhuma venda {filtroSales.toLowerCase()} em {inicio} até {fim}</div>) : (top4.map((p: any) => (<ProdutoMaisVendidoCard key={p.produto_id || p.id} p={p} />)))}
+                <div className="grid gap-2.5 md:gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                    {top4.length === 0? (<div className="col-span-full py-10 text-center bg-white rounded-[22px] border text-[12px] text-zinc-400">Nenhuma venda {filtroSales.toLowerCase()} em {inicio} até {fim}</div>) : (top4.map((p: any) => (<ProdutoMaisVendidoCard key={p.produto_id || p.id} p={p} />)))}
                 </div>
             </div>
 
