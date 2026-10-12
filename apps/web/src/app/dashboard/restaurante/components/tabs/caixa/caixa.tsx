@@ -95,7 +95,6 @@ export function CaixaTab() {
                     const vendas = dV.items || dV.vendas || dV || [];
                     const map = new Map<string, any>();
                     const mapDia = new Map<string, any>();
-                    // Gera todos os dias do periodo selecionado (se inicio=fim = hoje, gera só 1 dia)
                     gerarDiasDoPeriodo(inicio, fim).forEach(d => mapDia.set(d.dia, d));
                     for (const v of vendas) {
                         if (v.status && v.status!== "CONCLUIDA") continue;
@@ -119,8 +118,7 @@ export function CaixaTab() {
                         const db = items.find((p: any) => String(p.id) === String(m.produto_id));
                         return {...m,...db, nome: db?.nome || m.nome_produto, imagem_url: db?.imagem_url, preco_venda: db?.preco_venda, stock_atual: db?.stock_atual, controlar_stock: db?.controlar_stock, categoria: db?.categoria };
                     }).sort((a, b) => b.qtd_vendida - a.qtd_vendida).slice(0, 8).map((p, i) => ({...p, rank: i + 1 }));
-                    if (ranking.length > 0) setMaisVendidos(ranking);
-                    else setMaisVendidos([]);
+                    setMaisVendidos(ranking.length > 0? ranking : []);
                 }
             } catch { setMaisVendidos([]); }
         } catch (e) { console.log("erro produtos db", e); }
@@ -153,9 +151,17 @@ export function CaixaTab() {
     return (
         <div className="space-y-4">
             <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
-            <div className="hidden md:flex items-center justify-between">
-                <div className="flex gap-2 w-[calc((100%-32px)/3)]"><div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={inicio} onChange={setInicio} /></div><div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={fim} onChange={setFim} /></div></div>
-                <div className="relative" ref={menuRef}><button onClick={() => setMenuOpen(o =>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">≡</button>{menuOpen && (<div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-50"><button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button><button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button></div>)}</div>
+
+            {/* VOLTEI OS INPUTS - APARECEM NO MOBILE E DESKTOP */}
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex gap-2 flex-1 md:w-[calc((100%-32px)/3)] md:flex-none">
+                    <div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
+                    <div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={fim} onChange={setFim} /></div>
+                </div>
+                <div className="relative" ref={menuRef}>
+                    <button onClick={() => setMenuOpen(o =>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center shrink-0">≡</button>
+                    {menuOpen && (<div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-50"><button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button><button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button></div>)}
+                </div>
             </div>
 
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
