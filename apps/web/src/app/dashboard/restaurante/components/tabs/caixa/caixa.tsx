@@ -54,7 +54,9 @@ export function CaixaTab() {
     const [sangriaOpen, setSangriaOpen] = useState(false);
     const [sangriaTipo, setSangriaTipo] = useState<"SANGRIA" | "SUPRIMENTO">("SANGRIA");
     const [menuOpen, setMenuOpen] = useState(false);
+    const [showDateModal, setShowDateModal] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
+    const menuRefMobile = useRef<HTMLDivElement>(null);
     const [confirm, setConfirm] = useState<{ open: boolean, title: string, desc: string, type: "black" | "green" | "red", action: () => void }>({ open: false, title: "", desc: "", type: "black", action: () => { } });
 
     const load = useCallback(async () => {
@@ -139,7 +141,10 @@ export function CaixaTab() {
     useEffect(() => { const saved = localStorage.getItem(STORAGE_KEY); if (saved!== null) setShowExtrato(saved === "true"); }, []);
     useEffect(() => { load(); loadProdutosDb(); }, [load, loadProdutosDb]);
     useEffect(() => {
-        const h = (e: MouseEvent) => { if (menuRef.current &&!menuRef.current.contains(e.target as Node)) setMenuOpen(false); };
+        const h = (e: MouseEvent) => {
+            if (menuRef.current &&!menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+            if (menuRefMobile.current &&!menuRefMobile.current.contains(e.target as Node)) setMenuOpen(false);
+        };
         document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
     }, []);
 
@@ -161,59 +166,92 @@ export function CaixaTab() {
     const caixaAtual = status?.caixa_atual; const dataAberturaFull = caixaAtual?.aberto_em? formatDateTimeFull(caixaAtual.aberto_em) : "";
 
     return (
-        <div className="w-full max-w-full overflow-x-hidden space-y-4 box-border">
-            <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;} *{min-width:0;}`}</style>
+        <div className="w-full max-w-full space-y-4 box-border">
+            <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
 
-            {/* INPUTS DATA - SEM SCROLL-X */}
-            <div className="w-full max-w-full flex items-center gap-2 overflow-hidden box-border">
-                <div className="flex gap-2 flex-1 min-w-0 max-w-full md:max-w-[calc((100%-56px)/3)]">
-                    <div className="h-[46px] flex-1 min-w-0 max-w-[50%]"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
-                    <div className="h-[46px] flex-1 min-w-0 max-w-[50%]"><JCalendarPicker value={fim} onChange={setFim} /></div>
+            {/* DESKTOP - TAMANHO ORIGINAL QUE ESTAVA */}
+            <div className="hidden md:flex items-center justify-between">
+                <div className="flex gap-2 w-[calc((100%-32px)/3)]">
+                    <div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
+                    <div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={fim} onChange={setFim} /></div>
                 </div>
-                <div className="relative shrink-0" ref={menuRef}>
-                    <button onClick={() => setMenuOpen(o =>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center shrink-0">≡</button>
-                    {menuOpen && (<div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-50"><button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button><button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button></div>)}
+                <div className="relative" ref={menuRef}>
+                    <button onClick={() => setMenuOpen(o =>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
+                    </button>
+                    {menuOpen && (
+                        <div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-50">
+                            <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button>
+                            <div className="h-[1px] bg-zinc-100" />
+                            <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button>
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* CARDS - SCROLL SÓ AQUI DENTRO, NÃO NA PAGE */}
+            {/* MOBILE - IGUAL CODIGO ANTIGO QUE FUNCIONAVA */}
+            <div className="flex md:hidden justify-end items-center gap-2">
+                <button onClick={() => setShowDateModal(true)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                </button>
+                <div className="relative" ref={menuRefMobile}>
+                    <button onClick={() => setMenuOpen(o =>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
+                    </button>
+                    {menuOpen && (
+                        <div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-[9999]">
+                            <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button>
+                            <div className="h-[1px] bg-zinc-100" />
+                            <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {showDateModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:hidden">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowDateModal(false)} />
+                    <div className="relative w-full max-w-[340px] bg-white rounded-[24px] p-5 shadow-2xl">
+                        <h3 className="text-[14px] font-black uppercase tracking-widest mb-4 text-center">Filtrar por período</h3>
+                        <div className="space-y-3">
+                            <div className="h-[46px] w-full"><JCalendarPicker value={inicio} onChange={setInicio} /></div>
+                            <div className="h-[46px] w-full"><JCalendarPicker value={fim} onChange={setFim} /></div>
+                        </div>
+                        <button onClick={() => setShowDateModal(false)} className="mt-5 w-full h-[46px] bg-black text-white rounded-full text-[12px] font-black uppercase tracking-widest">Aplicar</button>
+                    </div>
+                </div>
+            )}
+
+            {/* CARDS COM SCROLL SÓ AQUI - SEM -mx-4 QUE CAUSAVA SCROLL-X NA PAGE */}
             <div className="w-full max-w-full overflow-hidden">
-                <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-3 pb-2 md:grid md:grid-cols-3 md:overflow-visible">
-                    <div onClick={() => handleCardClick("master")} className="min-w-[88%] w-[88%] snap-center md:min-w-0 md:w-full shrink-0 cursor-pointer"><MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante={caixaAtual?.aberto_por_nome? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE"} dataAbertura={dataAberturaFull} horaAbertura={dataAberturaFull} /></div>
-                    <div onClick={() => handleCardClick("entradas")} className="min-w-[88%] w-[88%] snap-center md:min-w-0 md:w-full shrink-0 cursor-pointer"><EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={inicio.slice(5).replace("-", "/")} qtdVendas={movs.filter((m: any) => (m.tipo || "").toUpperCase().includes("VENDA")).length} /></div>
-                    <div onClick={() => handleCardClick("saidas")} className="min-w-[88%] w-[88%] snap-center md:min-w-0 md:w-full shrink-0 cursor-pointer"><SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })} retirado={saidas > 0? '1' : '0'} /></div>
+                <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-3 pb-2 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible">
+                    <div onClick={() => handleCardClick("master")} className="min-w-[88%] w-[88%] snap-center md:min-w-0 md:w-full shrink-0 cursor-pointer active:scale-[0.98] transition"><MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante={caixaAtual?.aberto_por_nome? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE"} dataAbertura={dataAberturaFull} horaAbertura={dataAberturaFull} /></div>
+                    <div onClick={() => handleCardClick("entradas")} className="min-w-[88%] w-[88%] snap-center md:min-w-0 md:w-full shrink-0 cursor-pointer active:scale-[0.98] transition"><EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={inicio.slice(5).replace("-", "/")} qtdVendas={movs.filter((m: any) => (m.tipo || "").toUpperCase().includes("VENDA")).length} /></div>
+                    <div onClick={() => handleCardClick("saidas")} className="min-w-[88%] w-[88%] snap-center md:min-w-0 md:w-full shrink-0 cursor-pointer active:scale-[0.98] transition"><SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })} retirado={saidas > 0? '1' : '0'} /></div>
                 </div>
             </div>
 
-            <div className="w-full max-w-full space-y-3 overflow-hidden">
-                {/* FILTROS 100% SEM SCROLL-X - GRID 3 COL */}
+            <div className="w-full max-w-full space-y-3">
+                {/* FILTROS 100% NO CELULAR + TRADUZIDO */}
                 <div className="w-full max-w-full grid grid-cols-3 gap-2">
                     {(["Todas", "Pendentes", "Concluídas"] as const).map(t => (
-                        <button
-                            key={t}
-                            onClick={() => setFiltroSales(t)}
-                            className={`w-full min-w-0 px-2 py-2.5 rounded-full text-[11px] font-black transition flex justify-center items-center truncate ${filtroSales === t? "bg-[#8B6A5A] text-white shadow-md" : "bg-white border text-zinc-500"}`}
-                        >
-                            {t}
-                        </button>
+                        <button key={t} onClick={() => setFiltroSales(t)} className={`w-full min-w-0 px-2 py-2.5 rounded-full text-[11px] font-black transition truncate ${filtroSales === t? "bg-[#8B6A5A] text-white shadow-md" : "bg-white border text-zinc-500"}`}>{t}</button>
                     ))}
                 </div>
 
                 <div className="w-full max-w-full bg-white rounded-[28px] border border-black/5 p-4 md:p-5 shadow-sm overflow-hidden">
                     <div className="grid md:grid-cols-[1.6fr_1fr] gap-6 w-full max-w-full">
-                        <div className="w-full max-w-full overflow-hidden">
-                            <GraficoVendas vendasPorDia={vendasPorDia} filtro={filtroSales} inicio={inicio} fim={fim} />
-                        </div>
+                        <div className="w-full max-w-full overflow-hidden"><GraficoVendas vendasPorDia={vendasPorDia} filtro={filtroSales} inicio={inicio} fim={fim} /></div>
                         <div className="space-y-2.5 w-full max-w-full">
-                            <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white w-full max-w-full overflow-hidden">
+                            <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white w-full overflow-hidden">
                                 <div className="flex -space-x-2 shrink-0">{top4.slice(0, 2).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-10 h-10 rounded-full object-cover border-2 border-white" />))}</div>
-                                <div className="min-w-0 flex-1"><div className="text-[12px] font-black leading-none truncate">Mais Vendidos</div><div className="text-[10px] text-zinc-500 mt-1 leading-tight truncate">{top4[0]?.nome || `Sem vendas ${filtroSales.toLowerCase()} hoje`}</div></div>
+                                <div className="min-w-0 flex-1"><div className="text-[12px] font-black leading-none truncate">Mais Vendidos</div><div className="text-[10px] text-zinc-500 mt-1 truncate">{top4[0]?.nome || `Sem vendas ${filtroSales.toLowerCase()} hoje`}</div></div>
                             </div>
-                            <div className="flex items-center gap-3 p-3 rounded-[16px] bg-[#8B6A5A] text-white shadow-lg w-full max-w-full overflow-hidden">
+                            <div className="flex items-center gap-3 p-3 rounded-[16px] bg-[#8B6A5A] text-white shadow-lg w-full overflow-hidden">
                                 <div className="flex -space-x-2 shrink-0">{top4.slice(0, 3).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-[#8B6A5A]" />))}</div>
                                 <div className="min-w-0 flex-1"><div className="text-[12px] font-black leading-none">Em Alta</div><div className="text-[10px] opacity-80 mt-1 truncate">"{top4[0]?.qtd_vendida || 0} vendidos ✨"</div></div>
                             </div>
-                            <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white w-full max-w-full overflow-hidden">
+                            <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white w-full overflow-hidden">
                                 <div className="flex -space-x-2 shrink-0">{top4.slice(0, 4).map((p: any, i: number) => (<img key={i} src={getImgUrl(p.imagem_url)} onError={(e: any) => e.currentTarget.src = FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-white" />))}</div>
                                 <div className="min-w-0 flex-1"><div className="text-[12px] font-black leading-none">Favoritos</div><div className="text-[10px] text-zinc-500 mt-1 truncate">Kz {fmt(top4.reduce((a: any, b: any) => a + Number(b.faturamento || 0), 0))}</div></div>
                             </div>
@@ -222,17 +260,15 @@ export function CaixaTab() {
                 </div>
 
                 <div className="space-y-2 w-full max-w-full">
-                    <div className="w-full max-w-full bg-white border rounded-full px-4 py-3 flex items-center justify-center gap-3 text-[12px] font-black shadow-sm overflow-hidden">
-                        <span className="whitespace-nowrap truncate">📅 {inicio}</span>
-                        <span className="opacity-30 shrink-0">a</span>
-                        <span className="whitespace-nowrap truncate">📅 {fim}</span>
+                    <div className="w-full bg-white border rounded-full px-4 py-3 flex items-center justify-center gap-3 text-[12px] font-black shadow-sm">
+                        <span className="whitespace-nowrap">📅 {inicio}</span>
+                        <span className="opacity-30">a</span>
+                        <span className="whitespace-nowrap">📅 {fim}</span>
                     </div>
-                    <div className="text-[11px] font-bold text-zinc-400 text-left px-1">
-                        {vendasPorDia.length} dias • {maisVendidos.length} produtos • {filtroSales}
-                    </div>
+                    <div className="text-[11px] font-bold text-zinc-400 text-left px-1">{vendasPorDia.length} dias • {maisVendidos.length} produtos • {filtroSales}</div>
                 </div>
 
-                <div className="grid gap-2.5 md:gap-3 grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 w-full max-w-full">
+                <div className="grid gap-2.5 md:gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 w-full max-w-full">
                     {top4.length === 0? (<div className="col-span-full py-10 text-center bg-white rounded-[22px] border text-[12px] text-zinc-400 w-full">Nenhuma venda {filtroSales.toLowerCase()} em {inicio} até {fim}</div>) : (top4.map((p: any) => (<ProdutoMaisVendidoCard key={p.produto_id || p.id} p={p} />)))}
                 </div>
             </div>
