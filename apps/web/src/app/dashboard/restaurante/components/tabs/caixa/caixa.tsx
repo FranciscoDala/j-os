@@ -12,8 +12,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com";
 const BASE = `${API_URL.replace(/\/$/, "")}/api/v1`;
 
 function getAuthHeaders() {
-    const token = typeof window !== "undefined" ? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null;
-    const empresa_id = typeof window !== "undefined" ? localStorage.getItem("empresa_id") : null;
+    const token = typeof window!== "undefined"? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null;
+    const empresa_id = typeof window!== "undefined"? localStorage.getItem("empresa_id") : null;
     const h: Record<string, string> = {};
     if (token) h["Authorization"] = `Bearer ${token}`;
     if (empresa_id) h["X-Empresa-ID"] = empresa_id;
@@ -21,9 +21,9 @@ function getAuthHeaders() {
 }
 
 async function apiFetch(path: string, options: RequestInit = {}) {
-    const headers: any = { "Content-Type": "application/json", ...getAuthHeaders(), ...(options.headers || {}) };
+    const headers: any = { "Content-Type": "application/json",...getAuthHeaders(),...(options.headers || {}) };
     if (options.body instanceof FormData) delete headers["Content-Type"];
-    const res = await fetch(`${BASE}${path}`, { ...options, headers, cache: "no-store" as any });
+    const res = await fetch(`${BASE}${path}`, {...options, headers, cache: "no-store" as any });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) throw d;
     return d;
@@ -75,7 +75,7 @@ export function CaixaTab() {
 
     useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved !== null) setShowExtrato(saved === "true");
+        if (saved!== null) setShowExtrato(saved === "true");
         else setShowExtrato(false);
     }, []);
 
@@ -83,8 +83,8 @@ export function CaixaTab() {
 
     useEffect(() => {
         const h = (e: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-            if (menuRefMobile.current && !menuRefMobile.current.contains(e.target as Node)) setMenuOpen(false);
+            if (menuRef.current &&!menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+            if (menuRefMobile.current &&!menuRefMobile.current.contains(e.target as Node)) setMenuOpen(false);
         };
         document.addEventListener("mousedown", h);
         return () => document.removeEventListener("mousedown", h);
@@ -93,32 +93,27 @@ export function CaixaTab() {
     useEffect(() => {
         const hoje = todayISO();
         const isHoje = inicio === hoje && fim === hoje;
-
         const onExtratoPush = (e: any) => {
             if (!isHoje) { load(); return; }
             const m = e.detail?.data || e.detail;
             if (!m) return;
-            const valor = Number(m.valor ?? m.total_venda ?? m.total ?? 0);
+            const valor = Number(m.valor?? m.total_venda?? m.total?? 0);
             if (!m.id && valor === 0) return;
-
             setExtrato((prev: any) => {
                 if (!prev) return prev;
                 if (m.id && prev.movimentos?.some((x: any) => x.id === m.id)) return prev;
                 if (m.venda_id && prev.movimentos?.some((x: any) => x.venda_id === m.venda_id)) return prev;
-
-                const novoMovs = [m, ...(prev.movimentos || [])];
+                const novoMovs = [m,...(prev.movimentos || [])];
                 return {
-                    ...prev,
+                   ...prev,
                     movimentos: novoMovs,
                     saldo_atual: Number(prev.saldo_atual || 0) + valor,
-                    total_entradas: valor > 0 ? Number(prev.total_entradas || 0) + valor : prev.total_entradas,
-                    total_saidas: valor < 0 ? Number(prev.total_saidas || 0) + valor : prev.total_saidas,
+                    total_entradas: valor > 0? Number(prev.total_entradas || 0) + valor : prev.total_entradas,
+                    total_saidas: valor < 0? Number(prev.total_saidas || 0) + valor : prev.total_saidas,
                 };
             });
         };
-
         const onCaixaFullUpdate = () => load();
-
         window.addEventListener("caixa:extrato" as any, onExtratoPush);
         window.addEventListener("caixa:update" as any, onCaixaFullUpdate);
         window.addEventListener("caixa.updated" as any, onCaixaFullUpdate);
@@ -126,7 +121,6 @@ export function CaixaTab() {
         window.addEventListener("venda:nova" as any, onExtratoPush);
         window.addEventListener("venda:fechada" as any, onExtratoPush);
         window.addEventListener("venda:update" as any, onExtratoPush);
-
         return () => {
             window.removeEventListener("caixa:extrato" as any, onExtratoPush);
             window.removeEventListener("caixa:update" as any, onCaixaFullUpdate);
@@ -141,20 +135,20 @@ export function CaixaTab() {
     const movs = extrato?.movimentos || [];
     const entradas = Number(extrato?.total_entradas || 0);
     const saidas = Math.abs(Number(extrato?.total_saidas || 0));
-    const atual = Number(extrato?.saldo_atual ?? 0);
+    const atual = Number(extrato?.saldo_atual?? 0);
 
     const handleCardClick = (type: "master" | "entradas" | "saidas") => {
         if (type === "master") {
-            if (status?.aberto) setConfirm({ open: true, title: "Fechar caixa?", desc: `Saldo Kz ${fmt(atual)}. Fechar?`, type: "black", action: () => { setModalMode("fechar"); setModalOpen(true); } });
-            else setConfirm({ open: true, title: "Abrir caixa?", desc: "Iniciar novo turno.", type: "black", action: () => { setModalMode("abrir"); setModalOpen(true); } });
+            if (status?.aberto) setConfirm({ open: true, title: "Fechar caixa?", desc: `Saldo atual Kz ${fmt(atual)}. Queres fechar o caixa agora?`, type: "black", action: () => { setModalMode("fechar"); setModalOpen(true); } });
+            else setConfirm({ open: true, title: "Abrir caixa?", desc: "Vais iniciar um novo turno.", type: "black", action: () => { setModalMode("abrir"); setModalOpen(true); } });
         }
         if (type === "entradas") {
             if (!status?.aberto) { toast.error("ATT: você não podes adicionar valores sem antes abrir um caixa, porfavor abra o seu caixa para prosseguir!"); return; }
-            setConfirm({ open: true, title: "Suprimento?", desc: "Adicionar?", type: "green", action: () => { setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true); } });
+            setConfirm({ open: true, title: "Suprimento?", desc: "Queres adicionar valor ao caixa?", type: "green", action: () => { setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true); } });
         }
         if (type === "saidas") {
             if (!status?.aberto) { toast.error("ATT: você não podes fazer uma saída sem antes abrir um caixa, porfavor abra o seu caixa para prosseguir!"); return; }
-            setConfirm({ open: true, title: "Sangria?", desc: "Retirar?", type: "red", action: () => { setSangriaTipo("SANGRIA"); setSangriaOpen(true); } });
+            setConfirm({ open: true, title: "Sangria?", desc: "Queres retirar valor do caixa?", type: "red", action: () => { setSangriaTipo("SANGRIA"); setSangriaOpen(true); } });
         }
     };
 
@@ -166,7 +160,7 @@ export function CaixaTab() {
             linhas.push([data, m.tipo, String(m.valor), (m.descricao || "").replace(/;/g, ","), m.criado_por_nome || m.aberto_por_nome || ""]);
         });
         linhas.push([]); linhas.push(["Periodo", `${inicio} ate ${fim}`]);
-        linhas.push(["Caixa", status?.aberto ? `Aberto por ${status?.caixa_atual?.aberto_por_nome} em ${formatDateTimeFull(status?.caixa_atual?.aberto_em)}` : "Fechado"]);
+        linhas.push(["Caixa", status?.aberto? `Aberto por ${status?.caixa_atual?.aberto_por_nome} em ${formatDateTimeFull(status?.caixa_atual?.aberto_em)}` : "Fechado"]);
         const csv = linhas.map(r => r.join(";")).join("\n");
         const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
@@ -176,15 +170,15 @@ export function CaixaTab() {
     const handleImprimir = () => {
         setMenuOpen(false);
         const win = window.open("", "_blank"); if (!win) return;
-        const responsavelCaixa = status?.caixa_atual?.aberto_por_nome ? ` - Aberto por: ${status.caixa_atual.aberto_por_nome} em ${formatDateTimeFull(status.caixa_atual.aberto_em)}` : "";
-        const html = `<html><head><title>Relatorio ${inicio} - ${fim}</title><style>body{font-family:monospace;padding:20px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:6px;font-size:11px} th{background:#000;color:#fff}.info{margin-bottom:10px;font-size:12px}</style></head><body><h2>J-OS - ${inicio} ate ${fim}</h2><div class="info">Caixa: ${status?.aberto ? 'Aberto' : 'Fechado'}${responsavelCaixa}</div><table><thead><tr><th>Data/Hora</th><th>Tipo</th><th>Valor</th><th>Descricao</th><th>Responsavel</th></tr></thead><tbody>${movs.map((m: any) => `<tr><td>${formatDateTimeFull(m.criado_em)}</td><td>${m.tipo}</td><td>${fmt(Number(m.valor))}</td><td>${m.descricao || ''}</td><td>${m.criado_por_nome || m.aberto_por_nome || ''}</td></tr>`).join("")}</tbody></table><script>window.print()</script></body></html>`;
+        const responsavelCaixa = status?.caixa_atual?.aberto_por_nome? ` - Aberto por: ${status.caixa_atual.aberto_por_nome} em ${formatDateTimeFull(status.caixa_atual.aberto_em)}` : "";
+        const html = `<html><head><title>Relatorio ${inicio} - ${fim}</title><style>body{font-family:monospace;padding:20px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:6px;font-size:11px} th{background:#000;color:#fff}.info{margin-bottom:10px;font-size:12px}</style></head><body><h2>J-OS - ${inicio} ate ${fim}</h2><div class="info">Caixa: ${status?.aberto? 'Aberto' : 'Fechado'}${responsavelCaixa}</div><table><thead><tr><th>Data/Hora</th><th>Tipo</th><th>Valor</th><th>Descricao</th><th>Responsavel</th></tr></thead><tbody>${movs.map((m: any) => `<tr><td>${formatDateTimeFull(m.criado_em)}</td><td>${m.tipo}</td><td>${fmt(Number(m.valor))}</td><td>${m.descricao || ''}</td><td>${m.criado_por_nome || m.aberto_por_nome || ''}</td></tr>`).join("")}</tbody></table><script>window.print()</script></body></html>`;
         win.document.write(html); win.document.close();
     };
 
-    if (loading && !extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
+    if (loading &&!extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
 
     const caixaAtual = status?.caixa_atual;
-    const dataAberturaFull = caixaAtual?.aberto_em ? formatDateTimeFull(caixaAtual.aberto_em) : "";
+    const dataAberturaFull = caixaAtual?.aberto_em? formatDateTimeFull(caixaAtual.aberto_em) : "";
 
     return (
         <div className="space-y-4">
@@ -196,7 +190,7 @@ export function CaixaTab() {
                     <div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={fim} onChange={setFim} /></div>
                 </div>
                 <div className="relative" ref={menuRef}>
-                    <button onClick={() => setMenuOpen(o => !o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                    <button onClick={() => setMenuOpen(o =>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
                     </button>
                     {menuOpen && (
@@ -214,7 +208,7 @@ export function CaixaTab() {
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
                 </button>
                 <div className="relative" ref={menuRefMobile}>
-                    <button onClick={() => setMenuOpen(o => !o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                    <button onClick={() => setMenuOpen(o =>!o)} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
                     </button>
                     {menuOpen && (
@@ -246,30 +240,30 @@ export function CaixaTab() {
                     <MasterCard
                         aberto={!!status?.aberto}
                         atual={atual}
-                        nomeRestaurante={caixaAtual?.aberto_por_nome ? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE"}
-                        dataAbertura={dataAberturaFull ? dataAberturaFull.split(',')[0] || dataAberturaFull.split(' ')[0] : inicio.slice(5).replace("-", "/")}
-                        horaAbertura={dataAberturaFull ? dataAberturaFull.split(',').pop()?.trim() || dataAberturaFull : (movs[0] ? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : "--:--")}
+                        nomeRestaurante={caixaAtual?.aberto_por_nome? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE"}
+                        dataAbertura={dataAberturaFull? dataAberturaFull.split(',')[0] || dataAberturaFull.split(' ')[0] : inicio.slice(5).replace("-", "/")}
+                        horaAbertura={dataAberturaFull? dataAberturaFull.split(',').pop()?.trim() || dataAberturaFull : (movs[0]? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : "--:--")}
                     />
                 </div>
                 <div onClick={() => handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={inicio.slice(5).replace("-", "/")} qtdVendas={movs.filter((m: any) => (m.tipo || "").toUpperCase().includes("VENDA")).length} />
                 </div>
                 <div onClick={() => handleCardClick("saidas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
-                    <SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })} retirado={saidas > 0 ? '1' : '0'} />
+                    <SaidasCard saidas={saidas} nome="J-OS RESTAURANTE" hora={new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })} retirado={saidas > 0? '1' : '0'} />
                 </div>
             </div>
 
             <div className="flex justify-end pt-2">
-                <button onClick={() => { const v = !showExtrato; setShowExtrato(v); localStorage.setItem(STORAGE_KEY, String(v)); }} className="flex items-center gap-2">
-                    <div className={`w-[44px] h-[26px] rounded-full p-[3px] transition-colors ${showExtrato ? 'bg-green-500' : 'bg-zinc-300'}`}>
-                        <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-all ${showExtrato ? 'translate-x-[18px]' : 'translate-x-0'}`} />
+                <button onClick={() => { const v =!showExtrato; setShowExtrato(v); localStorage.setItem(STORAGE_KEY, String(v)); }} className="flex items-center gap-2">
+                    <div className={`w-[44px] h-[26px] rounded-full p-[3px] transition-colors ${showExtrato? 'bg-green-500' : 'bg-zinc-300'}`}>
+                        <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-all ${showExtrato? 'translate-x-[18px]' : 'translate-x-0'}`} />
                     </div>
                 </button>
             </div>
 
             {showExtrato && <ExtratoList movimentos={movs} selectedDate={extrato?.periodo_inicio || inicio} statusCaixa={status} />}
 
-            <JConfirm open={confirm.open} title={confirm.title} desc={confirm.desc} type={confirm.type} onClose={() => setConfirm(s => ({ ...s, open: false }))} onConfirm={confirm.action} />
+            <JConfirm open={confirm.open} title={confirm.title} desc={confirm.desc} type={confirm.type} onClose={() => setConfirm(s => ({...s, open: false }))} onConfirm={confirm.action} />
             <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={status?.caixa_atual || extrato} onClose={() => setModalOpen(false)} onSuccess={async () => { await load(); toast.success("Caixa atualizado!"); }} />
             <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={() => setSangriaOpen(false)} onSuccess={async () => { await load(); toast.success("Movimento registrado!"); }} />
         </div>
