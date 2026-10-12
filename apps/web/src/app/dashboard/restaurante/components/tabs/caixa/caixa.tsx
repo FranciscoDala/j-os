@@ -11,6 +11,16 @@ import { toast } from "sonner";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const BASE = `${API_URL.replace(/\/$/, "")}/api/v1`;
 
+const FALLBACK_IMG = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=400";
+
+export const getImgUrl = (url?: string) => {
+    if (!url) return FALLBACK_IMG;
+    if (url.startsWith("blob:")) return url;
+    if (url.startsWith("http")) return url;
+    if (url.startsWith("/media")) return `${API_URL}${url}`;
+    return url;
+};
+
 function getAuthHeaders() {
     const token = typeof window!== "undefined"? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null;
     const empresa_id = typeof window!== "undefined"? localStorage.getItem("empresa_id") : null;
@@ -75,7 +85,6 @@ export function CaixaTab() {
         setLoading(false);
     }, [inicio, fim]);
 
-    // PRODUTOS DO BANCO - MESMO CODIGO DA VENDAS TAB
     const loadProdutosDb = useCallback(async () => {
         try {
             const qs = new URLSearchParams({ skip: "0", limit: "100", search: "" });
@@ -124,7 +133,7 @@ export function CaixaTab() {
                 if (m.venda_id && prev.movimentos?.some((x: any) => x.venda_id === m.venda_id)) return prev;
                 const novoMovs = [m,...(prev.movimentos || [])];
                 return {
-                   ...prev,
+                  ...prev,
                     movimentos: novoMovs,
                     saldo_atual: Number(prev.saldo_atual || 0) + valor,
                     total_entradas: valor > 0? Number(prev.total_entradas || 0) + valor : prev.total_entradas,
@@ -277,7 +286,7 @@ export function CaixaTab() {
                 </div>
             </div>
 
-            {/* ===== RELATORIO PRODUTOS - IGUAL AO PRINT - PEGA DO BANCO ===== */}
+            {/* ===== RELATORIO PRODUTOS - PEGA DO BANCO COM getImgUrl ===== */}
             <div className="space-y-3">
                 <div className="flex gap-2">
                     {(["All Sales","Pending","Completed"] as const).map(t=>(
@@ -312,19 +321,25 @@ export function CaixaTab() {
                         <div className="space-y-2.5">
                             <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white">
                                 <div className="flex -space-x-2">
-                                    {top4.slice(0,2).map((p:any,i:number)=><img key={i} src={p.imagem_url? `${API_URL}${p.imagem_url}` : "https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=100"} className="w-10 h-10 rounded-full object-cover border-2 border-white"/>)}
+                                    {top4.slice(0,2).map((p:any,i:number)=>(
+                                        <img key={i} src={getImgUrl(p.imagem_url)} onError={(e:any)=> e.currentTarget.src=FALLBACK_IMG} className="w-10 h-10 rounded-full object-cover border-2 border-white"/>
+                                    ))}
                                 </div>
                                 <div><div className="text-[12px] font-black leading-none">Top-Selling Products</div><div className="text-[10px] text-zinc-500 mt-1 leading-tight">Highlight of our most popular premium products.</div></div>
                             </div>
                             <div className="flex items-center gap-3 p-3 rounded-[16px] bg-[#8B6A5A] text-white shadow-lg -mx-1">
                                 <div className="flex -space-x-2">
-                                    {top4.slice(0,3).map((p:any,i:number)=><img key={i} src={p.imagem_url? `${API_URL}${p.imagem_url}` : "https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=100"} className="w-8 h-8 rounded-full object-cover border-2 border-[#8B6A5A]"/>)}
+                                    {top4.slice(0,3).map((p:any,i:number)=>(
+                                        <img key={i} src={getImgUrl(p.imagem_url)} onError={(e:any)=> e.currentTarget.src=FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-[#8B6A5A]"/>
+                                    ))}
                                 </div>
                                 <div><div className="text-[12px] font-black leading-none">Trending Now</div><div className="text-[10px] opacity-80 mt-1">"Where sweetness meets simplicity ✨"</div></div>
                             </div>
                             <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white">
                                 <div className="flex -space-x-2">
-                                    {top4.slice(0,4).map((p:any,i:number)=><img key={i} src={p.imagem_url? `${API_URL}${p.imagem_url}` : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100"} className="w-8 h-8 rounded-full object-cover border-2 border-white"/>)}
+                                    {top4.slice(0,4).map((p:any,i:number)=>(
+                                        <img key={i} src={getImgUrl(p.imagem_url)} onError={(e:any)=> e.currentTarget.src=FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-white"/>
+                                    ))}
                                 </div>
                                 <div><div className="text-[12px] font-black leading-none">Best sellers</div><div className="text-[10px] text-zinc-500 mt-1 leading-tight">Food items that consistently lead our sales charts.</div></div>
                             </div>
@@ -346,7 +361,12 @@ export function CaixaTab() {
                         top4.map((p:any)=>(
                             <div key={p.id} className="bg-white rounded-[20px] p-2.5 border border-black/5 shadow-sm">
                                 <div className="aspect-square rounded-[14px] overflow-hidden bg-[#F6F3F0] mb-3">
-                                    {p.imagem_url? <img src={`${API_URL}${p.imagem_url}`} alt={p.nome} className="w-full h-full object-cover"/> : <div className="w-full h-full bg-zinc-100 flex items-center justify-center text-[10px]">Sem foto</div>}
+                                    <img
+                                        src={getImgUrl(p.imagem_url)}
+                                        onError={(e:any)=> e.currentTarget.src = FALLBACK_IMG}
+                                        alt={p.nome}
+                                        className="w-full h-full object-cover"
+                                    />
                                 </div>
                                 <div className="flex items-center gap-2 px-1">
                                     <span className="text-[13px] font-black">Kz {fmt(Number(p.preco_venda||0))}</span>
