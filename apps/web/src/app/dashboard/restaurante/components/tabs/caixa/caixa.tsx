@@ -7,6 +7,7 @@ import { JCalendarPicker } from "./cards/date-picker";
 import { JConfirm } from "./modals/confirm";
 import { ExtratoList } from "./table/extrato-list";
 import { toast } from "sonner";
+import { Ban, AlertTriangle } from "lucide-react";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const BASE = `${API_URL.replace(/\/$/, "")}/api/v1`;
@@ -50,6 +51,60 @@ const formatDateTimeFull = (iso: string) => {
     } catch { return iso; }
 };
 
+// CARD COM MESMO DESIGN DA TUA ProdutoCard MAS PARA MAIS VENDIDOS
+function ProdutoMaisVendidoCard({ p }: { p: any }) {
+    const getStockState = () => {
+        if (p._alerta === "zerado") return "zero";
+        if (p._alerta === "baixo") return "low";
+        if (!p.controlar_stock) return "ok";
+        const atual = Number(p.stock_atual?? 0);
+        const minimo = Number(p.stock_minimo?? 0);
+        if (atual <= 0) return "zero";
+        if (minimo > 0 && atual <= minimo) return "low";
+        if (atual <= 5) return "low";
+        return "ok";
+    };
+    const stockState = getStockState();
+    const isZero = stockState === "zero";
+    const isLow = stockState === "low";
+    const atual = Number(p.stock_atual?? 0);
+    const topBg = isZero? "bg-[#FFE0E0]" : isLow? "bg-[#FFF1CC]" : "bg-[#FFEAA6]";
+    const cardBorder = isZero? "border-red-200" : isLow? "border-amber-200" : "border-[#F3E9DF]";
+    const cardBg = isZero? "bg-[#FFF5F5]" : isLow? "bg-[#FFFBEB]" : "bg-[#FFFEFB]";
+    const qtyBg = isZero? "bg-[#C62828] text-white" : isLow? "bg-[#EF6C00] text-white" : "bg-black text-white";
+    const tags = [p.categoria, p.qtd_vendida? `${p.qtd_vendida} vendidos` : p.tipo].filter(Boolean).slice(0,3);
+
+    return (
+        <div className={`group relative w-full rounded-[18px] md:rounded-[22px] overflow-hidden border shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] md:hover:-translate-y-0.5 transition-all duration-300 flex flex-col ${cardBg} ${cardBorder}`}>
+            <div className={`relative w-full h-[120px] sm:h-[128px] md:h-[138px] overflow-hidden flex items-center justify-center ${topBg}`}>
+                <img src={getImgUrl(p.imagem_url)} onError={(e:any)=> e.currentTarget.src = FALLBACK_IMG} className={`w-full h-full object-cover ${isZero? "grayscale opacity-70" : "group-hover:scale-[1.03]"} transition-transform duration-500`} alt={p.nome} />
+                {/* badge de mais vendido em cima do stock */}
+                {p.qtd_vendida>0? (
+                    <div className="absolute top-2 left-2 bg-black text-white text-[9px] font-black px-2.5 py-1 rounded-full shadow-md border-2 border-white z-10">#{p.rank} • {p.qtd_vendida} vendidos</div>
+                ) : (
+                    p.controlar_stock && <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shadow-md border-2 border-white z-10 ${qtyBg}`}>{atual}</div>
+                )}
+                {isLow &&!isZero && <div className="absolute bottom-2 left-2 bg-[#FFE0B2] text-[#A65C00] text-[7px] font-black px-2 py-0.5 rounded-full border border-white flex items-center gap-0.5 shadow"><AlertTriangle size={10}/> BAIXO</div>}
+                {isZero && <div className="absolute bottom-2 left-2 bg-[#C62828] text-white text-[7px] font-black px-2 py-0.5 rounded-full border border-white flex items-center gap-0.5 shadow"><Ban size={10}/> ESGOTADO</div>}
+            </div>
+            <div className="px-3 md:px-3.5 py-2.5 md:py-3 flex flex-col flex-1">
+                <h3 className="font-black text-[12px] md:text-[13px] leading-[1.2] text-[#1E1E1E] line-clamp-2 break-words min-h-[28px] md:min-h-[31px]">{p.nome || p.nome_produto}</h3>
+                <div className="mt-1.5 flex items-center gap-1 flex-wrap min-h-[18px]">
+                    {tags.length>0? tags.map((t,i)=>(<span key={i} className="text-[8px] md:text-[9px] font-bold text-[#8A8A8A] bg-[#F5F0E9] px-2 py-0.5 rounded-full truncate max-w-[70px]">{String(t)}</span>)) : <span className="text-[8px] text-[#8A8A8A]">Sem categoria</span>}
+                </div>
+                <p className="mt-2 text-[10px] leading-[1.3] text-[#7A7A7A] line-clamp-2 min-h-[26px] hidden sm:block">Faturado Kz {fmt(Number(p.faturamento||0))} • Ticket {fmt(Number(p.preco_venda||0))}</p>
+                <div className="mt-auto pt-2.5 md:pt-3 flex items-end justify-between gap-2">
+                    <div className="leading-none">
+                        <p className="text-[14px] md:text-[15px] font-black text-[#EBA500] tracking-tight"><span className="text-[10px]">Kz </span>{Number(p.preco_venda || p.preco_unit || 0).toLocaleString('de-DE')}</p>
+                        <p className="text-[8px] md:text-[9px] font-bold text-[#9A9A9A] mt-1">{isZero? "Esgotado" : p.controlar_stock? `${atual} stock` : "Disponível"}</p>
+                    </div>
+                    <div className="h-[30px] px-4 rounded-full bg-[#FFC91A] text-black text-[11px] font-black shadow-sm flex items-center">Top {p.rank}</div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 export function CaixaTab() {
     const [status, setStatus] = useState<any>(null);
     const [extrato, setExtrato] = useState<any>(null);
@@ -58,6 +113,7 @@ export function CaixaTab() {
     const [fim, setFim] = useState(todayISO());
     const [showExtrato, setShowExtrato] = useState(false);
     const [produtosDb, setProdutosDb] = useState<any[]>([]);
+    const [maisVendidos, setMaisVendidos] = useState<any[]>([]);
     const [filtroSales, setFiltroSales] = useState<"All Sales"|"Pending"|"Completed">("All Sales");
     const [modalOpen, setModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<"abrir" | "fechar" | "forcar">("abrir");
@@ -85,21 +141,44 @@ export function CaixaTab() {
         setLoading(false);
     }, [inicio, fim]);
 
+    // PRODUTOS + MAIS VENDIDOS - BASEADO NO TEU MODEL Venda/VendaItem
     const loadProdutosDb = useCallback(async () => {
         try {
             const qs = new URLSearchParams({ skip: "0", limit: "100", search: "" });
-            const r = await fetch(`${BASE}/produtos/?${qs}`, {
-                headers: getAuthHeaders() as any,
-                cache: "no-store" as any
-            });
+            const r = await fetch(`${BASE}/produtos/?${qs}`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
             const data = await r.json();
-            const items = data.items || data || [];
-            const ativos = items.filter((p: any) => p.ativo!== false);
-            setProdutosDb(ativos);
-        } catch (e) {
-            console.log("erro produtos db", e);
-        }
-    }, []);
+            const items = (data.items || data || []).filter((p: any) => p.ativo!== false);
+            setProdutosDb(items);
+
+            // Tenta calcular mais vendidos via vendas
+            try {
+                const qsV = new URLSearchParams({ inicio, fim, skip: "0", limit: "500" });
+                const rV = await fetch(`${BASE}/vendas/?${qsV}`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
+                if (rV.ok) {
+                    const dV = await rV.json();
+                    const vendas = dV.items || dV.vendas || dV || [];
+                    const map = new Map<string, any>();
+                    for (const v of vendas) {
+                        if (v.status && v.status!== "CONCLUIDA") continue;
+                        for (const it of (v.itens||[])) {
+                            const pid = String(it.produto_id);
+                            const cur = map.get(pid) || { qtd_vendida: 0, faturamento: 0, nome_produto: it.nome_produto, produto_id: pid };
+                            cur.qtd_vendida += Number(it.quantidade||0);
+                            cur.faturamento += Number(it.total||0);
+                            map.set(pid, cur);
+                        }
+                    }
+                    let ranking = Array.from(map.values()).map((m:any)=>{
+                        const db = items.find((p:any)=> String(p.id)===String(m.produto_id));
+                        return {...m,...db, nome: db?.nome || m.nome_produto, imagem_url: db?.imagem_url || m.imagem_url, preco_venda: db?.preco_venda, stock_atual: db?.stock_atual, controlar_stock: db?.controlar_stock, categoria: db?.categoria };
+                    }).sort((a,b)=> b.qtd_vendida - a.qtd_vendida).slice(0,8).map((p,i)=>({...p, rank:i+1}));
+
+                    if (ranking.length>0) setMaisVendidos(ranking);
+                    else setMaisVendidos(items.slice(0,4).map((p:any,i)=>({...p, qtd_vendida:0, faturamento:0, rank:i+1})));
+                }
+            } catch { setMaisVendidos(items.slice(0,4).map((p:any,i)=>({...p, qtd_vendida:0, faturamento:0, rank:i+1}))); }
+        } catch (e) { console.log("erro produtos db", e); }
+    }, [inicio, fim]);
 
     useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
@@ -133,7 +212,7 @@ export function CaixaTab() {
                 if (m.venda_id && prev.movimentos?.some((x: any) => x.venda_id === m.venda_id)) return prev;
                 const novoMovs = [m,...(prev.movimentos || [])];
                 return {
-                  ...prev,
+                 ...prev,
                     movimentos: novoMovs,
                     saldo_atual: Number(prev.saldo_atual || 0) + valor,
                     total_entradas: valor > 0? Number(prev.total_entradas || 0) + valor : prev.total_entradas,
@@ -168,7 +247,7 @@ export function CaixaTab() {
     const entradas = Number(extrato?.total_entradas || 0);
     const saidas = Math.abs(Number(extrato?.total_saidas || 0));
     const atual = Number(extrato?.saldo_atual?? 0);
-    const top4 = useMemo(()=> produtosDb.slice(0,4), [produtosDb]);
+    const top4 = useMemo(()=> maisVendidos.length>0? maisVendidos.slice(0,4) : produtosDb.slice(0,4).map((p,i)=>({...p, qtd_vendida:0, faturamento:0, rank:i+1})), [maisVendidos, produtosDb]);
 
     const handleCardClick = (type: "master" | "entradas" | "saidas") => {
         if (type === "master") {
@@ -270,13 +349,7 @@ export function CaixaTab() {
 
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div onClick={() => handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
-                    <MasterCard
-                        aberto={!!status?.aberto}
-                        atual={atual}
-                        nomeRestaurante={caixaAtual?.aberto_por_nome? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE"}
-                        dataAbertura={dataAberturaFull? dataAberturaFull.split(',')[0] || dataAberturaFull.split(' ')[0] : inicio.slice(5).replace("-", "/")}
-                        horaAbertura={dataAberturaFull? dataAberturaFull.split(',').pop()?.trim() || dataAberturaFull : (movs[0]? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : "--:--")}
-                    />
+                    <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante={caixaAtual?.aberto_por_nome? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE"} dataAbertura={dataAberturaFull? dataAberturaFull.split(',')[0] || dataAberturaFull.split(' ')[0] : inicio.slice(5).replace("-", "/")} horaAbertura={dataAberturaFull? dataAberturaFull.split(',').pop()?.trim() || dataAberturaFull : (movs[0]? new Date(movs[0].criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : "--:--")} />
                 </div>
                 <div onClick={() => handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer active:scale-[0.98] transition">
                     <EntradasCard entradas={entradas} nome="J-OS RESTAURANTE" dataHoje={inicio.slice(5).replace("-", "/")} qtdVendas={movs.filter((m: any) => (m.tipo || "").toUpperCase().includes("VENDA")).length} />
@@ -286,7 +359,6 @@ export function CaixaTab() {
                 </div>
             </div>
 
-            {/* ===== RELATORIO PRODUTOS - PEGA DO BANCO COM getImgUrl ===== */}
             <div className="space-y-3">
                 <div className="flex gap-2">
                     {(["All Sales","Pending","Completed"] as const).map(t=>(
@@ -298,92 +370,55 @@ export function CaixaTab() {
                     <div className="grid md:grid-cols-[1.6fr_1fr] gap-6">
                         <div>
                             <div className="flex gap-4 mb-5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#8B6A5A]"/>Series 1</span>
-                                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#9B8B7F]"/>Series 2</span>
-                                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-zinc-200"/>Series 3</span>
+                                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#8B6A5A]"/>Faturamento</span>
+                                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#9B8B7F]"/>Pedidos</span>
+                                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-zinc-200"/>Ticket</span>
                             </div>
                             <div className="relative h-[170px]">
-                                <div className="absolute left-0 top-0 bottom-6 flex flex-col justify-between text-[11px] text-zinc-400 w-8">
-                                    <span>50</span><span>40</span><span>30</span><span>20</span><span>10</span><span>0</span>
-                                </div>
+                                <div className="absolute left-0 top-0 bottom-6 flex flex-col justify-between text-[11px] text-zinc-400 w-8"><span>50</span><span>40</span><span>30</span><span>20</span><span>10</span><span>0</span></div>
                                 <svg className="absolute left-10 right-0 top-0 bottom-6 w-[calc(100%-40px)] h-[146px]" viewBox="0 0 300 146">
                                     {[0,29,58,87,116].map(y=> <line key={y} x1="0" x2="300" y1={y} y2={y} stroke="#F5F2EF" strokeWidth="1"/>)}
                                     <polyline fill="none" stroke="#8B6A5A" strokeWidth="2.5" points="0,100 75,60 150,70 225,40 300,50" />
                                     <polyline fill="none" stroke="#6B5B54" strokeWidth="2.2" points="0,146 75,120 150,35 225,50 300,70" />
                                     <polyline fill="none" stroke="#E5DDD6" strokeWidth="2" points="0,130 75,85 150,55 225,65 300,80" />
                                 </svg>
-                                <div className="absolute bottom-0 left-10 right-0 flex justify-between text-[10px] font-bold text-zinc-400">
-                                    <span>Item 1</span><span>Item 2</span><span>Item 3</span><span>Item 4</span><span>Item 5</span>
-                                </div>
+                                <div className="absolute bottom-0 left-10 right-0 flex justify-between text-[10px] font-bold text-zinc-400"><span>Item 1</span><span>Item 2</span><span>Item 3</span><span>Item 4</span><span>Item 5</span></div>
                             </div>
                         </div>
-
                         <div className="space-y-2.5">
                             <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white">
-                                <div className="flex -space-x-2">
-                                    {top4.slice(0,2).map((p:any,i:number)=>(
-                                        <img key={i} src={getImgUrl(p.imagem_url)} onError={(e:any)=> e.currentTarget.src=FALLBACK_IMG} className="w-10 h-10 rounded-full object-cover border-2 border-white"/>
-                                    ))}
-                                </div>
-                                <div><div className="text-[12px] font-black leading-none">Top-Selling Products</div><div className="text-[10px] text-zinc-500 mt-1 leading-tight">Highlight of our most popular premium products.</div></div>
+                                <div className="flex -space-x-2">{top4.slice(0,2).map((p:any,i:number)=>(<img key={i} src={getImgUrl(p.imagem_url)} onError={(e:any)=> e.currentTarget.src=FALLBACK_IMG} className="w-10 h-10 rounded-full object-cover border-2 border-white"/>))}</div>
+                                <div><div className="text-[12px] font-black leading-none">Top-Selling Products</div><div className="text-[10px] text-zinc-500 mt-1 leading-tight">{top4[0]?.nome || "Mais populares"}</div></div>
                             </div>
                             <div className="flex items-center gap-3 p-3 rounded-[16px] bg-[#8B6A5A] text-white shadow-lg -mx-1">
-                                <div className="flex -space-x-2">
-                                    {top4.slice(0,3).map((p:any,i:number)=>(
-                                        <img key={i} src={getImgUrl(p.imagem_url)} onError={(e:any)=> e.currentTarget.src=FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-[#8B6A5A]"/>
-                                    ))}
-                                </div>
-                                <div><div className="text-[12px] font-black leading-none">Trending Now</div><div className="text-[10px] opacity-80 mt-1">"Where sweetness meets simplicity ✨"</div></div>
+                                <div className="flex -space-x-2">{top4.slice(0,3).map((p:any,i:number)=>(<img key={i} src={getImgUrl(p.imagem_url)} onError={(e:any)=> e.currentTarget.src=FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-[#8B6A5A]"/>))}</div>
+                                <div><div className="text-[12px] font-black leading-none">Trending Now</div><div className="text-[10px] opacity-80 mt-1">"{top4[0]?.qtd_vendida || 0} vendidos ✨"</div></div>
                             </div>
                             <div className="flex items-center gap-3 p-3 rounded-[16px] border bg-white">
-                                <div className="flex -space-x-2">
-                                    {top4.slice(0,4).map((p:any,i:number)=>(
-                                        <img key={i} src={getImgUrl(p.imagem_url)} onError={(e:any)=> e.currentTarget.src=FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-white"/>
-                                    ))}
-                                </div>
-                                <div><div className="text-[12px] font-black leading-none">Best sellers</div><div className="text-[10px] text-zinc-500 mt-1 leading-tight">Food items that consistently lead our sales charts.</div></div>
+                                <div className="flex -space-x-2">{top4.slice(0,4).map((p:any,i:number)=>(<img key={i} src={getImgUrl(p.imagem_url)} onError={(e:any)=> e.currentTarget.src=FALLBACK_IMG} className="w-8 h-8 rounded-full object-cover border-2 border-white"/>))}</div>
+                                <div><div className="text-[12px] font-black leading-none">Best sellers</div><div className="text-[10px] text-zinc-500 mt-1 leading-tight">Faturamento Kz {fmt(top4.reduce((a:any,b:any)=>a+Number(b.faturamento||0),0))}</div></div>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div className="flex justify-between items-center">
-                    <div className="bg-white border rounded-full px-4 py-2 flex items-center gap-2 text-[11px] font-black shadow-sm">
-                        <span>📅 {inicio}</span><span className="opacity-30">To</span><span>📅 {fim}</span>
-                    </div>
-                    <div className="flex gap-2 text-[11px] font-bold text-zinc-400"><span>‹</span><span>1</span><span className="text-black">2</span><span>3</span><span>›</span></div>
+                    <div className="bg-white border rounded-full px-4 py-2 flex items-center gap-2 text-[11px] font-black shadow-sm"><span>📅 {inicio}</span><span className="opacity-30">To</span><span>📅 {fim}</span></div>
+                    <div className="text-[11px] font-bold text-zinc-400">{maisVendidos.length || produtosDb.length} produtos • mais vendidos primeiro</div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {produtosDb.length===0? (
-                        <div className="col-span-4 py-10 text-center bg-white rounded-[20px] border text-[12px] text-zinc-400">Nenhum produto no banco - cadastre em Produtos</div>
+                <div className="grid gap-2.5 md:gap-3 grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                    {top4.length===0? (
+                        <div className="col-span-4 py-10 text-center bg-white rounded-[22px] border text-[12px] text-zinc-400">Nenhum produto no banco</div>
                     ) : (
-                        top4.map((p:any)=>(
-                            <div key={p.id} className="bg-white rounded-[20px] p-2.5 border border-black/5 shadow-sm">
-                                <div className="aspect-square rounded-[14px] overflow-hidden bg-[#F6F3F0] mb-3">
-                                    <img
-                                        src={getImgUrl(p.imagem_url)}
-                                        onError={(e:any)=> e.currentTarget.src = FALLBACK_IMG}
-                                        alt={p.nome}
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                                <div className="flex items-center gap-2 px-1">
-                                    <span className="text-[13px] font-black">Kz {fmt(Number(p.preco_venda||0))}</span>
-                                    <span className="w-px h-3 bg-zinc-300"/>
-                                    <span className="text-[11px] font-bold truncate">{p.nome}</span>
-                                </div>
-                            </div>
-                        ))
+                        top4.map((p:any)=>(<ProdutoMaisVendidoCard key={p.produto_id||p.id} p={p} />))
                     )}
                 </div>
             </div>
 
             <div className="flex justify-end pt-2">
                 <button onClick={() => { const v =!showExtrato; setShowExtrato(v); localStorage.setItem(STORAGE_KEY, String(v)); }} className="flex items-center gap-2">
-                    <div className={`w-[44px] h-[26px] rounded-full p-[3px] transition-colors ${showExtrato? 'bg-green-500' : 'bg-zinc-300'}`}>
-                        <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-all ${showExtrato? 'translate-x-[18px]' : 'translate-x-0'}`} />
-                    </div>
+                    <div className={`w-[44px] h-[26px] rounded-full p-[3px] transition-colors ${showExtrato? 'bg-green-500' : 'bg-zinc-300'}`}><div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-all ${showExtrato? 'translate-x-[18px]' : 'translate-x-0'}`} /></div>
                 </button>
             </div>
 
