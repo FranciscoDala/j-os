@@ -34,15 +34,15 @@ export default function RelatorioFolhaView({ extrato, inicio, fim, empresa, stat
     }
 
     return (
-        <div className="fixed inset-0 z-[10000] bg-[#525659] overflow-y-auto overflow-x-hidden">
+        <div className="fixed inset-0 z-[10000] bg-[#525659] overflow-y-auto overflow-x-auto">
             <style>{`
               #relatorio-wrapper{width:100%;display:flex;flex-direction:column;align-items:center;gap:24px;padding:24px 16px;background:transparent}
-             .pagina-pdf{transform-origin:top center;box-shadow:0 10px 30px rgba(0,0,0,0.4)}
-              @media (max-width:768px){
-               .pagina-pdf{transform:scale(0.42);margin-bottom:-58%}
-                #relatorio-wrapper{padding:0;display:block}
-              }
+             .pagina-pdf{transform-origin:top center;box-shadow:0 10px 30px rgba(0,0,0,0.4);background:white;width:210mm;min-width:210mm;min-height:297mm}
               #relatorio-wrapper::-webkit-scrollbar{display:none}
+              @media (max-width:768px){
+                #relatorio-wrapper{padding:8px;gap:12px;width:100%;align-items:stretch}
+               .pagina-pdf{width:100%!important;min-width:100%!important;max-width:100%!important;min-height:auto!important;padding:3mm!important;box-shadow:0 2px 8px rgba(0,0,0,0.15)!important}
+              }
               @media print{.no-print{display:none!important}}
             `}</style>
 

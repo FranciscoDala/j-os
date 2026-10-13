@@ -13,14 +13,14 @@ const LogoDefault = ({ nome, size = 'small' }: { nome?: string; size?: 'small' |
     if (size === 'large') {
         return (
             <div className="flex flex-col items-center opacity-[0.12]" style={{ fontFamily: "var(--fonte-principal)" }}>
-                <div className="w-[550px] h-[550px] bg-[#1a5ca8] rounded-full flex items-center justify-center text-white font-black text-[220px]" style={{ fontFamily: "var(--fonte-principal)" }}>{inicial}</div>
+                <div className="w-[550px] h-[550px] bg-[#1a5ca8] rounded-full flex items-center justify-center text-white font-black text-[220px]">{inicial}</div>
             </div>
         )
     }
     return (
         <div className="w-[110px] h-[90px] flex flex-col items-center justify-center shrink-0">
-            <div className="w-[70px] h-[70px] bg-[#1a5ca8] rounded-full flex items-center justify-center text-white font-black text-[36px]" style={{ fontFamily: "var(--fonte-principal)" }}>{inicial}</div>
-            <div className="mt-1 bg-[#1a5ca8] text-white text-[9px] font-bold px-2 py-[2px]" style={{ fontFamily: "var(--fonte-principal)" }}>{(nome || 'J-OS').toUpperCase().slice(0, 10)}</div>
+            <div className="w-[70px] h-[70px] bg-[#1a5ca8] rounded-full flex items-center justify-center text-white font-black text-[36px]">{inicial}</div>
+            <div className="mt-1 bg-[#1a5ca8] text-white text-[9px] font-bold px-2 py-[2px]">{(nome || 'J-OS').toUpperCase().slice(0, 10)}</div>
         </div>
     )
 }
@@ -91,6 +91,7 @@ export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Pro
                 nome_snapshot: m.descricao || tipoNorm,
                 quantidade: 1,
                 unidade: tipoNorm,
+                preco_unit_snapshot: Math.abs(Number(m.valor || 0)),
                 subtotal_linha: Math.abs(Number(m.valor || 0)),
                 tipoNorm
             }
@@ -112,7 +113,7 @@ export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Pro
                 const isLast = pageIdx === paginas.length - 1
                 const isFirst = pageIdx === 0
                 return (
-                    <div key={pageIdx} id={pageIdx === 0? "fatura-pdf" : `fatura-pdf-${pageIdx}`} className="pagina-pdf relative bg-white text-black w-[210mm] min-w-[210mm] min-h-[297mm] p-[10mm] flex flex-col border border-gray-200 overflow-hidden mx-auto" style={{ fontFamily: "var(--fonte-principal)" }}>
+                    <div key={pageIdx} className="pagina-pdf relative bg-white text-black w-[210mm] min-w-[210mm] min-h-[297mm] p-[10mm] flex flex-col border border-gray-200 overflow-hidden mx-auto" style={{ fontFamily: "var(--fonte-principal)" }}>
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                             {hasLogo? <img src={emp.logo_url} alt="marca" className="w-[650px] h-[650px] object-contain opacity-[0.10]" /> : <LogoDefault nome={emp.nome} size="large" />}
                         </div>
@@ -141,12 +142,12 @@ export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Pro
                                             <p className="font-bold text-[13px]">Resumo Período:</p>
                                             <p className="font-bold">De {fmtData(inicio)} até {fmtData(fim)}</p>
                                             <p>Saldo Inicial: Kz {fmt(totais.saldoInicial)}</p>
-                                            <p>Total Movimentos: {movsFiltrados.length} (Vendas, Entradas e Saidas)</p>
+                                            <p>Total Movimentos: {movsFiltrados.length}</p>
                                             <p>Operador: {status?.caixa_atual?.aberto_por_nome || 'Sistema'}</p>
                                         </div>
-                                        <div className="text-right"><p className="text-[9px] text-[#666]">Processado por {emp.nome}</p><p className="text-[9px] text-[#666]">Relatório interno</p></div>
+                                        <div className="text-right"><p className="text-[9px] text-[#666]">Processado por {emp.nome}</p></div>
                                     </div>
-                                    <div className="mt-4 grid grid-cols-[90px_95px_95px_125px_115px_1fr] gap-[5px]">
+                                    <div className="mt-4 grid grid-cols-3 md:grid-cols-6 gap-[5px]">
                                         {[
                                             { k: 'CÓD. CAIXA', v: status?.caixa_atual?.id?.slice(0, 8) || 'AVULSO' },
                                             { k: 'DATA INÍCIO', v: fmtData(inicio) },
@@ -155,27 +156,27 @@ export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Pro
                                             { k: 'SALDO INICIAL', v: `Kz ${fmt(totais.saldoInicial)}` },
                                             { k: 'OPERADOR', v: status?.caixa_atual?.aberto_por_nome?.slice(0, 10) || 'Sistema' },
                                         ].map(b => (
-                                            <div key={b.k} className="border border-[#bbb] py-[5px] px-1 bg-[rgba(255,255,255,0.40)]"><p className="font-bold text-[10px] truncate">{b.k}</p><p className="text-center text-[11px] mt-[2px] truncate">{b.v}</p></div>
+                                            <div key={b.k} className="border border-[#bbb] py-[5px] px-1 bg-[rgba(255,255,255,0.40)]"><p className="font-bold text-[8px] md:text-[10px] truncate">{b.k}</p><p className="text-center text-[10px] md:text-[11px] mt-[2px] truncate">{b.v}</p></div>
                                         ))}
                                     </div>
                                 </>
                             )}
-                            <div className="w-full mt-2 overflow-x-auto no-scrollbar">
-                                <table className="w-full border-collapse table-auto min-w-[720px]">
+                            <div className="w-full mt-2">
+                                <table className="w-full border-collapse table-auto">
                                     <thead>
                                         <tr className="bg-[rgba(194,194,194,0.65)] text-[10.5px] font-bold">
-                                            <th className="border border-[#999] py-[7px] px-2 text-left">HORA</th>
+                                            <th className="border border-[#999] py-[7px] px-2 text-left w-[68px]">HORA</th>
                                             <th className="border border-[#999] py-[7px] px-2 text-left">DESCRIÇÃO</th>
-                                            <th className="border border-[#999] py-[7px] px-1 text-center">QTD.</th>
-                                            <th className="border border-[#999] py-[7px] px-1 text-center">TIPO</th>
-                                            <th className="border border-[#999] py-[7px] px-2 text-right">VALOR (KZ)</th>
+                                            <th className="border border-[#999] py-[7px] px-1 text-center w-[56px]">QTD.</th>
+                                            <th className="border border-[#999] py-[7px] px-1 text-center w-[90px]">TIPO</th>
+                                            <th className="border border-[#999] py-[7px] px-2 text-right w-[118px]">VALOR (KZ)</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {itens.length === 0? <tr><td colSpan={5} className="border border-[#bbb] py-10 text-center text-[11px] text-gray-400">Sem vendas/entradas/saidas</td></tr> : itens.map((it: any, i: number) => (
+                                        {itens.length === 0? <tr><td colSpan={5} className="border border-[#bbb] py-10 text-center text-[11px] text-gray-400">Sem movimentos</td></tr> : itens.map((it: any, i: number) => (
                                             <tr key={i} className="text-[11px]">
                                                 <td className="border border-[#bbb] px-2 py-[6px] bg-[rgba(255,255,255,0.40)]">{it.referencia}</td>
-                                                <td className="border border-[#bbb] px-2 py-[6px] bg-[rgba(255,255,255,0.40)]">{it.nome_snapshot}</td>
+                                                <td className="border border-[#bbb] px-2 py-[6px] bg-[rgba(255,255,255,0.40)] break-words">{it.nome_snapshot}</td>
                                                 <td className="border border-[#bbb] text-center px-1 py-[6px] bg-[rgba(255,255,255,0.40)]">{it.quantidade}</td>
                                                 <td className="border border-[#bbb] text-center px-1 py-[6px] bg-[rgba(255,255,255,0.40)] font-bold text-[10px]">{it.unidade}</td>
                                                 <td className={`border border-[#bbb] text-right px-2 py-[6px] font-semibold ${it.tipoNorm === 'SAIDA'? 'text-red-600 bg-[#FFF0F0]' : it.tipoNorm === 'ENTRADA'? 'text-green-700 bg-[#F0FFF0]' : 'bg-[rgba(255,255,255,0.40)]'}`}>{fmt(it.subtotal_linha)}</td>
@@ -185,10 +186,10 @@ export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Pro
                                 </table>
                             </div>
                             {isLast && (
-                                <div className="flex mt-2 gap-1">
-                                    <div className="flex-1 border border-[#999]">
+                                <div className="flex flex-col md:flex-row mt-2 gap-1">
+                                    <div className="flex-1 border border-[#999] min-w-0">
                                         <div className="flex bg-[rgba(194,194,194,0.65)] text-[11px] font-bold">
-                                            <div className="flex-1 border-r border-[#999] py-[6px] px-1">TIPO MOVIMENTO</div>
+                                            <div className="flex-1 border-r border-[#999] py-[6px] px-1">TIPO</div>
                                             <div className="w-[50px] border-r border-[#999] py-[6px] text-center">QTD</div>
                                             <div className="w-[125px] py-[6px] text-center">VALOR</div>
                                         </div>
@@ -200,7 +201,7 @@ export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Pro
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="w-[300px] shrink-0">
+                                    <div className="w-full md:w-[300px] shrink-0">
                                         <div className="flex bg-[rgba(194,194,194,0.65)] text-[11px] border border-[#999]"><div className="flex-1 py-[7px] px-2 text-right">Total Entradas</div><div className="w-[135px] bg-white border-l border-[#999] py-[7px] text-right pr-2 font-bold text-green-700">{fmt(totais.entradas)}</div></div>
                                         <div className="flex bg-[rgba(194,194,194,0.65)] text-[11px] border border-[#999] border-t-0"><div className="flex-1 py-[7px] px-2 text-right">Total Saidas</div><div className="w-[135px] bg-white border-l border-[#999] py-[7px] text-right pr-2 font-bold text-red-600">{fmt(totais.saidas)}</div></div>
                                         <div className="flex bg-[rgba(194,194,194,0.65)] text-[11px] border border-[#999] border-t-0"><div className="flex-1 py-[7px] px-2 text-right">Saldo Inicial</div><div className="w-[135px] bg-white border-l border-[#999] py-[7px] text-right pr-2">{fmt(totais.saldoInicial)}</div></div>
