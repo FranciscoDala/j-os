@@ -15,7 +15,6 @@ body {
     -ms-overflow-style: none;
 }
 
-/* ESCONDE TODO SCROLL DO SISTEMA */
 html::-webkit-scrollbar,
 body::-webkit-scrollbar {
     display: none;
@@ -34,7 +33,6 @@ body::-webkit-scrollbar {
     scrollbar-width: none;
 }
 
-/* ===== FIX ZOOM iOS - REGRA DE OURO ===== */
 input,
 select,
 textarea {
@@ -49,7 +47,6 @@ textarea {
     }
 }
 
-/* Garante que no foco não dê zoom */
 input:focus,
 select:focus,
 textarea:focus {
@@ -64,40 +61,46 @@ textarea:focus {
     }
 }
 
-/* Previne double-tap zoom */
 button, a {
     touch-action: manipulation;
 }
 
-/* ===== FIX RELATÓRIO E FATURA - ABRIR NA METADE iOS ===== */
+/* FIX DEFINITIVO - SEM SCALE */
 .fixed.inset-0{
     height: 100dvh !important;
-    min-height: 100dvh !important;
     -webkit-overflow-scrolling: touch;
 }
 
 #fatura-pdf-wrapper,
 #relatorio-wrapper{
-    align-items: flex-start !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
     justify-content: flex-start !important;
+    padding: 24px 16px 120px 16px !important;
+    gap: 24px !important;
     min-height: auto !important;
+}
+
+#fatura-pdf,
+.pagina-pdf{
+    transform-origin: top center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
 }
 
 @media (max-width:768px){
     #fatura-pdf-wrapper,
     #relatorio-wrapper{
-        display: block !important;
-        padding: 0 !important;
-        overflow-x: hidden !important;
+        padding: 12px 8px 120px 8px !important;
+        gap: 12px !important;
     }
     #fatura-pdf,
     .pagina-pdf{
-        transform: scale(0.42) !important;
-        transform-origin: top center !important;
-        margin: 0 auto -58% auto !important;
+        transform: none !important;
+        zoom: 0.42 !important;
+        margin: 0 auto !important;
         display: block !important;
-    }
-    .pagina-pdf:last-child{
-        margin-bottom: 0 !important;
+        width: 210mm !important;
+        min-width: 210mm !important;
     }
 }
