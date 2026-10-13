@@ -10,6 +10,7 @@ import { ProdutoMaisVendidoCard, getImgUrl } from "./cards/produto-mais-vendido"
 import { GraficoVendas } from "./cards/grafico-vendas";
 import RelatorioFolhaView from "./pdf/folha_RelatorioView";
 import { toast } from "sonner";
+import { useEmpresa } from "@/components/dashboard/empresaContext";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
 const BASE = `${API_URL.replace(/\/$/, "")}/api/v1`;
@@ -39,9 +40,12 @@ const formatDateTimeFull = (iso: string) => {
 };
 
 export function CaixaTab() {
+
+    const { empresa: empresaCtx } = useEmpresa();
+    const empresa = empresaCtx as any;
+
     const [status, setStatus] = useState<any>(null);
     const [extrato, setExtrato] = useState<any>(null);
-    const [empresaReal, setEmpresaReal] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [inicio, setInicio] = useState(todayISO());
     const [fim, setFim] = useState(todayISO());
@@ -72,36 +76,6 @@ export function CaixaTab() {
         } catch { setExtrato({ movimentos: [], saldo_inicial: 0, saldo_atual: 0, total_entradas: 0, total_saidas: 0, qtd_caixas: 0, periodo_inicio: inicio, periodo_fim: fim }); }
         setLoading(false);
     }, [inicio, fim]);
-
-    const loadEmpresa = useCallback(async () => {
-        try {
-            const token = localStorage.getItem("access_token") || localStorage.getItem("token")
-            const empresa_id = localStorage.getItem("empresa_id")
-            const h: any = {}
-            if (token) h["Authorization"] = `Bearer ${token}`
-            if (empresa_id) h["X-Empresa-ID"] = empresa_id
-            const paths = ["/empresa/me", "/empresas/me", "/empresa", "/auth/me", "/usuarios/me", "/empresa/perfil"]
-            for (const p of paths) {
-                try {
-                    const r = await fetch(`${BASE}${p}`, { headers: h, cache: "no-store" as any })
-                    if (!r.ok) continue
-                    const d = await r.json()
-                    const cand = d?.empresa || d?.data?.empresa || d?.data || d?.user?.empresa || d?.perfil?.empresa || d
-                    if (cand?.nome || cand?.companyName || cand?.razao_social) {
-                        setEmpresaReal(cand)
-                        localStorage.setItem("empresa_cache", JSON.stringify(cand))
-                        console.log("✅ Empresa carregada:", cand.nome)
-                        return
-                    }
-                } catch { }
-            }
-            // fallback cache
-            const cached = localStorage.getItem("empresa_cache")
-            if (cached) setEmpresaReal(JSON.parse(cached))
-        } catch {
-            try { const c = localStorage.getItem("empresa_cache"); if (c) setEmpresaReal(JSON.parse(c)) } catch { }
-        }
-    }, []);
 
     const gerarDiasDoPeriodo = (ini: string, f: string) => {
         const dias: any[] = [];
@@ -172,7 +146,7 @@ export function CaixaTab() {
     }, [vendasBrutas, produtosDb, filtroSales, inicio, fim]);
 
     useEffect(() => { const saved = localStorage.getItem(STORAGE_KEY); if (saved !== null) setShowExtrato(saved === "true"); }, []);
-    useEffect(() => { load(); loadProdutosDb(); loadEmpresa(); }, [load, loadProdutosDb, loadEmpresa]);
+    useEffect(() => { load(); loadProdutosDb(); }, [load, loadProdutosDb]);
     useEffect(() => {
         const h = (e: MouseEvent) => {
             const target = e.target as Node;
@@ -266,13 +240,13 @@ export function CaixaTab() {
 
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div onClick={() => handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer">
-                    <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante={empresaReal?.nome || (caixaAtual?.aberto_por_nome ? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE")} dataAbertura={dataAberturaFull} horaAbertura={dataAberturaFull} />
+                    <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante={empresa?.nome || empresa?.nome_fantasia || (caixaAtual?.aberto_por_nome ? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE")} dataAbertura={dataAberturaFull} horaAbertura={dataAberturaFull} />
                 </div>
                 <div onClick={() => handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer">
-                    <EntradasCard entradas={entradas} nome={empresaReal?.nome || "J-OS RESTAURANTE"} dataHoje={inicio.slice(5).replace("-", "/")} qtdVendas={movs.filter((m: any) => (m.tipo || "").toUpperCase().includes("VENDA")).length} />
+                    <EntradasCard entradas={entradas} nome={empresa?.nome || empresa?.nome_fantasia || "J-OS RESTAURANTE"} dataHoje={inicio.slice(5).replace("-", "/")} qtdVendas={movs.filter((m: any) => (m.tipo || "").toUpperCase().includes("VENDA")).length} />
                 </div>
                 <div onClick={() => handleCardClick("saidas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer">
-                    <SaidasCard saidas={saidas} nome={empresaReal?.nome || "J-OS RESTAURANTE"} hora={new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })} retirado={saidas > 0 ? '1' : '0'} />
+                    <SaidasCard saidas={saidas} nome={empresa?.nome || empresa?.nome_fantasia || "J-OS RESTAURANTE"} hora={new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })} retirado={saidas > 0 ? '1' : '0'} />
                 </div>
             </div>
 
@@ -329,7 +303,7 @@ export function CaixaTab() {
                     inicio={inicio}
                     fim={fim}
                     status={status}
-                    empresa={empresaReal}
+                    empresa={empresa}
                     onVoltar={() => setShowRelatorio(false)}
                 />
             )}
