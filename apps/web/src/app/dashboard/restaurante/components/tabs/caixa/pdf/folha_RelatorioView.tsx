@@ -25,7 +25,7 @@ export default function RelatorioFolhaView({ extrato, inicio, fim, empresa, stat
               @page{size:A4;margin:0}
               *{font-family:'Zalando Sans Expanded',sans-serif!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
               html,body{margin:0;padding:0;background:white}
-             .pagina-pdf{width:210mm!important;min-height:297mm!important;padding:10mm!important;page-break-after:always;break-after:page;margin:0 auto!important;box-shadow:none!important;border:none!important;position:relative!important}
+             .pagina-pdf{width:210mm!important;min-width:210mm!important;min-height:297mm!important;transform:none!important;margin:0 auto!important;box-shadow:none!important;border:none!important;padding:10mm!important;position:relative!important;page-break-after:always;break-after:page}
             </style>
           </head><body>${wrapper.innerHTML}</body></html>
         `)
@@ -34,15 +34,15 @@ export default function RelatorioFolhaView({ extrato, inicio, fim, empresa, stat
     }
 
     return (
-        <div className="fixed inset-0 z-[10000] bg-[#525659] overflow-y-auto overflow-x-auto">
+        <div className="fixed inset-0 z-[10000] bg-[#525659] overflow-y-auto overflow-x-hidden">
             <style>{`
-              #relatorio-wrapper{width:100%;display:flex;flex-direction:column;align-items:center;gap:24px;padding:24px 16px;background:transparent}
-             .pagina-pdf{transform-origin:top center;box-shadow:0 10px 30px rgba(0,0,0,0.4);background:white;width:210mm;min-width:210mm;min-height:297mm}
-              #relatorio-wrapper::-webkit-scrollbar{display:none}
+              #relatorio-wrapper{width:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:24px 16px;background:transparent;gap:24px}
+             .pagina-pdf{transform-origin:top center;box-shadow:0 10px 30px rgba(0,0,0,0.4)}
               @media (max-width:768px){
-                #relatorio-wrapper{padding:8px;gap:12px;width:100%;align-items:stretch}
-               .pagina-pdf{width:100%!important;min-width:100%!important;max-width:100%!important;min-height:auto!important;padding:3mm!important;box-shadow:0 2px 8px rgba(0,0,0,0.15)!important}
+               .pagina-pdf{transform:scale(0.42);margin-bottom:-58%}
+                #relatorio-wrapper{padding:0;display:block}
               }
+              #relatorio-wrapper::-webkit-scrollbar{display:none}
               @media print{.no-print{display:none!important}}
             `}</style>
 
@@ -52,9 +52,10 @@ export default function RelatorioFolhaView({ extrato, inicio, fim, empresa, stat
                     <p className="text-[11px] md:text-[13px] font-bold uppercase truncate">RELATÓRIO {inicio} a {fim}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={onVoltar} className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded"><Share2 className="w-4 h-4" /></button>
-                    <button onClick={handlePrint} className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded"><Download className="w-4 h-4" /></button>
-                    <button onClick={handlePrint} className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded"><Printer className="w-4 h-4" /></button>
+                    <span className="bg-[#1e1e1e] text-[10px] px-1.5 py-0.5 rounded">{extrato?.movimentos?.length || 0} movs</span>
+                    <button onClick={onVoltar} className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded"><Share2 className="w-4 h-4"/></button>
+                    <button onClick={handlePrint} className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded"><Download className="w-4 h-4"/></button>
+                    <button onClick={handlePrint} className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded"><Printer className="w-4 h-4"/></button>
                 </div>
             </div>
 
