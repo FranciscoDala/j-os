@@ -26,9 +26,6 @@ const LogoDefault = ({ nome, size = 'small' }: { nome?: string; size?: 'small' |
 }
 
 export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Props) => {
-    const movs = extrato?.movimentos || []
-
-    // EMPRESA - PEGA DE QUALQUER FORMATO
     const empresaRaw = useMemo(() => {
         let e: any = empresa
         if (!e) {
@@ -57,44 +54,63 @@ export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Pro
     const hasLogo =!!emp.logo && emp.logo.trim()!== ''
     const mask = (v: string) => v && v.trim()!== ''? v : '---'
 
-    const { itensAll, totais } = useMemo(() => {
-        const entradas = Number(extrato?.total_entradas || 0)
-        const saidas = Math.abs(Number(extrato?.total_saidas || 0))
+    // NORMALIZA TIPOS: SANGRIA -> SAIDA, SUPRIMENTO -> ENTRADA
+    const normalizeTipo = (raw: string) => {
+        const t = (raw || '').toUpperCase()
+        if (t.includes('SANGRIA')) return 'SAIDA'
+        if (t.includes('SUPRIMENTO')) return 'ENTRADA'
+        if (t.includes('VENDA')) return 'VENDA'
+        if (t.includes('ENTRADA')) return 'ENTRADA'
+        if (t.includes('SAIDA')) return 'SAIDA'
+        return t
+    }
+
+    const { itensAll, totais, movsFiltrados } = useMemo(() => {
+        const all = extrato?.movimentos || []
+        // FILTRA: remove ABERTURA e FECHAMENTO
+        const filtrados = all.filter((m: any) => {
+            const t = (m.tipo || '').toUpperCase()
+            if (t.includes('ABERTURA') || t.includes('FECHAMENTO') || t.includes('FECHAR') || t.includes('ABRIR')) return false
+            return true
+        })
+
+        const entradas = filtrados.filter((m: any) => {
+            const t = normalizeTipo(m.tipo)
+            return t === 'ENTRADA' || t === 'VENDA'
+        }).reduce((s: number, m: any) => s + Number(m.valor || 0), 0)
+
+        const saidas = filtrados.filter((m: any) => normalizeTipo(m.tipo) === 'SAIDA')
+           .reduce((s: number, m: any) => s + Math.abs(Number(m.valor || 0)), 0)
+
         const saldoInicial = Number(extrato?.saldo_inicial || 0)
         const saldoAtual = Number(extrato?.saldo_atual || (saldoInicial + entradas - saidas))
 
         const porTipo: Record<string, { incidencia: number, valor: number }> = {}
-        movs.forEach((m: any) => {
-            const t = (m.tipo || 'OUTRO').toUpperCase()
+        filtrados.forEach((m: any) => {
+            const t = normalizeTipo(m.tipo)
             if (!porTipo[t]) porTipo[t] = { incidencia: 0, valor: 0 }
             porTipo[t].incidencia += 1
-            porTipo[t].valor += Number(m.valor || 0)
+            porTipo[t].valor += Math.abs(Number(m.valor || 0))
         })
 
-        const parsed = movs.map((m: any) => {
+        const parsed = filtrados.map((m: any) => {
             const dt = new Date(m.criado_em)
+            const tipoNorm = normalizeTipo(m.tipo)
             return {
                 referencia: dt.toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' }),
-                nome_snapshot: m.descricao || m.tipo || 'Movimento caixa',
+                nome_snapshot: m.descricao || tipoNorm,
                 quantidade: 1,
-                unidade: (m.tipo || 'MOV').slice(0, 6).toUpperCase(),
-                preco_unit_snapshot: Number(m.valor || 0),
-                desconto_perc: 0,
-                desconto_valor: 0,
-                taxa_iva: 0,
-                subtotal_base: Number(m.valor || 0),
-                valor_iva: 0,
-                subtotal_linha: Number(m.valor || 0),
+                unidade: tipoNorm,
+                preco_unit_snapshot: Math.abs(Number(m.valor || 0)),
+                subtotal_linha: Math.abs(Number(m.valor || 0)),
+                tipoNorm
             }
         })
 
         return {
+            movsFiltrados: filtrados,
             itensAll: parsed,
             totais: {
-                liquido: entradas,
-                desconto: saidas,
-                iva: 0,
-                pagar: saldoAtual,
                 saldoInicial,
                 entradas,
                 saidas,
@@ -102,13 +118,12 @@ export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Pro
                 ivaPorTaxa: porTipo
             }
         }
-    }, [movs, extrato])
+    }, [extrato])
 
     const fmt = (n: number) => Number(n).toLocaleString('pt-AO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const fmtData = (d: any) => d? new Date(d).toLocaleDateString('pt-AO') : '---'
     const fmtDataHora = (d: any) => d? new Date(d).toLocaleString('pt-AO') : '---'
 
-    // PAGINAÇÃO - 20 ITENS POR PÁGINA PARA NÃO CRIAR FOLHA LONGA
     const ITENS_POR_PAGINA = 20
     const paginas: any[][] = []
     for (let i = 0; i < itensAll.length; i += ITENS_POR_PAGINA) paginas.push(itensAll.slice(i, i + ITENS_POR_PAGINA))
@@ -118,8 +133,8 @@ export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Pro
         <div id="relatorio-wrapper" className="flex flex-col gap-8">
             <style>{`
               @import url('https://fonts.googleapis.com/css2?family=Zalando+Sans+Expanded:ital,wght@0,200..900;1,200..900&display=swap');
-             .no-scrollbar::-webkit-scrollbar{display:none}
-             .no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+            .no-scrollbar::-webkit-scrollbar{display:none}
+            .no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
             `}</style>
 
             {paginas.map((itens, pageIdx) => {
@@ -141,19 +156,13 @@ export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Pro
                                     <p className="font-bold text-[12px]">RELATÓRIO DE CAIXA</p>
                                     <p className="mt-1">Período: {inicio} a {fim}</p>
                                     <p>Moeda: AKZ</p>
-                                    <p className="mt-1">Caixa: {status?.aberto? `Aberto por ${status?.caixa_atual?.aberto_por_nome || '---'}` : 'Fechado'}</p>
-                                    <p>Movimentos: {movs.length} • Pág {pageIdx + 1}/{paginas.length}</p>
+                                    <p>Movimentos: {movsFiltrados.length} • Pág {pageIdx + 1}/{paginas.length}</p>
                                 </div>
                                 <div className="flex gap-3 items-start">
                                     <div className="text-right leading-[14px]">
-                                        <p className="font-bold text-[15px]">RC-{inicio}_a_{fim}</p>
-                                        <p className="text-[#777] text-[11px] mt-1">Regime Geral</p>
-                                        <p className="font-bold text-[12px] mt-1">ORIGINAL</p>
+                                        <p className="font-bold text-[12px]">ORIGINAL</p>
                                         <p className="text-[10px] mt-1">Emissão: {fmtDataHora(new Date().toISOString())}</p>
                                         <p className="text-[10px]">Período: {inicio} a {fim}</p>
-                                    </div>
-                                    <div className="w-[90px] h-[90px] shrink-0 border p-1 bg-white flex items-center justify-center text-[8px] font-black text-center leading-[10px]">
-                                        J-OS<br />RELATÓRIO<br />{movs.length} MOVS
                                     </div>
                                 </div>
                             </div>
@@ -165,10 +174,10 @@ export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Pro
                                             <p className="font-bold text-[13px]">Resumo Período:</p>
                                             <p className="font-bold">De {fmtData(inicio)} até {fmtData(fim)}</p>
                                             <p>Saldo Inicial: Kz {fmt(totais.saldoInicial)}</p>
-                                            <p>Total Movimentos: {movs.length}</p>
+                                            <p>Total Movimentos: {movsFiltrados.length} (Vendas, Entradas e Saidas)</p>
                                             <p>Operador: {status?.caixa_atual?.aberto_por_nome || 'Sistema'}</p>
                                         </div>
-                                        <div className="text-right"><p className="text-[9px] text-[#666]">Processado por J-OS Sistema</p><p className="text-[9px] text-[#666]">Relatório interno</p></div>
+                                        <div className="text-right"><p className="text-[9px] text-[#666]">Processado por {emp.nome}</p><p className="text-[9px] text-[#666]">Relatório interno</p></div>
                                     </div>
 
                                     <div className="mt-4 grid grid-cols-[90px_95px_95px_125px_115px_1fr] gap-[5px]">
@@ -176,7 +185,7 @@ export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Pro
                                             { k: 'CÓD. CAIXA', v: status?.caixa_atual?.id?.slice(0, 8) || 'AVULSO' },
                                             { k: 'DATA INÍCIO', v: fmtData(inicio) },
                                             { k: 'DATA FIM', v: fmtData(fim) },
-                                            { k: 'QTD MOVS', v: movs.length },
+                                            { k: 'QTD MOVS', v: movsFiltrados.length },
                                             { k: 'SALDO INICIAL', v: `Kz ${fmt(totais.saldoInicial)}` },
                                             { k: 'OPERADOR', v: status?.caixa_atual?.aberto_por_nome?.slice(0, 10) || 'Sistema' },
                                         ].map(b => (
@@ -192,35 +201,26 @@ export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Pro
                                         <col style={{ width: '68px' }} />
                                         <col style={{ width: 'auto' }} />
                                         <col style={{ width: '56px' }} />
-                                        <col style={{ width: '56px' }} />
-                                        <col style={{ width: '96px' }} />
-                                        <col style={{ width: '82px' }} />
-                                        <col style={{ width: '68px' }} />
+                                        <col style={{ width: '90px' }} />
                                         <col style={{ width: '118px' }} />
                                     </colgroup>
                                     <thead>
                                         <tr className="bg-[rgba(194,194,194,0.65)] text-[10.5px] font-bold">
                                             <th className="border border-[#999] py-[7px] px-2 text-left whitespace-nowrap">HORA</th>
-                                            <th className="border border-[#999] py-[7px] px-2 text-left">DESCRIÇÃO / TIPO</th>
+                                            <th className="border border-[#999] py-[7px] px-2 text-left">DESCRIÇÃO</th>
                                             <th className="border border-[#999] py-[7px] px-1 text-center">QTD.</th>
                                             <th className="border border-[#999] py-[7px] px-1 text-center">TIPO</th>
-                                            <th className="border border-[#999] py-[7px] px-2 text-right">VALOR UNIT.</th>
-                                            <th className="border border-[#999] py-[7px] px-2 text-right">-</th>
-                                            <th className="border border-[#999] py-[7px] px-1 text-center">-</th>
                                             <th className="border border-[#999] py-[7px] px-2 text-right">VALOR (KZ)</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {itens.length === 0? <tr><td colSpan={8} className="border border-[#bbb] py-10 text-center text-[11px] text-gray-400">Sem movimentos de {inicio} até {fim}</td></tr> : itens.map((it: any, i: number) => (
+                                        {itens.length === 0? <tr><td colSpan={5} className="border border-[#bbb] py-10 text-center text-[11px] text-gray-400">Sem vendas/entradas/saidas de {inicio} até {fim}</td></tr> : itens.map((it: any, i: number) => (
                                             <tr key={i} className="text-[11px] align-top">
                                                 <td className="border border-[#bbb] px-2 py-[6px] bg-[rgba(255,255,255,0.40)] whitespace-nowrap">{it.referencia}</td>
                                                 <td className="border border-[#bbb] px-2 py-[6px] bg-[rgba(255,255,255,0.40)] whitespace-normal break-words leading-[14px]">{it.nome_snapshot}</td>
                                                 <td className="border border-[#bbb] text-center px-1 py-[6px] bg-[rgba(255,255,255,0.40)]">{it.quantidade}</td>
                                                 <td className="border border-[#bbb] text-center px-1 py-[6px] bg-[rgba(255,255,255,0.40)] font-bold text-[10px]">{it.unidade}</td>
-                                                <td className="border border-[#bbb] text-right px-2 py-[6px] bg-[rgba(255,255,255,0.40)] whitespace-nowrap">{fmt(it.preco_unit_snapshot)}</td>
-                                                <td className="border border-[#bbb] text-right px-2 py-[6px] bg-[rgba(255,255,255,0.40)]">-</td>
-                                                <td className="border border-[#bbb] text-center px-1 py-[6px] bg-[rgba(255,255,255,0.40)]">-</td>
-                                                <td className={`border border-[#bbb] text-right px-2 py-[6px] font-semibold whitespace-nowrap ${it.subtotal_linha < 0? 'text-red-600 bg-[#FFF0F0]' : 'bg-[rgba(255,255,255,0.40)]'}`}>{fmt(it.subtotal_linha)}</td>
+                                                <td className={`border border-[#bbb] text-right px-2 py-[6px] font-semibold whitespace-nowrap ${it.tipoNorm === 'SAIDA'? 'text-red-600 bg-[#FFF0F0]' : it.tipoNorm === 'ENTRADA'? 'text-green-700 bg-[#F0FFF0]' : 'bg-[rgba(255,255,255,0.40)]'}`}>{fmt(it.subtotal_linha)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -233,23 +233,21 @@ export const RelatorioCaixaPDF = ({ extrato, inicio, fim, empresa, status }: Pro
                                         <div className="flex bg-[rgba(194,194,194,0.65)] text-[11px] font-bold">
                                             <div className="flex-1 border-r border-[#999] py-[6px] px-1">TIPO MOVIMENTO</div>
                                             <div className="w-[50px] border-r border-[#999] py-[6px] text-center shrink-0">QTD</div>
-                                            <div className="w-[125px] border-r border-[#999] py-[6px] text-center shrink-0">OCORRÊNCIAS</div>
                                             <div className="w-[125px] py-[6px] text-center shrink-0">VALOR</div>
                                         </div>
                                         {Object.entries(totais.ivaPorTaxa).map(([tipo, d]: any) => (
                                             <div key={tipo} className="flex text-[11px]">
                                                 <div className="flex-1 border-r border-[#999] py-[6px] px-1 bg-[rgba(255,255,255,0.40)] font-bold truncate">{tipo}</div>
                                                 <div className="w-[50px] border-r border-[#999] py-[6px] text-center bg-[rgba(255,255,255,0.40)] shrink-0">{d.incidencia}</div>
-                                                <div className="w-[125px] border-r border-[#999] py-[6px] text-right pr-2 bg-[rgba(255,255,255,0.40)] shrink-0">{d.incidencia}</div>
                                                 <div className="w-[125px] py-[6px] text-right pr-2 bg-[rgba(255,255,255,0.40)] shrink-0 font-bold whitespace-nowrap">{fmt(d.valor)}</div>
                                             </div>
                                         ))}
                                     </div>
                                     <div className="w-[300px] shrink-0">
-                                        <div className="flex bg-[rgba(194,194,194,0.65)] text-[11px] border border-[#999]"><div className="flex-1 py-[7px] px-2 text-right">Total Entradas</div><div className="w-[135px] bg-[rgba(255,255,255,0.55)] border-l border-[#999] py-[7px] text-right pr-2 font-bold text-green-700 whitespace-nowrap">{fmt(totais.entradas)}</div></div>
-                                        <div className="flex bg-[rgba(194,194,194,0.65)] text-[11px] border border-[#999] border-t-0"><div className="flex-1 py-[7px] px-2 text-right">Total Saídas</div><div className="w-[135px] bg-[rgba(255,255,255,0.55)] border-l border-[#999] py-[7px] text-right pr-2 font-bold text-red-600 whitespace-nowrap">{fmt(totais.saidas)}</div></div>
+                                        <div className="flex bg-[rgba(194,194,194,0.65)] text-[11px] border border-[#999]"><div className="flex-1 py-[7px] px-2 text-right">Total Entradas (Vendas + Entradas)</div><div className="w-[135px] bg-[rgba(255,255,255,0.55)] border-l border-[#999] py-[7px] text-right pr-2 font-bold text-green-700 whitespace-nowrap">{fmt(totais.entradas)}</div></div>
+                                        <div className="flex bg-[rgba(194,194,194,0.65)] text-[11px] border border-[#999] border-t-0"><div className="flex-1 py-[7px] px-2 text-right">Total Saidas</div><div className="w-[135px] bg-[rgba(255,255,255,0.55)] border-l border-[#999] py-[7px] text-right pr-2 font-bold text-red-600 whitespace-nowrap">{fmt(totais.saidas)}</div></div>
                                         <div className="flex bg-[rgba(194,194,194,0.65)] text-[11px] border border-[#999] border-t-0"><div className="flex-1 py-[7px] px-2 text-right">Saldo Inicial</div><div className="w-[135px] bg-[rgba(255,255,255,0.55)] border-l border-[#999] py-[7px] text-right pr-2 whitespace-nowrap">{fmt(totais.saldoInicial)}</div></div>
-                                        <div className="flex text-[11px] font-bold border border-[#999] border-t-0 bg-[rgba(194,194,194,0.75)]"><div className="flex-1 py-[7px] px-2 text-right">DIFERENÇA (SALDO)</div><div className="w-[135px] bg-white border-l border-[#999] py-[7px] text-right pr-2 font-bold whitespace-nowrap">Kz {fmt(totais.diferenca)}</div></div>
+                                        <div className="flex text-[11px] font-bold border border-[#999] border-t-0 bg-[rgba(194,194,194,0.75)]"><div className="flex-1 py-[7px] px-2 text-right">SALDO ATUAL</div><div className="w-[135px] bg-white border-l border-[#999] py-[7px] text-right pr-2 font-bold whitespace-nowrap">Kz {fmt(totais.diferenca)}</div></div>
                                     </div>
                                 </div>
                             )}
