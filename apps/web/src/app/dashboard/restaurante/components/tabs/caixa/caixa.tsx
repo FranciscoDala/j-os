@@ -8,6 +8,7 @@ import { JConfirm } from "./modals/confirm";
 import { ExtratoList } from "./table/extrato-list";
 import { ProdutoMaisVendidoCard, getImgUrl } from "./cards/produto-mais-vendido";
 import { GraficoVendas } from "./cards/grafico-vendas";
+import RelatorioFolhaView from "./pdf/folha_RelatorioView";
 import { toast } from "sonner";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
@@ -44,6 +45,7 @@ export function CaixaTab() {
     const [inicio, setInicio] = useState(todayISO());
     const [fim, setFim] = useState(todayISO());
     const [showExtrato, setShowExtrato] = useState(false);
+    const [showRelatorio, setShowRelatorio] = useState(false);
     const [produtosDb, setProdutosDb] = useState<any[]>([]);
     const [vendasBrutas, setVendasBrutas] = useState<any[]>([]);
     const [maisVendidos, setMaisVendidos] = useState<any[]>([]);
@@ -159,7 +161,7 @@ export function CaixaTab() {
         if (type === "entradas") { if (!status?.aberto) { toast.error("Abra o caixa antes!"); return; } setConfirm({ open: true, title: "Suprimento?", desc: "Adicionar?", type: "green", action: () => { setSangriaTipo("SUPRIMENTO"); setSangriaOpen(true); } }); }
         if (type === "saidas") { if (!status?.aberto) { toast.error("Abra o caixa antes!"); return; } setConfirm({ open: true, title: "Sangria?", desc: "Retirar?", type: "red", action: () => { setSangriaTipo("SANGRIA"); setSangriaOpen(true); } }); }
     };
-    const handleBaixar = () => { setMenuOpen(false); const linhas = [["Data", "Tipo", "Valor"]]; movs.forEach((m: any) => { linhas.push([formatDateTimeFull(m.criado_em), m.tipo, String(m.valor)]); }); const csv = linhas.map(r => r.join(";")).join("\n"); const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `relatorio-${inicio}_a_${fim}.csv`; a.click(); URL.revokeObjectURL(url); };
+    const handleRelatorio = () => { setMenuOpen(false); setShowRelatorio(true); };
     const handleImprimir = () => { setMenuOpen(false); const win = window.open("", "_blank"); if (!win) return; win.document.write(`<html><body><h2>${inicio} a ${fim}</h2><table>${movs.map((m: any) => `<tr><td>${formatDateTimeFull(m.criado_em)}</td><td>${m.tipo}</td><td>${fmt(Number(m.valor))}</td></tr>`).join("")}</table><script>window.print()</script></body></html>`); win.document.close(); };
 
     if (loading &&!extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
@@ -180,7 +182,7 @@ export function CaixaTab() {
                     </button>
                     {menuOpen && (
                         <div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-50">
-                            <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button>
+                            <button onClick={handleRelatorio} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Relatório</button>
                             <div className="h-[1px] bg-zinc-100" />
                             <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button>
                         </div>
@@ -198,7 +200,7 @@ export function CaixaTab() {
                     </button>
                     {menuOpen && (
                         <div className="absolute right-0 top-[52px] w-[180px] bg-white border rounded-[16px] shadow-xl overflow-hidden z-[9999]">
-                            <button onClick={handleBaixar} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Baixar</button>
+                            <button onClick={handleRelatorio} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Relatório</button>
                             <div className="h-[1px] bg-zinc-100" />
                             <button onClick={handleImprimir} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase hover:bg-zinc-50">Imprimir</button>
                         </div>
@@ -220,7 +222,6 @@ export function CaixaTab() {
                 </div>
             )}
 
-            {/* CARDS COMO ESTAVAM - SCROLL-X INVISIVEL, 1 NA TELA, 100% WIDTH */}
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div onClick={() => handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer">
                     <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante={caixaAtual?.aberto_por_nome? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE"} dataAbertura={dataAberturaFull} horaAbertura={dataAberturaFull} />
@@ -279,6 +280,7 @@ export function CaixaTab() {
             <JConfirm open={confirm.open} title={confirm.title} desc={confirm.desc} type={confirm.type} onClose={() => setConfirm(s => ({...s, open: false }))} onConfirm={confirm.action} />
             <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={status?.caixa_atual || extrato} onClose={() => setModalOpen(false)} onSuccess={async () => { await load(); loadProdutosDb(); toast.success("Caixa atualizado!"); }} />
             <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={() => setSangriaOpen(false)} onSuccess={async () => { await load(); loadProdutosDb(); toast.success("Movimento registrado!"); }} />
+            {showRelatorio && <RelatorioFolhaView extrato={extrato} inicio={inicio} fim={fim} status={status} onVoltar={() => setShowRelatorio(false)} />}
         </div>
     )
 }
