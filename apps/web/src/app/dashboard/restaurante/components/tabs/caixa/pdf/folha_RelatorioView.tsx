@@ -1,21 +1,8 @@
 import { useMemo } from 'react'
 import RelatorioCaixaPDF from './pdf_RelatorioCaixa'
-import { Menu, Download, Printer, Share2, Lock } from 'lucide-react'
-
-const CARGOS_PERMISSOES: Record<string, string[]> = {
-    admin: ["*"],
-    financeira: ["ver_faturas", "baixar_fatura", "imprimir_fatura"],
-    rh: [],
-    recepcao: ["ver_faturas"]
-}
-function temPermissao(cargo: string, perm: string) {
-    if (cargo === 'admin') return true
-    const perms = CARGOS_PERMISSOES[cargo] || []
-    return perms.includes(perm) || perms.includes("*")
-}
+import { Menu, Download, Printer, Share2 } from 'lucide-react'
 
 export default function RelatorioFolhaView({ extrato, inicio, fim, empresa, status, onVoltar }: any) {
-    // EMPRESA VIEW IGUAL AO DA FATURA
     const empresaView = useMemo(() => {
         let e = empresa
         if (!e) { try { const c = localStorage.getItem("empresa_cache"); if (c) e = JSON.parse(c) } catch {} }
@@ -24,11 +11,6 @@ export default function RelatorioFolhaView({ extrato, inicio, fim, empresa, stat
         return e? {...e, logo: e.logo_url || e.image_url || e.logo || '', logo_url: e.logo_url || e.image_url || e.logo || '' } : { nome: 'J-OS RESTAURANTE', logo: '', logo_url: '' }
     }, [empresa])
 
-    const funcionarioLogado = useMemo(() => { try { return JSON.parse(localStorage.getItem("funcionario") || "null") } catch { return null } }, [])
-    const cargoAtual = funcionarioLogado?.cargo?.toLowerCase() || 'admin'
-    const podeBaixar = true
-    const podeImprimir = true
-
     const handlePrint = () => {
         const wrapper = document.getElementById('relatorio-wrapper')
         if (!wrapper) return
@@ -36,14 +18,14 @@ export default function RelatorioFolhaView({ extrato, inicio, fim, empresa, stat
         if (!w) return
         w.document.write(`
           <html><head>
-            <title>RC_${inicio}_a_${fim}</title>
+            <title>RELATORIO_${inicio}_a_${fim}</title>
             <link href="https://fonts.googleapis.com/css2?family=Zalando+Sans+Expanded:ital,wght@0,200..900;1,200..900&display=swap" rel="stylesheet">
             <script src="https://cdn.tailwindcss.com"></script>
             <style>
               @page{size:A4;margin:0}
               *{font-family:'Zalando Sans Expanded',sans-serif!important; -webkit-print-color-adjust:exact; print-color-adjust:exact}
               html,body{margin:0;padding:0;background:white}
-             .pagina-pdf{width:210mm!important;min-height:297mm!important; padding:10mm!important; page-break-after:always; break-after:page; margin:0!important; box-shadow:none!important; border:none!important; position:relative!important}
+             .pagina-pdf{width:210mm!important;min-height:297mm!important;padding:10mm!important;page-break-after:always;break-after:page;margin:0 auto!important;box-shadow:none!important;border:none!important;position:relative!important}
             </style>
           </head><body>${wrapper.innerHTML}</body></html>
         `)
@@ -51,35 +33,41 @@ export default function RelatorioFolhaView({ extrato, inicio, fim, empresa, stat
         setTimeout(() => { w.focus(); w.print(); }, 700)
     }
 
-    const totalPags = Math.ceil((extrato?.movimentos?.length || 0) / 20) || 1
+    const totalPags = Math.ceil((extrato?.movimentos?.filter((m:any)=>! (m.tipo||'').toUpperCase().includes('FECH') &&! (m.tipo||'').toUpperCase().includes('ABERT')).length || 0) / 20) || 1
 
     return (
         <div className="fixed inset-0 z-[10000] bg-[#525659] overflow-y-auto overflow-x-hidden">
             <style>{`
-              #fatura-pdf-wrapper{width:100%;display:flex;justify-content:center;padding:24px 16px;background:transparent; flex-direction:column; align-items:center; gap:24px}
-             .pagina-pdf{transform-origin:top center;box-shadow:0 10px 30px rgba(0,0,0,0.4)}
+              #relatorio-wrapper{width:100%;display:flex;flex-direction:column;align-items:center;gap:24px;padding:24px 16px;background:transparent}
+             .pagina-pdf{transform-origin:top center;box-shadow:0 10px 30px rgba(0,0,0,0.4);background:white}
+              #relatorio-wrapper::-webkit-scrollbar{display:none}
               @media (max-width:768px){
-               .pagina-pdf{transform:scale(0.42);margin-bottom:-58%}
-                #fatura-pdf-wrapper{padding:0;display:block}
+                #relatorio-wrapper{padding:8px 0;gap:12px}
+               .pagina-pdf{
+                  transform:scale(0.46);
+                  margin-bottom:-76%;
+                }
               }
-              #fatura-pdf-wrapper::-webkit-scrollbar{display:none}
-              @media print{.no-print{display:none!important}}
+              @media (max-width:400px){
+               .pagina-pdf{transform:scale(0.38);margin-bottom:-95%}
+              }
+              @media print{.no-print{display:none!important} #relatorio-wrapper{padding:0!important;gap:0}.pagina-pdf{transform:none!important;margin:0!important;box-shadow:none!important}}
             `}</style>
 
             <div className="no-print sticky top-0 z-30 h-[44px] bg-[#323233] flex items-center justify-between px-2 text-white">
                 <div className="flex items-center gap-2 min-w-0">
                     <button onClick={onVoltar} className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded shrink-0"><Menu className="w-4 h-4" /></button>
-                    <p className="text-[11px] md:text-[13px] font-bold uppercase truncate">RELATÓRIO {inicio} a {fim} • {extrato?.movimentos?.length || 0} MOVS • {totalPags} PÁG</p>
+                    <p className="text-[11px] md:text-[13px] font-bold uppercase truncate">RELATÓRIO {inicio} a {fim} • {totalPags} PÁG</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                    <span className="bg-[#1e1e1e] text-[10px] px-1.5 py-0.5 rounded">{totalPags} / {totalPags}</span>
+                    <span className="bg-[#1e1e1e] text-[10px] px-1.5 py-0.5 rounded">{totalPags} PÁG</span>
                     <button onClick={onVoltar} className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded"><Share2 className="w-4 h-4" /></button>
                     <button onClick={handlePrint} className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded"><Download className="w-4 h-4" /></button>
                     <button onClick={handlePrint} className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded"><Printer className="w-4 h-4" /></button>
                 </div>
             </div>
 
-            <div id="fatura-pdf-wrapper">
+            <div id="relatorio-wrapper">
                 <RelatorioCaixaPDF extrato={extrato} inicio={inicio} fim={fim} empresa={empresaView} status={status} />
             </div>
         </div>
