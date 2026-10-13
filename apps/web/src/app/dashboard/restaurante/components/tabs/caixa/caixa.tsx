@@ -16,17 +16,17 @@ const BASE = `${API_URL.replace(/\/$/, "")}/api/v1`;
 const FALLBACK_IMG = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=400";
 
 function getAuthHeaders() {
-    const token = typeof window!== "undefined"? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null;
-    const empresa_id = typeof window!== "undefined"? localStorage.getItem("empresa_id") : null;
+    const token = typeof window !== "undefined" ? (localStorage.getItem("access_token") || localStorage.getItem("token")) : null;
+    const empresa_id = typeof window !== "undefined" ? localStorage.getItem("empresa_id") : null;
     const h: Record<string, string> = {};
     if (token) h["Authorization"] = `Bearer ${token}`;
     if (empresa_id) h["X-Empresa-ID"] = empresa_id;
     return h;
 }
 async function apiFetch(path: string, options: RequestInit = {}) {
-    const headers: any = { "Content-Type": "application/json",...getAuthHeaders(),...(options.headers || {}) };
+    const headers: any = { "Content-Type": "application/json", ...getAuthHeaders(), ...(options.headers || {}) };
     if (options.body instanceof FormData) delete headers["Content-Type"];
-    const res = await fetch(`${BASE}${path}`, {...options, headers, cache: "no-store" as any });
+    const res = await fetch(`${BASE}${path}`, { ...options, headers, cache: "no-store" as any });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) throw d;
     return d;
@@ -75,21 +75,31 @@ export function CaixaTab() {
 
     const loadEmpresa = useCallback(async () => {
         try {
-            let emp = null;
-            try { emp = await apiFetch("/empresa") } catch {}
-            if (!emp) { try { emp = await apiFetch("/empresas/me") } catch {} }
-            if (!emp) { try { emp = await apiFetch("/empresa/me") } catch {} }
-            if (!emp) { try { emp = await apiFetch("/empresas/perfil") } catch {} }
-            const data = emp?.empresa || emp?.data || emp || null;
-            if (data && (data.nome || data.companyName)) {
-                setEmpresaReal(data);
-                try { localStorage.setItem("empresa_cache", JSON.stringify(data)) } catch {}
-            } else {
-                const cached = localStorage.getItem("empresa_cache");
-                if (cached) setEmpresaReal(JSON.parse(cached));
+            const token = localStorage.getItem("access_token") || localStorage.getItem("token")
+            const empresa_id = localStorage.getItem("empresa_id")
+            const h: any = {}
+            if (token) h["Authorization"] = `Bearer ${token}`
+            if (empresa_id) h["X-Empresa-ID"] = empresa_id
+            const paths = ["/empresa/me", "/empresas/me", "/empresa", "/auth/me", "/usuarios/me", "/empresa/perfil"]
+            for (const p of paths) {
+                try {
+                    const r = await fetch(`${BASE}${p}`, { headers: h, cache: "no-store" as any })
+                    if (!r.ok) continue
+                    const d = await r.json()
+                    const cand = d?.empresa || d?.data?.empresa || d?.data || d?.user?.empresa || d?.perfil?.empresa || d
+                    if (cand?.nome || cand?.companyName || cand?.razao_social) {
+                        setEmpresaReal(cand)
+                        localStorage.setItem("empresa_cache", JSON.stringify(cand))
+                        console.log("✅ Empresa carregada:", cand.nome)
+                        return
+                    }
+                } catch { }
             }
+            // fallback cache
+            const cached = localStorage.getItem("empresa_cache")
+            if (cached) setEmpresaReal(JSON.parse(cached))
         } catch {
-            try { const cached = localStorage.getItem("empresa_cache"); if (cached) setEmpresaReal(JSON.parse(cached)) } catch {}
+            try { const c = localStorage.getItem("empresa_cache"); if (c) setEmpresaReal(JSON.parse(c)) } catch { }
         }
     }, []);
 
@@ -110,7 +120,7 @@ export function CaixaTab() {
             const qs = new URLSearchParams({ skip: "0", limit: "100", search: "" });
             const r = await fetch(`${BASE}/produtos/?${qs}`, { headers: getAuthHeaders() as any, cache: "no-store" as any });
             const data = await r.json();
-            const items = (data.items || data || []).filter((p: any) => p.ativo!== false);
+            const items = (data.items || data || []).filter((p: any) => p.ativo !== false);
             setProdutosDb(items);
             try {
                 const qsV = new URLSearchParams({ inicio, fim, skip: "0", limit: "1000" });
@@ -144,7 +154,7 @@ export function CaixaTab() {
             const curDia = mapDia.get(diaKey);
             curDia.total += Number(v.total || 0);
             curDia.qtd += 1;
-            curDia.ticket = curDia.qtd > 0? curDia.total / curDia.qtd : 0;
+            curDia.ticket = curDia.qtd > 0 ? curDia.total / curDia.qtd : 0;
             for (const it of (v.itens || [])) {
                 const pid = String(it.produto_id);
                 const cur = map.get(pid) || { qtd_vendida: 0, faturamento: 0, nome_produto: it.nome_produto, produto_id: pid };
@@ -156,17 +166,17 @@ export function CaixaTab() {
         setVendasPorDia(Array.from(mapDia.values()).sort((a, b) => new Date(a.dia).getTime() - new Date(b.dia).getTime()));
         let ranking = Array.from(map.values()).map((m: any) => {
             const db = items.find((p: any) => String(p.id) === String(m.produto_id));
-            return {...m,...db, nome: db?.nome || m.nome_produto, imagem_url: db?.imagem_url, preco_venda: db?.preco_venda, stock_atual: db?.stock_atual, controlar_stock: db?.controlar_stock, categoria: db?.categoria };
-        }).sort((a, b) => b.qtd_vendida - a.qtd_vendida).slice(0, 8).map((p, i) => ({...p, rank: i + 1 }));
+            return { ...m, ...db, nome: db?.nome || m.nome_produto, imagem_url: db?.imagem_url, preco_venda: db?.preco_venda, stock_atual: db?.stock_atual, controlar_stock: db?.controlar_stock, categoria: db?.categoria };
+        }).sort((a, b) => b.qtd_vendida - a.qtd_vendida).slice(0, 8).map((p, i) => ({ ...p, rank: i + 1 }));
         setMaisVendidos(ranking);
     }, [vendasBrutas, produtosDb, filtroSales, inicio, fim]);
 
-    useEffect(() => { const saved = localStorage.getItem(STORAGE_KEY); if (saved!== null) setShowExtrato(saved === "true"); }, []);
+    useEffect(() => { const saved = localStorage.getItem(STORAGE_KEY); if (saved !== null) setShowExtrato(saved === "true"); }, []);
     useEffect(() => { load(); loadProdutosDb(); loadEmpresa(); }, [load, loadProdutosDb, loadEmpresa]);
     useEffect(() => {
         const h = (e: MouseEvent) => {
             const target = e.target as Node;
-            if (menuRef.current &&!menuRef.current.contains(target) && menuRefMobile.current &&!menuRefMobile.current.contains(target)) {
+            if (menuRef.current && !menuRef.current.contains(target) && menuRefMobile.current && !menuRefMobile.current.contains(target)) {
                 setMenuOpen(false);
             }
         };
@@ -176,8 +186,8 @@ export function CaixaTab() {
     const movs = extrato?.movimentos || [];
     const entradas = Number(extrato?.total_entradas || 0);
     const saidas = Math.abs(Number(extrato?.total_saidas || 0));
-    const atual = Number(extrato?.saldo_atual?? 0);
-    const top4 = useMemo(() => maisVendidos.length > 0? maisVendidos.slice(0, 4) : [], [maisVendidos]);
+    const atual = Number(extrato?.saldo_atual ?? 0);
+    const top4 = useMemo(() => maisVendidos.length > 0 ? maisVendidos.slice(0, 4) : [], [maisVendidos]);
 
     const handleCardClick = (type: "master" | "entradas" | "saidas") => {
         if (type === "master") { if (status?.aberto) setConfirm({ open: true, title: "Fechar caixa?", desc: `Saldo Kz ${fmt(atual)}. Fechar?`, type: "black", action: () => { setModalMode("fechar"); setModalOpen(true); } }); else setConfirm({ open: true, title: "Abrir caixa?", desc: "Iniciar novo turno.", type: "black", action: () => { setModalMode("abrir"); setModalOpen(true); } }); }
@@ -196,8 +206,8 @@ export function CaixaTab() {
         handleRelatorio(e);
     };
 
-    if (loading &&!extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
-    const caixaAtual = status?.caixa_atual; const dataAberturaFull = caixaAtual?.aberto_em? formatDateTimeFull(caixaAtual.aberto_em) : "";
+    if (loading && !extrato) return <div className="bg-white rounded-[20px] p-8 animate-pulse h-[300px]" />;
+    const caixaAtual = status?.caixa_atual; const dataAberturaFull = caixaAtual?.aberto_em ? formatDateTimeFull(caixaAtual.aberto_em) : "";
 
     return (
         <div className="space-y-4">
@@ -209,7 +219,7 @@ export function CaixaTab() {
                     <div className="h-[46px] flex-1 min-w-0"><JCalendarPicker value={fim} onChange={setFim} /></div>
                 </div>
                 <div className="relative" ref={menuRef}>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); setMenuOpen(o =>!o) }} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setMenuOpen(o => !o) }} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
                     </button>
                     {menuOpen && (
@@ -227,7 +237,7 @@ export function CaixaTab() {
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
                 </button>
                 <div className="relative" ref={menuRefMobile}>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); setMenuOpen(o =>!o) }} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setMenuOpen(o => !o) }} className="h-[46px] w-[46px] bg-black text-white rounded-full flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
                     </button>
                     {menuOpen && (
@@ -256,20 +266,20 @@ export function CaixaTab() {
 
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-0 -mx-4 px-4 md:mx-0 md:px-0 md:gap-4 md:grid md:grid-cols-3 pb-2">
                 <div onClick={() => handleCardClick("master")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer">
-                    <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante={empresaReal?.nome || (caixaAtual?.aberto_por_nome? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE")} dataAbertura={dataAberturaFull} horaAbertura={dataAberturaFull} />
+                    <MasterCard aberto={!!status?.aberto} atual={atual} nomeRestaurante={empresaReal?.nome || (caixaAtual?.aberto_por_nome ? `Resp: ${caixaAtual?.aberto_por_nome}` : "J-OS RESTAURANTE")} dataAbertura={dataAberturaFull} horaAbertura={dataAberturaFull} />
                 </div>
                 <div onClick={() => handleCardClick("entradas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer">
                     <EntradasCard entradas={entradas} nome={empresaReal?.nome || "J-OS RESTAURANTE"} dataHoje={inicio.slice(5).replace("-", "/")} qtdVendas={movs.filter((m: any) => (m.tipo || "").toUpperCase().includes("VENDA")).length} />
                 </div>
                 <div onClick={() => handleCardClick("saidas")} className="min-w-full w-full snap-center md:min-w-0 shrink-0 cursor-pointer">
-                    <SaidasCard saidas={saidas} nome={empresaReal?.nome || "J-OS RESTAURANTE"} hora={new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })} retirado={saidas > 0? '1' : '0'} />
+                    <SaidasCard saidas={saidas} nome={empresaReal?.nome || "J-OS RESTAURANTE"} hora={new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })} retirado={saidas > 0 ? '1' : '0'} />
                 </div>
             </div>
 
             <div className="space-y-3">
                 <div className="w-full grid grid-cols-3 gap-2">
                     {(["Todas", "Pendentes", "Concluídas"] as const).map(t => (
-                        <button key={t} onClick={() => setFiltroSales(t)} className={`w-full px-2 py-2.5 rounded-full text-[11px] font-black transition truncate ${filtroSales === t? "bg-[#8B6A5A] text-white shadow-md" : "bg-white border text-zinc-500"}`}>{t}</button>
+                        <button key={t} onClick={() => setFiltroSales(t)} className={`w-full px-2 py-2.5 rounded-full text-[11px] font-black transition truncate ${filtroSales === t ? "bg-[#8B6A5A] text-white shadow-md" : "bg-white border text-zinc-500"}`}>{t}</button>
                     ))}
                 </div>
                 <div className="bg-white rounded-[28px] border border-black/5 p-4 md:p-5 shadow-sm">
@@ -298,18 +308,18 @@ export function CaixaTab() {
                     <div className="text-[11px] font-bold text-zinc-400 text-left px-1">{vendasPorDia.length} dias • {maisVendidos.length} produtos • {filtroSales}</div>
                 </div>
                 <div className="grid gap-2.5 md:gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                    {top4.length === 0? (<div className="col-span-full py-10 text-center bg-white rounded-[22px] border text-[12px] text-zinc-400">Nenhuma venda {filtroSales.toLowerCase()} em {inicio} até {fim}</div>) : (top4.map((p: any) => (<ProdutoMaisVendidoCard key={p.produto_id || p.id} p={p} />)))}
+                    {top4.length === 0 ? (<div className="col-span-full py-10 text-center bg-white rounded-[22px] border text-[12px] text-zinc-400">Nenhuma venda {filtroSales.toLowerCase()} em {inicio} até {fim}</div>) : (top4.map((p: any) => (<ProdutoMaisVendidoCard key={p.produto_id || p.id} p={p} />)))}
                 </div>
             </div>
 
             <div className="flex justify-between items-center pt-2">
                 <p className="text-[11px] font-bold text-zinc-500">Extrato detalhado</p>
-                <button type="button" onClick={() => { const v =!showExtrato; setShowExtrato(v); localStorage.setItem(STORAGE_KEY, String(v)); }} className="flex items-center gap-2">
-                    <div className={`w-[44px] h-[26px] rounded-full p-[3px] transition-colors ${showExtrato? 'bg-green-500' : 'bg-zinc-300'}`}><div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-all ${showExtrato? 'translate-x-[18px]' : 'translate-x-0'}`} /></div>
+                <button type="button" onClick={() => { const v = !showExtrato; setShowExtrato(v); localStorage.setItem(STORAGE_KEY, String(v)); }} className="flex items-center gap-2">
+                    <div className={`w-[44px] h-[26px] rounded-full p-[3px] transition-colors ${showExtrato ? 'bg-green-500' : 'bg-zinc-300'}`}><div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-all ${showExtrato ? 'translate-x-[18px]' : 'translate-x-0'}`} /></div>
                 </button>
             </div>
             {showExtrato && <ExtratoList movimentos={movs} selectedDate={extrato?.periodo_inicio || inicio} statusCaixa={status} />}
-            <JConfirm open={confirm.open} title={confirm.title} desc={confirm.desc} type={confirm.type} onClose={() => setConfirm(s => ({...s, open: false }))} onConfirm={() => { setConfirm(s => ({...s, open: false })); confirm.action(); }} />
+            <JConfirm open={confirm.open} title={confirm.title} desc={confirm.desc} type={confirm.type} onClose={() => setConfirm(s => ({ ...s, open: false }))} onConfirm={() => { setConfirm(s => ({ ...s, open: false })); confirm.action(); }} />
             <CaixaModal open={modalOpen} mode={modalMode} caixaAtual={status?.caixa_atual || extrato} onClose={() => setModalOpen(false)} onSuccess={async () => { await load(); loadProdutosDb(); toast.success("Caixa atualizado!"); }} />
             <SangriaModal open={sangriaOpen} tipo={sangriaTipo} onClose={() => setSangriaOpen(false)} onSuccess={async () => { await load(); loadProdutosDb(); toast.success("Movimento registrado!"); }} />
 
