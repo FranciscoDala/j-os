@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 export default function AdminPage() {
     const [empresas, setEmpresas] = useState<any[]>([]);
     const [donos, setDonos] = useState<any[]>([]);
-    const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [modalOpen, setModalOpen] = useState(false);
@@ -26,21 +25,18 @@ export default function AdminPage() {
 
     const rawUrl = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/+$/, "");
     const baseUrl = rawUrl.endsWith("/api/v1")? rawUrl : rawUrl.endsWith("/api")? rawUrl + "/v1" : rawUrl + "/api/v1";
-
     const getToken = () => typeof window!== 'undefined'? localStorage.getItem("access_token") || "" : "";
 
     const fetchData = async () => {
         setLoading(true);
         try {
             const headers = { Authorization: `Bearer ${getToken()}` };
-            const [resEmp, resDonos, resStats] = await Promise.all([
+            const [resEmp, resDonos] = await Promise.all([
                 fetch(`${baseUrl}/admin/empresas`, { headers }),
                 fetch(`${baseUrl}/admin/donos`, { headers }),
-                fetch(`${baseUrl}/admin/stats`, { headers }),
             ]);
             if (resEmp.ok) setEmpresas(await resEmp.json());
             if (resDonos.ok) setDonos(await resDonos.json());
-            if (resStats.ok) setStats(await resStats.json());
         } finally { setLoading(false); }
     };
 
@@ -103,12 +99,6 @@ export default function AdminPage() {
             </header>
 
             <main className="max-w-7xl mx-auto px-6 py-8">
-                <div className="grid grid-cols-3 gap-4 mb-8">
-                    <div className="bg-white rounded-[20px] p-5 border shadow-sm"><p className="text-xs text-slate-500 uppercase font-semibold">Lojas</p><p className="text-2xl font-bold mt-1">{stats?.total_empresas?? empresas.length}</p></div>
-                    <div className="bg-white rounded-[20px] p-5 border shadow-sm"><p className="text-xs text-slate-500 uppercase font-semibold">Usuários</p><p className="text-2xl font-bold mt-1">{stats?.total_users?? "-"}</p></div>
-                    <div className="bg-black rounded-[20px] p-5 text-white"><p className="text-xs text-white/70 uppercase">Donos</p><p className="text-2xl font-bold mt-1">{stats?.total_donos?? "-"}</p></div>
-                </div>
-
                 <div className="bg-white rounded-[24px] border shadow-sm">
                     <div className="p-6 flex justify-between gap-4 border-b">
                         <h2 className="font-bold flex items-center gap-2"><Building2 size={18} /> Lojas • {filtered.length}</h2>
@@ -122,8 +112,7 @@ export default function AdminPage() {
                         <div className="p-12 flex justify-center text-slate-400"><Loader2 className="animate-spin" /></div>
                     ) : (
                         <div className="p-4">
-                            {/* AQUI O SCROLL INVISIVEL SÓ NOS CARDS */}
-                            <div className="h-[calc(100vh-280px)] overflow-y-auto overflow-x-hidden pr-1 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                            <div className="h-[calc(100vh-200px)] overflow-y-auto overflow-x-hidden pr-1 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                                 <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}`}</style>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 pb-24">
                                     {filtered.map(emp => (
