@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from jos_api.db.base import Base
 
 class RoleEnum(str, enum.Enum):
+    SUPERADMIN = "superadmin"
     DONO = "dono"
     GERENTE_RESTAURANTE = "gerente_restaurante"
     OPERADOR_CAIXA = "operador_caixa"
@@ -54,3 +55,7 @@ class User(Base):
         if isinstance(r, str): return r.lower()
         if isinstance(r, enum.Enum): return str(r.value).lower()
         return str(r).lower()
+
+    @property
+    def is_superadmin(self) -> bool:
+        return self.role_slug == "superadmin"

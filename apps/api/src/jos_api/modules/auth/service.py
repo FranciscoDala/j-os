@@ -52,10 +52,12 @@ def criar_usuario(db: Session, dados: schemas.UserCreate, criado_por_id: uuid.UU
         empresa_id=dados.empresa_id
     )
     db.add(user); db.flush()
-    if not db.query(models.UserEmpresa).filter_by(user_id=user.id, empresa_id=dados.empresa_id).first():
-        db.add(models.UserEmpresa(user_id=user.id, empresa_id=dados.empresa_id, role=role_enum))
+    if role_enum!= RoleEnum.SUPERADMIN:
+        if not db.query(models.UserEmpresa).filter_by(user_id=user.id, empresa_id=dados.empresa_id).first():
+            db.add(models.UserEmpresa(user_id=user.id, empresa_id=dados.empresa_id, role=role_enum))
     db.flush()
-    registrar_atividade(db, empresa_id=dados.empresa_id, modulo="USUARIO", acao="CRIAR", descricao=f"Criou usuário '{user.nome}' ({user.email}) - {user.role.value}", entidade="User", entidade_id=user.id, entidade_nome=user.nome, user_id=criado_por_id, user_nome=criado_por_nome, detalhes={"email": user.email, "role": user.role.value}, ip=ip, commit=False)
+    if role_enum!= RoleEnum.SUPERADMIN:
+        registrar_atividade(db, empresa_id=dados.empresa_id, modulo="USUARIO", acao="CRIAR", descricao=f"Criou usuário '{user.nome}' ({user.email}) - {user.role.value}", entidade="User", entidade_id=user.id, entidade_nome=user.nome, user_id=criado_por_id, user_nome=criado_por_nome, detalhes={"email": user.email, "role": user.role.value}, ip=ip, commit=False)
     db.commit(); db.refresh(user)
     try:
         payload = {"id": str(user.id), "nome": user.nome, "email": user.email, "role": str(user.role.value)}
@@ -67,6 +69,8 @@ def criar_usuario(db: Session, dados: schemas.UserCreate, criado_por_id: uuid.UU
     return user
 
 def _get_empresas_do_user(db: Session, user: models.User):
+    if to_role_enum(user.role) == RoleEnum.SUPERADMIN:
+        return [], []
     vinculos = db.query(models.UserEmpresa).filter(models.UserEmpresa.user_id == user.id).all()
     if not vinculos and getattr(user, 'empresa_id', None):
         novo = models.UserEmpresa(user_id=user.id, empresa_id=user.empresa_id, role=to_role_enum(user.role))
@@ -91,6 +95,11 @@ def autenticar(db: Session, dados: schemas.UserLogin, ip: str | None = None):
     if not user: raise HTTPException(401, "Email ou senha inválidos")
     if not verify_password(dados.senha, user.senha_hash): raise HTTPException(401, "Email ou senha inválidos")
     if not user.ativo: raise HTTPException(403, "Usuário desativado")
+
+    if to_role_enum(user.role) == RoleEnum.SUPERADMIN:
+        token=create_access_token({"sub": str(user.id), "role": "superadmin"})
+        return {"access_token": token, "user": user, "empresas": [], "empresa": None, "temp_token": None, "empresa_id": None}
+
     empresas_resumo, vinculos = _get_empresas_do_user(db, user)
     if not vinculos: raise HTTPException(403, "Usuário sem empresa vinculada")
     if len(vinculos)==1:

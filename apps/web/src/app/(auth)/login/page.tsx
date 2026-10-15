@@ -25,6 +25,17 @@ export default function LoginPage() {
         setLoading(true);
         try {
             const data = await loginApi(email, senha);
+
+            // REGRA SUPERADMIN: sem loja, direto para /admin
+            const role = (data.user as any)?.role?.toLowerCase?.() || (data.user as any)?.role_slug || "";
+            const isSuperAdmin = role === "superadmin" || data.user?.email?.toLowerCase() === "superadmin@j-os.ao";
+
+            if (isSuperAdmin) {
+                setToast({ msg: `Bem-vindo Super Admin!`, type: "success" });
+                setTimeout(() => { window.location.href = "/admin"; }, 600);
+                return;
+            }
+
             if (data.access_token) {
                 const nomeEmp = data.empresa?.nome_fantasia || data.user?.nome || "Dr.";
                 setToast({ msg: `Bem-vindo, ${nomeEmp}!`, type: "success" });

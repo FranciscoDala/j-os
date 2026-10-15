@@ -23,7 +23,6 @@ def get_current_user(
             raise HTTPException(status_code=401, detail="Token inválido")
         user_id = UUID(sub)
         empresa_id_str = payload.get("empresa_id")
-        # Frontend pode forçar empresa via header
         if x_empresa_id and x_empresa_id.strip():
             empresa_id_str = x_empresa_id.strip()
         empresa_id = UUID(empresa_id_str) if empresa_id_str else None
@@ -37,13 +36,18 @@ def get_current_user(
     if not user.ativo:
         raise HTTPException(status_code=403, detail="Usuário desativado")
 
+    if user.role == RoleEnum.SUPERADMIN or role_token == "superadmin":
+        setattr(user, "empresa_id_token", empresa_id)
+        setattr(user, "role_token", "superadmin")
+        setattr(user, "token_payload", payload)
+        return user
+
     if empresa_id:
         vinc = db.query(UserEmpresa).filter(
             UserEmpresa.user_id == user.id,
             UserEmpresa.empresa_id == empresa_id
         ).first()
         if not vinc and str(user.empresa_id)!= str(empresa_id):
-            # Dono pode não ter vínculo N:N ainda
             if user.role!= RoleEnum.DONO and getattr(user, 'role_slug', 'funcionario')!= 'dono':
                 raise HTTPException(status_code=403, detail="Sem acesso a essa empresa")
 
@@ -56,16 +60,17 @@ def get_perfil_atual(current_user: User = Depends(get_current_user), db: Session
     from jos_api.modules.entidades.models import Entidade
     from jos_api.modules.empresa.perfis_models import Perfil
 
+    if current_user.role == RoleEnum.SUPERADMIN or getattr(current_user, 'role_token', None) == 'superadmin':
+        return {"perfil": None, "permissoes": {"all": True, "modulos": ["*"], "acoes": ["*"]}, "empresa_id": getattr(current_user, 'empresa_id_token', None), "entidade": None, "role": "superadmin"}
+
     empresa_id = getattr(current_user, 'empresa_id_token', None)
 
-    # Dono absoluto sempre passa
     if current_user.role == RoleEnum.DONO:
         return {"perfil": None, "permissoes": {"all": True, "modulos": ["*"], "acoes": ["*"]}, "empresa_id": empresa_id or current_user.empresa_id, "entidade": None, "role": "dono"}
 
     if not empresa_id:
         raise HTTPException(status_code=400, detail="Token sem empresa - faça login novamente")
 
-    # Verifica se tem vínculo de DONO nessa empresa específica
     vinc_dono = db.query(UserEmpresa).filter_by(user_id=current_user.id, empresa_id=empresa_id, role=RoleEnum.DONO).first()
     if vinc_dono:
         return {"perfil": None, "permissoes": {"all": True, "modulos": ["*"], "acoes": ["*"]}, "empresa_id": empresa_id, "entidade": None, "role": "dono"}
@@ -100,27 +105,20 @@ def precisa_modulo(modulo: str):
     return guard
 
 def precisa_permissao(acao: str):
-    """NOVO PADRÃO CORRETO - usa acao do tipo restaurante:entidade:read"""
     def guard(perfil_data=Depends(get_perfil_atual)):
         perms = perfil_data["permissoes"]
         if perms.get("all"):
             return perfil_data
-
         acoes = perms.get("acoes", [])
-        # Se o perfil tem * ou restaurante:* ou restaurante:entidade:*
         if "*" in acoes or acao in acoes:
             return perfil_data
-
-        # check por wildcard de módulo: restaurante:*
         partes = acao.split(":")
         if len(partes) >= 2:
             if f"{partes[0]}:*" in acoes or f"{partes[0]}:{partes[1]}:*" in acoes:
                 return perfil_data
-
-        # Fallback para PERMISSIONS antigo baseado no role_equivalente
         from jos_api.core.permissions import check_permission
         role = perfil_data.get("role", "funcionario")
-        check_permission(role, acao) # lança 403 se não tiver
+        check_permission(role, acao)
         return perfil_data
     return guard
 
