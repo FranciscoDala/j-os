@@ -10,6 +10,8 @@ from jos_api.modules.atividade.routes import router as atividade_router
 from jos_api.modules.pedido.routes import public_router as pedido_qr_public_router
 from jos_api.modules.pedido.routes import private_router as pedido_qr_private_router
 from jos_api.core.realtime_router import router as realtime_router
+# NOVO
+from jos_api.modules.admin.routes import router as admin_router
 
 api_router = APIRouter()
 
@@ -24,3 +26,4 @@ api_router.include_router(atividade_router)
 api_router.include_router(pedido_qr_public_router)
 api_router.include_router(pedido_qr_private_router)
 api_router.include_router(realtime_router)
+api_router.include_router(admin_router)

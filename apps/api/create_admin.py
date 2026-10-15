@@ -1,19 +1,28 @@
 from jos_api.db.session import SessionLocal
 from jos_api.modules.auth.models import User, RoleEnum
 from jos_api.core.security import hash_password
+from sqlalchemy import text
 import uuid
 
 db = SessionLocal()
 
-# --- NAO limpa tudo se já tens dados em produção ---
-# Se quiseres limpar só o superadmin antigo:
+# 1. FORÇA o Postgres a aceitar SUPERADMIN (se já existir, ignora erro)
+try:
+    db.execute(text("ALTER TYPE roleenum ADD VALUE 'SUPERADMIN'"))
+    db.commit()
+    print("Enum SUPERADMIN adicionado no banco.")
+except Exception as e:
+    db.rollback()
+    print(f"Enum já existia ou erro ignorado: {e}")
+
+# 2. Limpa superadmin antigo
 db.query(User).filter(User.email.ilike("superadmin@j-os.ao")).delete()
 db.commit()
 
-# cria superadmin SEM empresa_id e SEM UserEmpresa
+# 3. Cria superadmin IGUAL ao dono que deu certo, mas sem empresa
 user = User(
     id=uuid.uuid4(),
-    empresa_id=None,  # superadmin não tem loja
+    empresa_id=None,  # superadmin não tem empresa_id
     nome="Francisco Dala",
     email="superadmin@j-os.ao",
     senha_hash=hash_password("Super@123"),
@@ -28,6 +37,5 @@ print(f"Email: superadmin@j-os.ao")
 print(f"Senha: Super@123")
 print(f"user_id: {user.id}")
 print(f"role: {user.role}")
-print(f"empresa_id: {user.empresa_id}") # deve ser None
 
 db.close()
