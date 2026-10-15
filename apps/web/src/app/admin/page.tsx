@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 type Toast = { id: string; msg: string; type: "success" | "error" | "info" };
 
 const rawUrl = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/+$/, "");
-const baseUrl = rawUrl.endsWith("/api/v1")? rawUrl : rawUrl.endsWith("/api")? rawUrl + "/v1" : rawUrl + "/api/v1";
+const baseUrl = rawUrl.endsWith("/api/v1") ? rawUrl : rawUrl.endsWith("/api") ? rawUrl + "/v1" : rawUrl + "/api/v1";
 
 function getToken() {
     if (typeof window === 'undefined') return "";
@@ -38,11 +38,11 @@ function getReadableError(raw: string): string {
     try {
         const j = JSON.parse(raw);
         if (j.detail) {
-            if (Array.isArray(j.detail)) return j.detail[0]?.msg? `Campo ${j.detail[0].loc?.at(-1)}: ${j.detail[0].msg}` : getReadableError(JSON.stringify(j.detail[0]));
+            if (Array.isArray(j.detail)) return j.detail[0]?.msg ? `Campo ${j.detail[0].loc?.at(-1)}: ${j.detail[0].msg}` : getReadableError(JSON.stringify(j.detail[0]));
             return getReadableError(String(j.detail));
         }
     } catch { }
-    return raw.length > 200? raw.slice(0, 200) + "..." : raw;
+    return raw.length > 200 ? raw.slice(0, 200) + "..." : raw;
 }
 
 export default function AdminPage() {
@@ -66,14 +66,14 @@ export default function AdminPage() {
         const id = Date.now().toString() + Math.random().toString().slice(2);
         const clean = getReadableError(msg);
         setToasts(t => [...t, { id, msg: clean, type }]);
-        setTimeout(() => setToasts(t => t.filter(x => x.id!== id)), 5000);
+        setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 5000);
     }, []);
 
     const authFetch = useCallback(async (url: string, opts: RequestInit = {}) => {
         const token = getToken();
         if (!token) { clearAndRedirect(); throw new Error("Sem token"); }
-        const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}`,...(opts.headers || {}) } as any;
-        const res = await fetch(url, {...opts, headers });
+        const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(opts.headers || {}) } as any;
+        const res = await fetch(url, { ...opts, headers });
         if (res.status === 401 || res.status === 403) {
             const data = await res.json().catch(() => null);
             const detail = data?.detail || "";
@@ -98,11 +98,11 @@ export default function AdminPage() {
             ]);
             if (resEmp.ok) {
                 const data = await resEmp.json();
-                setEmpresas(Array.isArray(data)? data : data.items || []);
+                setEmpresas(Array.isArray(data) ? data : data.items || []);
             }
             if (resDonos.ok) setDonos(await resDonos.json());
         } catch (e: any) {
-            if (e.message!== "Unauthorized") pushToast("Falha ao carregar dados", "error");
+            if (e.message !== "Unauthorized") pushToast("Falha ao carregar dados", "error");
         } finally { setLoading(false); }
     }, [authFetch, pushToast]);
 
@@ -128,7 +128,7 @@ export default function AdminPage() {
         if (saving) return;
         if (!formData.nome_fantasia?.trim()) return pushToast("Digite o nome da loja", "error");
         if (!editingLoja) {
-            if (formData.modoDono === "existente" &&!formData.dono_existente_id) return pushToast("Selecione um dono existente", "error");
+            if (formData.modoDono === "existente" && !formData.dono_existente_id) return pushToast("Selecione um dono existente", "error");
             if (formData.modoDono === "novo") {
                 if (!formData.dono_novo.nome?.trim()) return pushToast("Digite o nome do novo dono", "error");
                 if (!formData.dono_novo.email?.trim()) return pushToast("Digite o email do novo dono", "error");
@@ -143,11 +143,11 @@ export default function AdminPage() {
             const res = await authFetch(url, { method, body: JSON.stringify(formData) });
             const text = await res.text();
             if (!res.ok) throw new Error(text);
-            pushToast(editingLoja? `Loja "${formData.nome_fantasia}" atualizada!` : `Loja "${formData.nome_fantasia}" criada!`, "success");
+            pushToast(editingLoja ? `Loja "${formData.nome_fantasia}" atualizada!` : `Loja "${formData.nome_fantasia}" criada!`, "success");
             setModalOpen(false);
             fetchData();
         } catch (err: any) {
-            if (err.message!== "Unauthorized") pushToast(err.message, "error");
+            if (err.message !== "Unauthorized") pushToast(err.message, "error");
         } finally { setSaving(false); }
     };
 
@@ -163,7 +163,7 @@ export default function AdminPage() {
             setLojaToDelete(null);
             fetchData();
         } catch (err: any) {
-            if (err.message!== "Unauthorized") pushToast(err.message, "error");
+            if (err.message !== "Unauthorized") pushToast(err.message, "error");
         } finally { setDeleting(false); }
     };
 
@@ -178,10 +178,10 @@ export default function AdminPage() {
             {/* TOASTS */}
             <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 w-[92%] max-w-[380px] pointer-events-none">
                 {toasts.map(t => (
-                    <div key={t.id} className={`pointer-events-auto flex gap-2.5 items-start p-3.5 rounded-[16px] border backdrop-blur-xl shadow-[0_12px_32px_rgba(0,0,0,0.15)] text-[12px] font-bold ${t.type === "success"? "bg-[#E8F5E9] border-green-200 text-green-800" : t.type === "error"? "bg-[#FDECEA] border-red-200 text-red-800" : "bg-white border-[#E8DCCF] text-[#1E1E1E]"}`}>
+                    <div key={t.id} className={`pointer-events-auto flex gap-2.5 items-start p-3.5 rounded-[16px] border backdrop-blur-xl shadow-[0_12px_32px_rgba(0,0,0,0.15)] text-[12px] font-bold ${t.type === "success" ? "bg-[#E8F5E9] border-green-200 text-green-800" : t.type === "error" ? "bg-[#FDECEA] border-red-200 text-red-800" : "bg-white border-[#E8DCCF] text-[#1E1E1E]"}`}>
                         {t.type === "success" && <CheckCircle size={16} className="shrink-0 mt-0.5" />}{t.type === "error" && <AlertTriangle size={16} className="shrink-0 mt-0.5" />}{t.type === "info" && <Info size={16} className="shrink-0 mt-0.5" />}
                         <span className="flex-1 leading-[1.4]">{t.msg}</span>
-                        <button onClick={() => setToasts(x => x.filter(f => f.id!== t.id))}><X size={12} /></button>
+                        <button onClick={() => setToasts(x => x.filter(f => f.id !== t.id))}><X size={12} /></button>
                     </div>
                 ))}
             </div>
@@ -203,26 +203,28 @@ export default function AdminPage() {
                 </div>
             </header>
 
-            {/* MAIN SEM CARD BRANCO - LIVRE */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+            // TROCA ESSE MAIN INTEIRO
+
+            {/* MAIN SEM SCROLL TRAVADO - LIVRE */}
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-[120px]">
                 {/* Barra de título + busca */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <h2 className="font-black text-[13px] flex items-center gap-2 shrink-0"><Building2 size={18} /> Lojas • {filtered.length}</h2>
                     <div className="relative w-full sm:w-72">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar loja ou dono..." className="w-full pl-9 pr-4 py-2.5 sm:py-2 bg-white border border-[#E8DCCF] rounded-full text-[12px] outline-none focus:border-black transition-all shadow-sm" />
+                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar loja ou dono..." className="w-full pl-9 pr-4 py-3 sm:py-2.5 bg-white border border-[#E8DCCF] rounded-full text-[13px] sm:text-[12px] outline-none focus:border-black transition-all shadow-sm" />
                     </div>
                 </div>
 
-                {loading? (
+                {loading ? (
                     <div className="py-16 flex flex-col items-center gap-3 text-slate-400"><Loader2 className="animate-spin" /><p className="text-[11px] font-bold">Carregando lojas...</p></div>
-                ) : filtered.length === 0? (
+                ) : filtered.length === 0 ? (
                     <div className="py-16 text-center border border-dashed border-[#E8DCCF] rounded-[18px] bg-white">
                         <p className="font-black text-[13px]">Nenhuma loja encontrada</p>
                         <p className="text-[11px] opacity-60 mt-1">Tente outro termo de busca</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 pb-24">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {filtered.map(emp => (
                             <AdminEmpresaCard key={emp.id} emp={emp} onEdit={openEdit} onDelete={openDelete} />
                         ))}
