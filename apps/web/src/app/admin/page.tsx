@@ -33,8 +33,14 @@ export default function AdminPage() {
     const [search, setSearch] = useState("");
     const [userName, setUserName] = useState("Super Admin");
 
-    // CORRIGIDO: baseUrl já vem com /api/v1
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com/api/v1";
+    // FIX DEFINITIVO: normaliza a URL, seja https://j-os.onrender.com ou https://j-os.onrender.com/api/v1
+    const rawUrl = process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com";
+    const baseUrl = (() => {
+        let url = rawUrl.replace(/\/+$/, "");
+        if (url.endsWith("/api/v1")) return url;
+        if (url.endsWith("/api")) return url + "/v1";
+        return url + "/api/v1";
+    })();
 
     useEffect(() => {
         const userStr = localStorage.getItem("user");
@@ -55,13 +61,12 @@ export default function AdminPage() {
             const token = getToken();
             const headers = { Authorization: `Bearer ${token}` };
 
-            // CORRIGIDO: sem /api duplicado
             const resEmpresas = await fetch(`${baseUrl}/admin/empresas`, { headers });
-            console.log("STATUS admin/empresas:", resEmpresas.status);
+            console.log("STATUS admin/empresas:", resEmpresas.status, "URL:", `${baseUrl}/admin/empresas`);
 
             if (resEmpresas.ok) {
                 const data = await resEmpresas.json();
-                setEmpresas(Array.isArray(data) ? data : []);
+                setEmpresas(Array.isArray(data)? data : []);
             } else {
                 const txt = await resEmpresas.text();
                 console.error("Erro admin/empresas:", resEmpresas.status, txt);
@@ -121,7 +126,7 @@ export default function AdminPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-xs text-slate-500 uppercase font-semibold">Total Lojas</p>
-                                <p className="text-2xl font-bold text-slate-800 mt-1">{stats?.total_empresas ?? empresas.length}</p>
+                                <p className="text-2xl font-bold text-slate-800 mt-1">{stats?.total_empresas?? empresas.length}</p>
                             </div>
                             <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-blue-600"><Building2 /></div>
                         </div>
@@ -130,7 +135,7 @@ export default function AdminPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-xs text-slate-500 uppercase font-semibold">Total Usuários</p>
-                                <p className="text-2xl font-bold text-slate-800 mt-1">{stats?.total_users ?? "-"}</p>
+                                <p className="text-2xl font-bold text-slate-800 mt-1">{stats?.total_users?? "-"}</p>
                             </div>
                             <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center text-green-600"><Shield size={20} /></div>
                         </div>
@@ -139,7 +144,7 @@ export default function AdminPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-xs text-white/70 uppercase font-semibold">Total Donos</p>
-                                <p className="text-2xl font-bold mt-1">{stats?.total_donos ?? "-"}</p>
+                                <p className="text-2xl font-bold mt-1">{stats?.total_donos?? "-"}</p>
                                 <p className="text-[11px] text-white/70 mt-1">Superadmin não precisa de loja</p>
                             </div>
                             <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center"><Crown /></div>
@@ -159,11 +164,11 @@ export default function AdminPage() {
                         </div>
                     </div>
 
-                    {loading ? (
+                    {loading? (
                         <div className="p-12 flex flex-col items-center justify-center text-slate-400">
                             <Loader2 className="animate-spin mb-2" /> Carregando lojas...
                         </div>
-                    ) : filtered.length === 0 ? (
+                    ) : filtered.length === 0? (
                         <div className="p-12 text-center text-slate-400">
                             <Building2 size={32} className="mx-auto mb-2 opacity-30" />
                             <p>Nenhuma loja encontrada</p>
@@ -177,29 +182,29 @@ export default function AdminPage() {
                                     <div className="flex items-start justify-between mb-4">
                                         <div className="flex gap-3">
                                             <div className="w-14 h-14 rounded-2xl bg-slate-100 overflow-hidden flex items-center justify-center font-bold text-slate-600 shrink-0">
-                                                {emp.logo_url ? <img src={emp.logo_url} className="w-full h-full object-cover" /> : emp.nome_fantasia.charAt(0).toUpperCase()}
+                                                {emp.logo_url? <img src={emp.logo_url} className="w-full h-full object-cover" /> : emp.nome_fantasia.charAt(0).toUpperCase()}
                                             </div>
                                             <div>
                                                 <p className="font-bold text-slate-800 leading-tight text-[14px]">{emp.nome_fantasia}</p>
                                                 <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                                                    {emp.nif_verified ? <CheckCircle size={12} className="text-green-500" /> : <XCircle size={12} className="text-slate-300" />}
+                                                    {emp.nif_verified? <CheckCircle size={12} className="text-green-500" /> : <XCircle size={12} className="text-slate-300" />}
                                                     {emp.nif || "Sem NIF"} • {emp.tipo}
                                                 </p>
-                                                <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-1"><Calendar size={10} /> {emp.created_at ? new Date(emp.created_at).toLocaleDateString() : "-"}</p>
+                                                <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-1"><Calendar size={10} /> {emp.created_at? new Date(emp.created_at).toLocaleDateString() : "-"}</p>
                                             </div>
                                         </div>
-                                        <span className={`text-[9px] px-2 py-1 rounded-full font-bold shrink-0 ${emp.whatsapp_conectado ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-                                            {emp.whatsapp_conectado ? 'WHATSAPP ON' : 'OFF'}
+                                        <span className={`text-[9px] px-2 py-1 rounded-full font-bold shrink-0 ${emp.whatsapp_conectado? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                                            {emp.whatsapp_conectado? 'WHATSAPP ON' : 'OFF'}
                                         </span>
                                     </div>
 
                                     {/* Dono */}
                                     <div className="bg-[#F8FAFF] border border-[#E8EEFF] rounded-2xl p-3 mb-4">
                                         <p className="text-[10px] font-bold text-[#2F4A8A] uppercase tracking-widest mb-2 flex items-center gap-1"><Crown size={12} /> Dono</p>
-                                        {emp.dono ? (
+                                        {emp.dono? (
                                             <div className="flex items-center gap-3">
                                                 <div className="w-9 h-9 rounded-full bg-[#2F4A8A] text-white flex items-center justify-center font-bold text-sm overflow-hidden">
-                                                    {emp.dono.avatar_url ? <img src={emp.dono.avatar_url} className="w-full h-full object-cover" /> : emp.dono.nome.charAt(0).toUpperCase()}
+                                                    {emp.dono.avatar_url? <img src={emp.dono.avatar_url} className="w-full h-full object-cover" /> : emp.dono.nome.charAt(0).toUpperCase()}
                                                 </div>
                                                 <div className="overflow-hidden">
                                                     <p className="text-sm font-semibold text-slate-800 truncate">{emp.dono.nome}</p>
@@ -215,7 +220,7 @@ export default function AdminPage() {
                                     <div className="space-y-1.5 text-[11px] text-slate-600 mb-4 min-h-[40px]">
                                         {emp.phone && <p className="flex items-center gap-2"><Phone size={12} /> {emp.phone}</p>}
                                         {emp.email && <p className="flex items-center gap-2"><Mail size={12} /> {emp.email}</p>}
-                                        {emp.address && <p className="flex items-center gap-2"><MapPin size={12} /> {emp.address} {emp.city ? `- ${emp.city}` : ''}</p>}
+                                        {emp.address && <p className="flex items-center gap-2"><MapPin size={12} /> {emp.address} {emp.city? `- ${emp.city}` : ''}</p>}
                                     </div>
 
                                     <div className="flex gap-2">
