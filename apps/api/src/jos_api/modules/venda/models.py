@@ -1,3 +1,6 @@
+from __future__ import annotations
+# pyright: reportGeneralTypeIssues=false
+# pyright: reportOptionalMemberAccess=false
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -44,8 +47,13 @@ class Venda(Base):
     troco: Mapped[Decimal] = mapped_column(Numeric(12,2), default=Decimal("0"), nullable=False)
     forma_pagamento: Mapped[str] = mapped_column(String(20), default="DINHEIRO", nullable=False)
     status: Mapped[VendaStatus] = mapped_column(SAEnum(VendaStatus, name="vendastatus", create_type=False), default=VendaStatus.CONCLUIDA, nullable=False, index=True)
+    # --- AGT ---
+    hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hash_anterior: Mapped[str | None] = mapped_column(Text, nullable=True)
+    numero_fatura: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    data_fatura: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    itens: Mapped[list["VendaItem"]] = relationship("VendaItem", back_populates="venda", cascade="all, delete-orphan")
+    itens: Mapped[list["VendaItem"]] = relationship("VendaItem", back_populates="venda", cascade="all, delete-orphan") # type: ignore
 
 class VendaItem(Base):
     __tablename__ = "venda_itens"
@@ -63,7 +71,7 @@ class VendaItem(Base):
     total: Mapped[Decimal] = mapped_column(Numeric(12,2), nullable=False)
     status: Mapped[VendaItemStatus] = mapped_column(SAEnum(VendaItemStatus, name="vendaitemstatus", create_type=False), default=VendaItemStatus.PENDENTE, nullable=False, index=True)
     observacao: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    venda: Mapped[Venda] = relationship("Venda", back_populates="itens")
+    venda: Mapped["Venda"] = relationship("Venda", back_populates="itens") # type: ignore
 
 class ReservaCarrinho(Base):
     __tablename__ = "reservas_carrinho"

@@ -1,9 +1,10 @@
 from sqlalchemy.orm import Session
+
 from fastapi import HTTPException
 from decimal import Decimal
 import uuid
-from sqlalchemy import func
-from typing import Optional, Dict, Any
+from sqlalchemy import func, desc
+from typing import Optional, Dict, Any, cast
 from datetime import datetime, timedelta
 import asyncio
 import logging
@@ -18,17 +19,55 @@ from jos_api.core.realtime import manager
 
 logger = logging.getLogger(__name__)
 
-# === HELPER IGUAL STOCKBOT - NÃO TRAVA A VENDA ===
+AGT_ENABLED = False
+gerar_hash_agt: Any = None
+montar_string_fatura: Any = None
+try:
+    from jos_api.core.agt import gerar_hash_agt as _gerar_hash, montar_string_fatura as _montar
+    gerar_hash_agt = _gerar_hash
+    montar_string_fatura = _montar
+    AGT_ENABLED = True
+except ImportError as e:
+    logger.warning(f"[AGT] modulo agt nao carregado: {e}")
+
+def _get_ultimo_hash(db: Session, empresa_id: uuid.UUID) -> str:
+    ultima = db.query(Venda).filter(
+        Venda.empresa_id == empresa_id,
+        Venda.hash.is_not(None)
+    ).order_by(desc(Venda.numero)).with_for_update().first()
+    return str(ultima.hash) if ultima and ultima.hash else ""
+
+
+def _gerar_agt_para_venda(db: Session, venda: Venda, empresa_id: uuid.UUID) -> None:
+    if not AGT_ENABLED or gerar_hash_agt is None or montar_string_fatura is None:
+        return
+    hash_anterior: str = ""
+    try:
+        hash_anterior = _get_ultimo_hash(db, empresa_id)
+        numero_fatura = getattr(venda, 'numero_fatura', None) or f"FT {datetime.utcnow().year}/{venda.numero}"
+        data_iso = datetime.utcnow().date().isoformat()
+        total_str = f"{venda.total:.2f}"
+        string_para_hash = montar_string_fatura(data_iso, numero_fatura, total_str, hash_anterior)
+        hash_atual = gerar_hash_agt(string_para_hash)
+        venda.hash = hash_atual
+        venda.hash_anterior = hash_anterior
+        venda.numero_fatura = numero_fatura
+        venda.data_fatura = datetime.utcnow()
+    except Exception as e:
+        logger.error(f"[AGT] Falha hash venda #{venda.numero}: {e}")
+        venda.hash = None
+        venda.hash_anterior = hash_anterior
+        venda.numero_fatura = f"FT {datetime.utcnow().year}/{venda.numero}"
+
 def _broadcast_safe(empresa_id: uuid.UUID | str, payload: dict):
     try:
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(manager.broadcast(str(empresa_id), payload))
         except RuntimeError:
-            # endpoint sync - sem loop rodando
             asyncio.run(manager.broadcast(str(empresa_id), payload))
     except Exception as e:
-        logger.warning(f"[WS] broadcast falhou: {e} payload={payload.get('type')}")
+        logger.warning(f"[WS] broadcast falhou: {e}")
 
 def _next_numero(db: Session, empresa_id: uuid.UUID) -> int:
     max_n = db.query(func.max(Venda.numero)).filter(Venda.empresa_id == empresa_id).scalar()
@@ -45,7 +84,7 @@ def get_stock_disponivel(db: Session, empresa_id: uuid.UUID, produto_id: uuid.UU
     stock = Decimal(str(prod.stock_atual or 0))
     if not getattr(prod, 'controlar_stock', False): return Decimal("999999")
     q = db.query(func.coalesce(func.sum(ReservaCarrinho.quantidade), 0)).filter(ReservaCarrinho.empresa_id == empresa_id, ReservaCarrinho.produto_id == produto_id)
-    if ignorar_user_id: q = q.filter(ReservaCarrinho.user_id!= ignorar_user_id)
+    if ignorar_user_id: q = q.filter(ReservaCarrinho.user_id != ignorar_user_id)
     reservado = Decimal(str(q.scalar() or 0))
     return stock - reservado
 
@@ -61,7 +100,6 @@ def reservar_produto(db: Session, empresa_id: uuid.UUID, produto_id: uuid.UUID, 
     if disponivel < quantidade: raise HTTPException(400, f"Stock insuficiente. Disponível: {disponivel}")
     r = ReservaCarrinho(empresa_id=empresa_id, produto_id=produto_id, user_id=user_id, quantidade=quantidade, expira_em=datetime.utcnow() + timedelta(minutes=5))
     db.add(r); db.commit(); db.refresh(r)
-    # WS - avisa que tem reserva
     _broadcast_safe(empresa_id, {"type": "reserva:update", "tipo": "reserva:update", "produto_id": str(produto_id), "user_id": str(user_id), "quantidade": str(quantidade)})
     return r
 
@@ -96,41 +134,44 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
         venda_status = VendaStatus.CONCLUIDA
 
     agrupado: Dict[str, Any] = {}
-    for it in data.itens:
-        key = f"{it.produto_id}-{(getattr(it,'observacao',None) or '').strip().lower()}"
+    for item_in in data.itens:
+        key = f"{item_in.produto_id}-{(getattr(item_in,'observacao',None) or '').strip().lower()}"
         if key in agrupado:
-            agrupado[key].quantidade = Decimal(agrupado[key].quantidade) + Decimal(it.quantidade)
+            agrupado[key].quantidade = Decimal(agrupado[key].quantidade) + Decimal(item_in.quantidade)
         else:
-            agrupado[key] = it
+            agrupado[key] = item_in
 
     venda = Venda(empresa_id=empresa_id, created_by=created_by, garcom_id=garcom_id, caixa_id=caixa.id, numero=_next_numero(db, empresa_id), tipo=venda_tipo, mesa_id=data.mesa_id, pessoas=pessoas, observacao=getattr(data,'observacao',None), status=venda_status, forma_pagamento=data.forma_pagamento, dinheiro_recebido=data.dinheiro_recebido)
     sub = Decimal("0"); iva_tot = Decimal("0"); tot = Decimal("0")
     produtos_afectados = []
     produtos_para_notificar = []
 
-    for it in agrupado.values():
-        prod = db.query(Product).filter(Product.id == it.produto_id, Product.empresa_id == empresa_id).with_for_update().first()
-        if not prod: raise HTTPException(404, f"Produto {it.produto_id} não encontrado")
+    for item_data in list(agrupado.values()):
+        item_data = cast(Any, item_data)
+        prod = db.query(Product).filter(Product.id == item_data.produto_id, Product.empresa_id == empresa_id).with_for_update().first()
+        if not prod: raise HTTPException(404, f"Produto {item_data.produto_id} não encontrado")
         if getattr(prod, 'controlar_stock', False):
             disp = get_stock_disponivel(db, empresa_id, prod.id, ignorar_user_id=created_by)
             minha_reserva_qtd = db.query(func.coalesce(func.sum(ReservaCarrinho.quantidade),0)).filter(ReservaCarrinho.empresa_id==empresa_id, ReservaCarrinho.produto_id==prod.id, ReservaCarrinho.user_id==created_by).scalar() or Decimal("0")
-            if (disp + Decimal(str(minha_reserva_qtd))) < it.quantidade and not getattr(prod, 'allow_negative', False):
+            if (disp + Decimal(str(minha_reserva_qtd)) < Decimal(str(item_data.quantidade))) and not getattr(prod, 'allow_negative', False):
                 raise HTTPException(400, f"Stock insuficiente: {prod.nome}")
-        sub_item = prod.preco_venda * Decimal(it.quantidade)
+        sub_item = prod.preco_venda * Decimal(str(item_data.quantidade))
         if getattr(prod, 'tem_iva', False) and getattr(prod, 'iva', Decimal("0")) > 0:
             iva_v = sub_item * (prod.iva / Decimal("100")); tem_iva = True; iva_p = prod.iva
         else: iva_v = Decimal("0"); tem_iva = False; iva_p = Decimal("0")
         tot_item = sub_item + iva_v
-        venda.itens.append(VendaItem(empresa_id=empresa_id, produto_id=prod.id, nome_produto=prod.nome, quantidade=it.quantidade, preco_unit=prod.preco_venda, tem_iva=tem_iva, iva_percent=iva_p, subtotal=sub_item, iva_valor=iva_v, total=tot_item, status=VendaItemStatus.PENDENTE, observacao=getattr(it, 'observacao', None)))
+        venda.itens.append(VendaItem(empresa_id=empresa_id, produto_id=prod.id, nome_produto=prod.nome, quantidade=Decimal(str(item_data.quantidade)), preco_unit=prod.preco_venda, tem_iva=tem_iva, iva_percent=iva_p, subtotal=sub_item, iva_valor=iva_v, total=tot_item, status=VendaItemStatus.PENDENTE, observacao=getattr(item_data, 'observacao', None)))
         sub += sub_item; iva_tot += iva_v; tot += tot_item
         if venda_status == VendaStatus.CONCLUIDA and getattr(prod, 'controlar_stock', False):
-            prod.stock_atual -= Decimal(it.quantidade)
+            prod.stock_atual -= Decimal(str(item_data.quantidade))
             produtos_afectados.append({"id": str(prod.id), "stock_atual": str(prod.stock_atual), "nome": prod.nome, "produto": prod})
             produtos_para_notificar.append(prod)
         db.query(ReservaCarrinho).filter(ReservaCarrinho.empresa_id==empresa_id, ReservaCarrinho.produto_id==prod.id, ReservaCarrinho.user_id==created_by).delete()
 
     venda.subtotal = sub; venda.total_iva = iva_tot; venda.total = tot
     venda.troco = data.dinheiro_recebido - tot if data.dinheiro_recebido >= tot else Decimal("0")
+    if venda_status == VendaStatus.CONCLUIDA:
+        _gerar_agt_para_venda(db, venda, empresa_id)
     db.add(venda); db.flush()
 
     if mesa:
@@ -140,7 +181,6 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
         mesa.aberta_em = mesa.aberta_em or datetime.utcnow()
         mesa.pessoas_atual = pessoas
 
-    mov = None
     if venda_status == VendaStatus.CONCLUIDA:
         mov = CaixaMovimento(empresa_id=empresa_id, caixa_id=caixa.id, tipo=TipoMovimento.VENDA, origem=OrigemMovimento.VENDA, valor=venda.total, descricao=f"Venda #{venda.numero} - {venda.forma_pagamento}", venda_id=venda.id, forma_pagamento=venda.forma_pagamento, criado_por=created_by, criado_por_nome=criado_por_nome)
         db.add(mov); db.flush()
@@ -148,13 +188,10 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
     registrar_atividade(db, empresa_id=empresa_id, modulo="VENDA", acao="CRIAR", descricao=f"Venda #{venda.numero}", entidade="Venda", entidade_id=venda.id, entidade_nome=f"Venda #{venda.numero}", user_id=created_by, user_nome=criado_por_nome, detalhes={"total": str(venda.total)}, ip=ip, commit=False)
     db.commit(); db.refresh(venda)
 
-    # === WS IGUAL STOCKBOT ===
     for p in produtos_afectados:
         emit(str(empresa_id), "produto:update", data=p)
-        # broadcast stock
         _broadcast_safe(empresa_id, {"type": "stock.updated", "tipo": "stock.updated", "produto_id": p["id"], "nome_produto": p["nome"], "novo_estoque": p["stock_atual"], "stock_atual": p["stock_atual"]})
 
-    # notificações stock baixo/zerado
     for prod in produtos_para_notificar:
         if getattr(prod, 'controlar_stock', False):
             stock = Decimal(str(prod.stock_atual))
@@ -166,25 +203,20 @@ def create_venda(db: Session, data, empresa_id: uuid.UUID, created_by: uuid.UUID
     emit(str(empresa_id), "venda:nova", data={"id": str(venda.id), "numero": venda.numero, "total": str(venda.total), "mesa_id": str(venda.mesa_id) if venda.mesa_id else None})
     _broadcast_safe(empresa_id, {"type": "venda:nova", "tipo": "venda:nova", "data": {"id": str(venda.id), "numero": venda.numero, "total": float(venda.total), "mesa_id": str(venda.mesa_id) if venda.mesa_id else None}})
     _broadcast_safe(empresa_id, {"type": "stats.updated", "tipo": "stats.updated", "valor_venda": float(venda.total), "total_itens": sum([float(i.quantidade) for i in venda.itens]), "acao": "add"})
-
     if mesa:
         emit(str(empresa_id), "mesa:update", data={"id": str(mesa.id), "numero": mesa.numero, "status": "OCUPADA", "venda_atual_id": str(venda.id)})
         _broadcast_safe(empresa_id, {"type": "mesa:update", "tipo": "mesa:update", "data": {"id": str(mesa.id), "numero": mesa.numero, "status": "OCUPADA", "venda_atual_id": str(venda.id)}})
-
     if venda_status == VendaStatus.CONCLUIDA:
         _broadcast_safe(empresa_id, {"type": "caixa.updated", "tipo": "caixa.updated"})
-
     return venda, produtos_afectados
 
 def add_item_comanda(db: Session, venda_id: uuid.UUID, data, empresa_id: uuid.UUID, user_id: uuid.UUID, user_nome: str, ip: str | None = None):
     venda = db.query(Venda).filter(Venda.id == venda_id, Venda.empresa_id == empresa_id).with_for_update().first()
     if not venda or venda.status!= VendaStatus.ABERTA:
         raise HTTPException(400, "Comanda não está aberta")
-
     prod = db.query(Product).filter(Product.id == data.produto_id, Product.empresa_id == empresa_id).first()
     if not prod:
         raise HTTPException(404, "Produto não encontrado")
-
     for existente in venda.itens:
         if existente.status == VendaItemStatus.CANCELADO:
             continue
@@ -207,7 +239,6 @@ def add_item_comanda(db: Session, venda_id: uuid.UUID, data, empresa_id: uuid.UU
             emit(str(empresa_id), "venda:update", data={"id": str(venda.id), "total": str(venda.total)})
             _broadcast_safe(empresa_id, {"type": "venda:update", "tipo": "venda:update", "data": {"id": str(venda.id), "total": float(venda.total), "acao": "item_add"}})
             return venda
-
     sub_item = prod.preco_venda * data.quantidade
     iva_v = sub_item * (prod.iva / Decimal("100")) if getattr(prod, 'tem_iva', False) and prod.iva > 0 else Decimal("0")
     tot_item = sub_item + iva_v
@@ -236,6 +267,7 @@ def fechar_comanda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, dinh
     venda.dinheiro_recebido = dinheiro_recebido
     venda.troco = dinheiro_recebido - venda.total if dinheiro_recebido >= venda.total else Decimal("0")
     venda.status = VendaStatus.CONCLUIDA
+    _gerar_agt_para_venda(db, venda, empresa_id)
     mov = CaixaMovimento(empresa_id=empresa_id, caixa_id=caixa.id, tipo=TipoMovimento.VENDA, origem=OrigemMovimento.VENDA, valor=venda.total, descricao=f"Fechamento #{venda.numero}", venda_id=venda.id, forma_pagamento=venda.forma_pagamento, criado_por=user_id, criado_por_nome=user_nome)
     db.add(mov)
     mesa_id_para_broadcast = venda.mesa_id
@@ -249,7 +281,6 @@ def fechar_comanda(db: Session, venda_id: uuid.UUID, empresa_id: uuid.UUID, dinh
         _broadcast_safe(empresa_id, {"type": "stock.updated", "tipo": "stock.updated", "produto_id": p["id"], "nome_produto": p["nome"], "novo_estoque": p["stock_atual"]})
         if p["produto"].stock_atual == 0:
             _broadcast_safe(empresa_id, {"type": "notificacao:nova", "data": {"id": f"stock-{p['id']}", "tipo": "STOCK_ZERADO", "titulo": f"{p['nome']} zerado!", "desc": f"Fechamento #{venda.numero}", "time": "agora"}})
-
     emit(str(empresa_id), "venda:fechada", data={"id": str(venda.id)})
     _broadcast_safe(empresa_id, {"type": "venda:fechada", "tipo": "venda:fechada", "data": {"id": str(venda.id), "total": float(venda.total)}})
     _broadcast_safe(empresa_id, {"type": "caixa.updated", "tipo": "caixa.updated"})

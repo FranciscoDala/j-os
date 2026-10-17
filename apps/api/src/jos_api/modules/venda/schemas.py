@@ -19,7 +19,6 @@ class VendaCreateRequest(BaseModel):
     forma_pagamento: str = "DINHEIRO"
     modo: Optional[str] = None
 
-# SEU FRONT MANDA ARRAY
 class AddItensBulkRequest(BaseModel):
     itens: List[VendaItemCreate]
 
@@ -28,7 +27,6 @@ class AddItemRequest(BaseModel):
     quantidade: Decimal
     observacao: Optional[str] = None
 
-# SEU FRONT MANDA BODY NO FECHAR
 class FecharMesaRequest(BaseModel):
     forma_pagamento: Optional[str] = "DINHEIRO"
     dinheiro_recebido: Optional[Decimal] = Decimal("0")
@@ -77,6 +75,11 @@ class VendaResponse(BaseModel):
     status: str
     created_at: datetime
     itens: List[VendaItemResponse]
+    # --- AGT ---
+    hash: Optional[str] = None
+    hash_anterior: Optional[str] = None
+    numero_fatura: Optional[str] = None
+    data_fatura: Optional[datetime] = None
     class Config: from_attributes = True
 
 class ReservaResponse(BaseModel):
