@@ -37,27 +37,31 @@ def _get_ultimo_hash(db: Session, empresa_id: uuid.UUID) -> str:
     ).order_by(desc(Venda.numero)).with_for_update().first()
     return str(ultima.hash) if ultima and ultima.hash else ""
 
-
 def _gerar_agt_para_venda(db: Session, venda: Venda, empresa_id: uuid.UUID) -> None:
+    """Sempre cria numero_fatura e data_fatura, hash só se tiver chave"""
+    hash_anterior = _get_ultimo_hash(db, empresa_id)
+    numero_fatura = getattr(venda, 'numero_fatura', None) or f"FT {datetime.utcnow().year}/{venda.numero}"
+    data_fatura_agora = datetime.utcnow()
+
+    # Sempre grava esses dois, mesmo se falhar o hash
+    venda.numero_fatura = numero_fatura
+    venda.data_fatura = data_fatura_agora
+    venda.hash_anterior = hash_anterior
+
     if not AGT_ENABLED or gerar_hash_agt is None or montar_string_fatura is None:
+        logger.warning(f"[AGT] Gerando só numero_fatura {numero_fatura} sem hash - modulo desativado")
         return
-    hash_anterior: str = ""
+
     try:
-        hash_anterior = _get_ultimo_hash(db, empresa_id)
-        numero_fatura = getattr(venda, 'numero_fatura', None) or f"FT {datetime.utcnow().year}/{venda.numero}"
-        data_iso = datetime.utcnow().date().isoformat()
+        data_iso = data_fatura_agora.date().isoformat()
         total_str = f"{venda.total:.2f}"
         string_para_hash = montar_string_fatura(data_iso, numero_fatura, total_str, hash_anterior)
         hash_atual = gerar_hash_agt(string_para_hash)
         venda.hash = hash_atual
-        venda.hash_anterior = hash_anterior
-        venda.numero_fatura = numero_fatura
-        venda.data_fatura = datetime.utcnow()
+        logger.info(f"[AGT] Hash gerado para {numero_fatura}: {hash_atual[:10]}...")
     except Exception as e:
         logger.error(f"[AGT] Falha hash venda #{venda.numero}: {e}")
         venda.hash = None
-        venda.hash_anterior = hash_anterior
-        venda.numero_fatura = f"FT {datetime.utcnow().year}/{venda.numero}"
 
 def _broadcast_safe(empresa_id: uuid.UUID | str, payload: dict):
     try:
