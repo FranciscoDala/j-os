@@ -60,7 +60,7 @@ export default function LoginPage() {
             {/* BACKGROUND COM IMAGEM - RESTAURANTE / COMIDA */}
             <div className="fixed inset-0 -z-10">
                 <img
-                    src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1600&q=80"
+                    src="bg/1.jpg"
                     alt=""
                     className="w-full h-full object-cover"
                 />
