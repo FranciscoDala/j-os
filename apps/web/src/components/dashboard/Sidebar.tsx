@@ -83,48 +83,48 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile
                 <div className="flex items-center gap-3 px-2 mb-4">
                     <LogoTopo size="w-12 h-12" />
                     <div className="leading-none">
-                        <p className="text-[12px] font-black truncate">{empresa?.nome_fantasia || "Empresa"}</p>
-                        <p className="text-[10px] text-zinc-500">{empresa?.nif || ""}</p>
+                        <p className="text-[12px] font-black truncate text-black">{empresa?.nome_fantasia || "Empresa"}</p>
+                        <p className="text-[10px] text-black/60">{empresa?.nif || ""}</p>
                     </div>
                 </div>
                 <div className="flex-1 flex flex-col gap-1.5">
                     {filteredTabs.map(({ id, label, icon: Icon }: any) => {
                         const active = activeTab === id;
                         return (
-                            <button key={id} onClick={() => setActiveTab(id)} className={`w-full flex items-center gap-3 px-4 h-[56px] rounded-full text-[13px] font-bold transition-all ${active ? 'bg-black text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)]' : 'bg-white text-[#1E1E1E] border border-black/5 shadow-[0_1px_6px_rgba(0,0,0,0.04)]'}`}>
-                                <span className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${active ? 'bg-white/15' : 'bg-[#F5F2ED]'}`}><Icon size={24} strokeWidth={2} /></span>
+                            <button key={id} onClick={() => setActiveTab(id)} className={`w-full flex items-center gap-3 px-4 h-[56px] rounded-full text-[13px] font-bold transition-all ${active ? 'bg-white text-black shadow-[0_4px_12px_rgba(0,0,0,0.12)]' : 'bg-transparent text-black border border-black/10'}`}>
+                                <span className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${active ? 'bg-black/5' : 'bg-white/60'}`}><Icon size={24} strokeWidth={2} className="text-black" /></span>
                                 <span className="flex-1 text-left">{label}</span>
-                                {id === 'pedidos' && pedidosCount > 0 && <span className={`min-w-[22px] h-[22px] px-1.5 text-[11px] font-black rounded-full flex items-center justify-center ${active ? 'bg-white text-black' : 'bg-red-500 text-white'}`}>{pedidosCount > 9 ? "9+" : pedidosCount}</span>}
+                                {id === 'pedidos' && pedidosCount > 0 && <span className={`min-w-[22px] h-[22px] px-1.5 text-[11px] font-black rounded-full flex items-center justify-center ${active ? 'bg-black text-white' : 'bg-red-500 text-white'}`}>{pedidosCount > 9 ? "9+" : pedidosCount}</span>}
                             </button>
                         )
                     })}
                 </div>
                 <div className="mt-4 pt-4 border-t border-black/10 flex flex-col gap-2">
-                    {showConfig && <button onClick={onOpenConfig} className="w-full flex items-center gap-3 px-4 h-[52px] rounded-full bg-white text-[#1E1E1E] text-[13px] font-bold border border-black/5"><Settings size={22} strokeWidth={2} /> Configurações</button>}
-                    <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 h-[52px] rounded-full bg-white text-[#E53E3E] text-[13px] font-bold border border-black/5 hover:bg-[#FCE8E8]"><Power size={22} strokeWidth={2.5} /> Sair</button>
+                    {showConfig && <button onClick={onOpenConfig} className="w-full flex items-center gap-3 px-4 h-[52px] rounded-full bg-white/70 text-black text-[13px] font-bold border border-black/10"><Settings size={22} strokeWidth={2} className="text-black" /> Configurações</button>}
+                    <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 h-[52px] rounded-full bg-white/70 text-black text-[13px] font-bold border border-black/10 hover:bg-white"><Power size={22} strokeWidth={2.5} className="text-black" /> Sair</button>
                 </div>
             </div>
         )
     }
 
     return (
-        <aside className="w-[68px] h-[calc(100dvh-28px)] bg-white rounded-[28px] flex flex-col items-center py-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)] shrink-0" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
+        <aside className="w-[68px] h-[calc(100dvh-28px)] bg-transparent rounded-[28px] flex flex-col items-center py-4 shrink-0" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
             {/* LOGO NO TOPO */}
             <LogoTopo size="w-10 h-10" />
 
             <div className="flex-1 flex flex-col items-center gap-2 mt-5">
                 {filteredTabs.filter((t: any) => t.id !== 'home').map(({ id, icon: Icon }: any) => (
-                    <button key={id} onClick={() => setActiveTab(id)} className={`relative w-12 h-12 rounded-full flex items-center justify-center transition ${activeTab === id ? 'bg-black text-white shadow-[0_4px_12px_rgba(0,0,0,0.2)]' : 'text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED]'}`}>
-                        <Icon size={24} strokeWidth={2} />
+                    <button key={id} onClick={() => setActiveTab(id)} className={`relative w-12 h-12 rounded-full flex items-center justify-center transition ${activeTab === id ? 'bg-white text-black shadow-[0_4px_12px_rgba(0,0,0,0.15)]' : 'text-black hover:bg-white/60'}`}>
+                        <Icon size={24} strokeWidth={2} className="text-black" />
                         {id === 'pedidos' && pedidosCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-[4px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-[2px] border-white">{pedidosCount > 9 ? "9+" : pedidosCount}</span>}
                     </button>
                 ))}
             </div>
             <div className="flex flex-col items-center gap-2">
-                <div className="w-6 h-[1px] bg-[#EDEBE6] my-1" />
-                {showConfig && <button onClick={onOpenConfig} className="w-12 h-12 rounded-full flex items-center justify-center bg-[#F5F2ED] text-[#1E1E1E] hover:bg-black hover:text-white transition"><Settings size={22} strokeWidth={2} /></button>}
-                {/* SAIR - ícone OFF vermelho */}
-                <button onClick={onLogout} title="Sair" className="w-12 h-12 rounded-full flex items-center justify-center text-[#E53E3E] hover:bg-[#FCE8E8] hover:text-red-600 transition active:scale-95"><Power size={24} strokeWidth={2.5} /></button>
+                <div className="w-6 h-[1px] bg-black/20 my-1" />
+                {showConfig && <button onClick={onOpenConfig} className="w-12 h-12 rounded-full flex items-center justify-center bg-white/70 text-black hover:bg-white transition"><Settings size={22} strokeWidth={2} className="text-black" /></button>}
+                {/* SAIR - ícone OFF preto */}
+                <button onClick={onLogout} title="Sair" className="w-12 h-12 rounded-full flex items-center justify-center text-black hover:bg-white/70 transition active:scale-95"><Power size={24} strokeWidth={2.5} className="text-black" /></button>
             </div>
         </aside>
     );
