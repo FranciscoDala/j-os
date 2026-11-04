@@ -25,7 +25,6 @@ export default function LoginPage() {
         try {
             const data = await loginApi(email, senha);
 
-            // REGRA SUPERADMIN: sem loja, direto para /admin
             const role = (data.user as any)?.role?.toLowerCase?.() || (data.user as any)?.role_slug || "";
             const isSuperAdmin = role === "superadmin" || data.user?.email?.toLowerCase() === "superadmin@j-os.ao";
 
@@ -58,59 +57,58 @@ export default function LoginPage() {
             {/* FONT AWESOME */}
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
 
-            {/* BACKGROUND - IMAGEM RESTAURANTE / COMIDA */}
+            {/* BACKGROUND COM IMAGEM - RESTAURANTE / COMIDA */}
             <div className="fixed inset-0 -z-10">
-                {/* 👇 METE A TUA FOTO EM public/login-bg.jpg - foto de restaurante, comida ou fast food */}
                 <img
-                    src="/login-bg.jpg"
+                    src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1600&q=80"
                     alt=""
                     className="w-full h-full object-cover"
                 />
-                {/* Overlay escuro para o login ler bem */}
-                <div className="absolute inset-0 bg-black/70 bg-gradient-to-b from-black/60 via-black/75 to-black/90" />
+                <div className="absolute inset-0 bg-black/50" />
             </div>
 
             {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-            <div className="w-full max-w-[400px] bg-[#151203]/95 backdrop-blur-xl rounded-[36px] flex flex-col px-6 pt-6 pb-6 shadow-2xl border border-white/10 my-auto">
+            {/* CARD BRANCO - NÃO PRETO */}
+            <div className="w-full max-w-[400px] bg-white rounded-[36px] flex flex-col px-6 pt-6 pb-6 shadow-2xl my-auto">
 
                 {/* LOGO */}
                 <div className="flex flex-col items-center shrink-0">
-                    <div className="w-[140px] h-[140px] rounded-full overflow-hidden bg-[#f5a623] flex items-center justify-center">
+                    <div className="w-[140px] h-[140px] rounded-full overflow-hidden bg-[#f5a623] flex items-center justify-center p-4">
                         <img
                             src="/Kitanda.png"
                             alt="Kitanda"
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                         />
                     </div>
                 </div>
 
                 <form onSubmit={handleLogin} className="mt-5 space-y-2.5">
-                    {/* EMAIL - Font Awesome */}
-                    <div className="flex items-center gap-3 bg-black/40 border border-white/15 rounded-full px-4 h-[48px] focus-within:border-[#f5d76e]/60">
-                        <i className="fa-solid fa-envelope text-white/60 text-[15px] w-4 text-center shrink-0"></i>
+                    {/* EMAIL */}
+                    <div className="flex items-center gap-3 bg-[#F2F2F2] border border-black/10 rounded-full px-4 h-[48px] focus-within:border-[#f5a623]">
+                        <i className="fa-solid fa-envelope text-black/50 text-[15px] w-4 text-center shrink-0"></i>
                         <input
                             type="email"
                             placeholder="Email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="flex-1 bg-transparent outline-none text-white text-sm placeholder:text-white/50"
+                            className="flex-1 bg-transparent outline-none text-black text-sm placeholder:text-black/50"
                             required
                         />
                     </div>
 
-                    {/* SENHA - Font Awesome */}
-                    <div className="flex items-center gap-3 bg-black/40 border border-white/15 rounded-full px-4 h-[48px] focus-within:border-[#f5d76e]/60">
+                    {/* SENHA */}
+                    <div className="flex items-center gap-3 bg-[#F2F2F2] border border-black/10 rounded-full px-4 h-[48px] focus-within:border-[#f5a623]">
                         <i className="fa-solid fa-lock text-[#f5a623] text-[15px] w-4 text-center shrink-0"></i>
                         <input
                             type={mostrarSenha ? "text" : "password"}
                             placeholder="Senha"
                             value={senha}
                             onChange={(e) => setSenha(e.target.value)}
-                            className="flex-1 bg-transparent outline-none text-white text-sm placeholder:text-white/50"
+                            className="flex-1 bg-transparent outline-none text-black text-sm placeholder:text-black/50"
                             required
                         />
-                        <button type="button" onClick={() => setMostrarSenha(!mostrarSenha)} className="text-white/70 hover:text-white transition shrink-0 w-5 text-center">
+                        <button type="button" onClick={() => setMostrarSenha(!mostrarSenha)} className="text-black/50 hover:text-black transition shrink-0 w-5 text-center">
                             <i className={`fa-solid ${mostrarSenha ? "fa-eye-slash" : "fa-eye"} text-[15px]`}></i>
                         </button>
                     </div>
@@ -125,7 +123,7 @@ export default function LoginPage() {
                 </form>
 
                 <div className="pt-5 flex justify-center">
-                    <div className="w-[120px] h-[4px] bg-white/80 rounded-full" />
+                    <div className="w-[120px] h-[4px] bg-black/20 rounded-full" />
                 </div>
             </div>
             <style>{`@keyframes slideIn { from { transform: translateX(100%); opacity:0 } to { transform: translateX(0); opacity:1 } }`}</style>
