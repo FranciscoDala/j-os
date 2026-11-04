@@ -57,7 +57,7 @@ export default function LoginPage() {
             {/* FONT AWESOME */}
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
 
-            {/* MATA O AZUL DO AUTOFILL + FORÇA LETRA GRANDE */}
+            {/* MATA O AZUL DO AUTOFILL + SPINNER QUE GIRA DE VERDADE */}
             <style>{`
                 .login-input input { font-size: 17px !important; line-height: 1 !important; background: transparent !important; }
                 .login-input input::placeholder { font-size: 17px !important; line-height: 1 !important; }
@@ -72,6 +72,17 @@ export default function LoginPage() {
                     background: transparent !important;
                 }
                 @keyframes slideIn { from { transform: translateX(100%); opacity:0 } to { transform: translateX(0); opacity:1 } }
+                @keyframes kitanda-spin { to { transform: rotate(360deg); } }
+                .kitanda-spinner {
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 50%;
+                    border: 3px solid rgba(0,0,0,0.15);
+                    border-top-color: #000;
+                    animation: kitanda-spin 0.7s linear infinite;
+                    display: inline-block;
+                    flex-shrink: 0;
+                }
             `}</style>
 
             {/* BACKGROUND */}
@@ -118,7 +129,7 @@ export default function LoginPage() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             className="flex-1 bg-transparent outline-none text-black py-0"
-                            style={{ fontSize: "15px", height: "100%", background: "transparent" }}
+                            style={{ fontSize: "17px", height: "100%", background: "transparent" }}
                             autoComplete="off"
                             required
                         />
@@ -136,7 +147,7 @@ export default function LoginPage() {
                             value={senha}
                             onChange={(e) => setSenha(e.target.value)}
                             className="flex-1 bg-transparent outline-none text-black py-0 min-w-0"
-                            style={{ fontSize: "15px", height: "100%", background: "transparent" }}
+                            style={{ fontSize: "17px", height: "100%", background: "transparent" }}
                             autoComplete="new-password"
                             required
                         />
@@ -149,13 +160,13 @@ export default function LoginPage() {
                         </button>
                     </div>
 
-                    {/* BOTÃO */}
+                    {/* BOTÃO - SPINNER CSS PURO QUE GIRA */}
                     <button
                         disabled={loading}
                         className="w-full h-[48px] !mt-3 rounded-full bg-gradient-to-b from-[#ffe680] to-[#f5b800] text-black font-bold text-[17px] shadow-lg active:scale-[0.98] transition disabled:opacity-70 flex items-center justify-center gap-2"
                     >
                         {loading ? (
-                            <i className="fa-solid fa-spinner fa-spin text-[20px]"></i>
+                            <span className="kitanda-spinner"></span>
                         ) : (
                             "Entrar"
                         )}
