@@ -14,6 +14,7 @@ import { getCaixaStatus } from "@/lib/api";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
+const BG_IMAGE = "/bg/2.jpeg";
 type Toast = { id: string; msg: string; type: "success" | "error" | "info" | "warning" };
 type Ctx = { activeTab: string; setActiveTab: (t: string) => void; user: any; moduleId: ModuleId; role: string; can: (p: string) => boolean; pedidosCount: number; setPedidosCount: (n: number) => void; stockAlerts: number; setStockAlerts: (n: number) => void; };
 const DashboardCtx = createContext<Ctx>(null as any);
@@ -296,16 +297,21 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
 
     return (
         <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId, role, can, pedidosCount, setPedidosCount, stockAlerts, setStockAlerts }}>
-            <div className="h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-0 md:p-[14px] md:gap-[14px]" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
+            <div className="relative h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-0 md:p-[14px] md:gap-[14px]" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
+                {/* BACKGROUND IMAGE */}
+                <img src={BG_IMAGE} alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+                <div className="pointer-events-none absolute inset-0 bg-[#EDEBE6]/85" />
+
+                <div className="relative z-10 flex w-full gap-[14px] p-0 md:p-0">
                 <Toasts toasts={toasts} setToasts={setToasts} />
                 <div className="hidden md:flex shrink-0"><Sidebar activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} onOpenConfig={() => { setShowConfig(true); }} /></div>
                 {!isVendasOpen && (<div className={`fixed inset-0 z-[300] md:hidden transition ${isMobileOpen ? "visible" : "invisible"}`}><div className={`absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity ${isMobileOpen ? "opacity-100" : "opacity-0"}`} onClick={() => setIsMobileOpen(false)} /><div className={`absolute left-0 top-0 h-full w-[84%] max-w-[330px] bg-[#EDEBE6] p-4 shadow-[8px_0_30px_rgba(0,0,0,0.15)] transition-transform duration-300 overflow-y-auto no-scrollbar ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}`}><div className="flex justify-between items-center mb-6"><div className="flex items-center gap-2">{empresaLogo ? <img src={empresaLogo} className="w-8 h-8 rounded-full object-cover border" /> : <div className="w-8 h-8 bg-black text-white rounded-full grid place-items-center text-[10px] font-black">JD</div>}<div className="leading-none"><p className="text-[12px] font-black truncate">{empresa?.nome_fantasia || "Menu"}</p><p className="text-[10px] text-[#8A8A8A] capitalize">{role.replace('_', ' ')}</p></div></div><button onClick={() => setIsMobileOpen(false)} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center active:scale-95"><X size={16} /></button></div><Sidebar isMobile={true} activeTab={activeTab} setActiveTab={(t: any) => { setActiveTab(t); setIsMobileOpen(false) }} onLogout={logout} role={role} can={can} onOpenConfig={() => { setIsMobileOpen(false); setShowConfig(true); }} /></div></div>)}
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                     {!isVendasOpen && (
-                        <div className="flex items-center justify-between gap-3 px-4 md:px-0 py-3 shrink-0 bg-[#EDEBE6] md:bg-transparent border-b md:border-0 border-black/5">
+                        <div className="flex items-center justify-between gap-3 px-4 md:px-0 py-3 shrink-0 bg-transparent border-b md:border-0 border-black/5">
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                                 <button onClick={() => setIsMobileOpen(true)} className="md:hidden w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.08)] shrink-0 active:scale-95"><Menu size={20} strokeWidth={2} /></button>
-                                <div className="flex-1 min-w-0"><h1 className="text-[14px] md:text-[18px] font-[900] text-[#1E1E1E] leading-[0.9] tracking-[-0.02em] truncate">{headerTitle}</h1><p className="text-[11px] md:text-[13px] text-[#8A8A9A] mt-1 font-medium truncate hidden sm:block">{headerDesc}</p></div>
+                                <div className="flex-1 min-w-0"><h1 className="text-[14px] md:text-[18px] font-[900] text-[#1E1E1E] leading-[0.9] tracking-[-0.02em] truncate">{headerTitle}</h1><p className="text-[11px] md:text-[13px] text-[#8A8A8A] mt-1 font-medium truncate hidden sm:block">{headerDesc}</p></div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                                 <div className="hidden lg:flex bg-white rounded-full items-center pl-4 pr-1.5 py-1 w-[300px] h-11 shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5">
@@ -350,6 +356,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                     <div className="flex-1 overflow-y-auto no-scrollbar px-4 md:px-0 md:pr-1 pb-4 md:pb-0 mt-0 md:mt-2">{children}</div>
                 </div>
                 {isVendasOpen && <div className="absolute inset-0 z-[100] bg-[#EDEBE6] flex flex-col overflow-hidden"><div className="flex-1 overflow-hidden p-0 md:p-[14px]"><VendasTab onClose={() => setActiveTab("home")} /></div></div>}
+                </div>
             </div>
             {empresaData && <ModalEmpresa open={showConfig} initialData={empresaData} saving={savingEmpresa} onClose={() => setShowConfig(false)} onSave={handleSaveEmpresa} />}
             <style jsx global>{`html,body{height:100%;overflow:hidden;background:#EDEBE6;scrollbar-width:none}::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
