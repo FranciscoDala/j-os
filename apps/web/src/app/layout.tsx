@@ -7,10 +7,10 @@ import { EmpresaProvider } from "@/components/dashboard/empresaContext";
 
 export const metadata: Metadata = {
     title: {
-        default: "J-OS - Restaurante",
-        template: "%s | J-OS",
+        default: "Kitanda",
+        template: "%s | Kitanda",
     },
-    description: "Sistema de gestão J-OS - Restaurante, caixa, mesas e vendas",
+    description: "Sistema de gestão Kitanda - Restaurante, caixa, mesas e vendas",
     manifest: "/site.webmanifest",
     icons: {
         icon: [
@@ -28,9 +28,9 @@ export const metadata: Metadata = {
     appleWebApp: {
         capable: true,
         statusBarStyle: "default",
-        title: "J-OS",
+        title: "Kitanda",
     },
-    applicationName: "J-OS",
+    applicationName: "Kitanda",
 };
 
 export const viewport: Viewport = {
