@@ -110,7 +110,7 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile
     return (
         <aside className="w-[68px] h-[calc(100dvh-28px)] bg-white rounded-[28px] flex flex-col items-center py-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)] shrink-0" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
             {/* LOGO NO TOPO */}
-            <LogoTopo size="w-12 h-12" />
+            <LogoTopo size="w-10 h-10" />
 
             <div className="flex-1 flex flex-col items-center gap-2 mt-5">
                 {filteredTabs.filter((t: any) => t.id !== 'home').map(({ id, icon: Icon }: any) => (
