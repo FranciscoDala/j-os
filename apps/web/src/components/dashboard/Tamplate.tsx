@@ -305,7 +305,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                         <div className="flex items-center justify-between gap-3 px-4 md:px-0 py-3 shrink-0 bg-[#EDEBE6] md:bg-transparent border-b md:border-0 border-black/5">
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                                 <button onClick={() => setIsMobileOpen(true)} className="md:hidden w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-[0_1px_6px_rgba(0,0,0,0.08)] shrink-0 active:scale-95"><Menu size={20} strokeWidth={2} /></button>
-                                <div className="flex-1 min-w-0"><h1 className="text-[14px] md:text-[18px] font-[900] text-[#1E1E1E] leading-[0.9] tracking-[-0.02em] truncate">{headerTitle}</h1><p className="text-[11px] md:text-[13px] text-[#8A8A8A] mt-1 font-medium truncate hidden sm:block">{headerDesc}</p></div>
+                                <div className="flex-1 min-w-0"><h1 className="text-[14px] md:text-[18px] font-[900] text-[#1E1E1E] leading-[0.9] tracking-[-0.02em] truncate">{headerTitle}</h1><p className="text-[11px] md:text-[13px] text-[#8A8A9A] mt-1 font-medium truncate hidden sm:block">{headerDesc}</p></div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                                 <div className="hidden lg:flex bg-white rounded-full items-center pl-4 pr-1.5 py-1 w-[300px] h-11 shadow-[0_1px_6px_rgba(0,0,0,0.05)] border border-black/5">
@@ -343,18 +343,6 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                                         onGoPedidos={() => setActiveTab("pedidos")}
                                         onGoProdutos={() => setActiveTab("produtos")}
                                     />
-                                </div>
-
-                                <div className="bg-white rounded-full pl-1 pr-3 py-1 flex items-center gap-2 shadow-[0_1px_6px_rgba(0,0,0,0.05)] h-11 ml-1 border border-black/5">
-                                    {empresaLogo ? (
-                                        <img src={empresaLogo} className="w-8 h-8 rounded-full object-cover" alt="logo empresa" />
-                                    ) : (
-                                        <div className="w-8 h-8 rounded-full bg-black text-white grid place-items-center text-[10px] font-black">{empresa?.nome_fantasia?.[0] || user?.nome?.[0] || "F"}</div>
-                                    )}
-                                    <div className="hidden md:block leading-none">
-                                        <p className="text-[11px] font-bold truncate max-w-[90px]">{empresa?.nome_fantasia || user?.nome || "Francisco"}</p>
-                                        <p className="text-[9px] text-[#9A9A9A] capitalize truncate max-w-[90px]">{empresa?.nif || role.replace('_', ' ')}</p>
-                                    </div>
                                 </div>
                             </div>
                         </div>
