@@ -113,11 +113,16 @@ export default function LoginPage() {
                     </div>
 
                     {/* BOTÃO */}
+                    {/* BOTÃO */}
                     <button
                         disabled={loading}
-                        className="w-full h-[50px] !mt-4 rounded-full bg-gradient-to-b from-[#ffe680] to-[#f5b800] text-black font-bold text-[16px] shadow-lg active:scale-[0.98] transition disabled:opacity-70 flex items-center justify-center gap-2"
+                        className="w-full h-[54px] !mt-5 rounded-full bg-gradient-to-b from-[#ffe680] to-[#f5b800] text-black font-bold text-[17px] shadow-lg active:scale-[0.98] transition disabled:opacity-70 flex items-center justify-center gap-2"
                     >
-                        {loading ? <><i className="fa-solid fa-spinner fa-spin"></i> Entrando...</> : "Log In"}
+                        {loading ? (
+                            <i className="fa-solid fa-spinner fa-spin text-[20px]"></i>
+                        ) : (
+                            "Entrar"
+                        )}
                     </button>
                 </form>
 
