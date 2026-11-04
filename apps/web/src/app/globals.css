@@ -9,10 +9,10 @@ body {
     min-height: 100%;
     background: #5A8AD4;
     font-family: "Zalando Sans Expanded", sans-serif;
-    --overflow-x: hidden;
-    --overflow-y: auto;
-    --overscroll-behavior: auto;
-    --scrollbar-width: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: auto;
+    scrollbar-width: none;
     -ms-overflow-style: none;
 }
 
@@ -36,19 +36,20 @@ body::-webkit-scrollbar {
 }
 
 /* ===== FIX ZOOM iOS - REGRA DE OURO ===== */
+/* Texto digitado tem que ser 16px, senão o iPhone faz zoom */
 input,
 select,
 textarea {
     font-size: 16px !important;
 }
 
-@media screen and (min-width: 768px) {
-
-    input,
-    select,
-    textarea {
-        font-size: 11px !important;
-    }
+/* Placeholder pode ser pequeno, não faz zoom - AQUI ESTAVA O ERRO */
+input::placeholder,
+textarea::placeholder {
+    font-size: 13px !important;
+    line-height: 1 !important;
+    color: rgba(0, 0, 0, 0.4) !important;
+    opacity: 1 !important;
 }
 
 /* Garante que no foco não dê zoom */
@@ -58,13 +59,42 @@ textarea:focus {
     font-size: 16px !important;
 }
 
+/* Placeholder continua 13px mesmo no foco */
+input:focus::placeholder,
+textarea:focus::placeholder {
+    font-size: 13px !important;
+}
+
 @media screen and (min-width: 768px) {
+    input,
+    select,
+    textarea {
+        font-size: 11px !important;
+    }
 
     input:focus,
     select:focus,
     textarea:focus {
         font-size: 11px !important;
     }
+
+    /* No desktop o placeholder acompanha, se quiseres 13px também aqui, mantém 13px */
+    input::placeholder,
+    textarea::placeholder {
+        font-size: 13px !important;
+    }
+}
+
+/* ===== MATA O AZUL DO AUTOFILL DO CHROME - GLOBAL ===== */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+    -webkit-text-fill-color: #000 !important;
+    caret-color: #000 !important;
+    transition: background-color 9999s ease-in-out 0s !important;
+    background: transparent !important;
 }
 
 /* Previne double-tap zoom */
@@ -80,7 +110,12 @@ a {
 }
 
 .kitanda-spinner {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
     border: 3px solid rgba(0, 0, 0, 0.15);
     border-top-color: #000;
     animation: kitanda-spin 0.7s linear infinite;
+    display: inline-block;
+    flex-shrink: 0;
 }
