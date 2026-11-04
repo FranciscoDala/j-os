@@ -64,26 +64,25 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#1a1a1a] p-4 sm:bg-[#111]">
+        <div className="min-h-[100dvh] overflow-y-auto flex justify-center bg-[#1a1a1a] px-4 py-6 sm:bg-[#111] sm:items-center">
             {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* CARD TIPO TELEMÓVEL - igual à imagem */}
-            <div className="w-full max-w-[400px] min-h-[720px] bg-[#151203] rounded-[36px] overflow-hidden flex flex-col px-6 pt-10 pb-6 shadow-2xl border border-white/10">
+            {/* CARD - sem altura fixa, cresce com o conteúdo */}
+            <div className="w-full max-w-[400px] bg-[#151203] rounded-[36px] flex flex-col px-6 pt-6 pb-6 shadow-2xl border border-white/10 my-auto">
 
-                {/* LOGO - TROCA AQUI */}
-                <div className="flex flex-col items-center">
-                    <div className="w-[200px] h-[200px] rounded-full overflow-hidden bg-[#f5a623] flex items-center justify-center">
-                        {/* 👇 TUA LOGO QUE ESTÁ EM /public - ex: /kitanda.png, /logo.png */}
+                {/* LOGO */}
+                <div className="flex flex-col items-center shrink-0">
+                    <div className="w-[140px] h-[140px] rounded-full overflow-hidden bg-[#f5a623] flex items-center justify-center p-3">
                         <img
                             src="/Kitanda.png"
                             alt="Kitanda"
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                         />
                     </div>
                 </div>
 
                 {/* ABAS LOG IN / SIGN UP */}
-                <div className="mt-8 flex bg-black/40 rounded-full p-1 border border-white/10">
+                <div className="mt-6 flex bg-black/40 rounded-full p-1 border border-white/10">
                     <button
                         type="button"
                         onClick={() => setTab("login")}
@@ -100,7 +99,7 @@ export default function LoginPage() {
                     </button>
                 </div>
 
-                <form onSubmit={handleLogin} className="mt-7 space-y-4">
+                <form onSubmit={handleLogin} className="mt-6 space-y-4">
                     {/* EMAIL */}
                     <div>
                         <label className="text-white text-[13px]">Email</label>
@@ -130,7 +129,7 @@ export default function LoginPage() {
                                 className="flex-1 bg-transparent outline-none text-white text-sm placeholder:text-white/50"
                                 required
                             />
-                            <button type="button" onClick={() => setMostrarSenha(!mostrarSenha)} className="text-white/70 hover:text-white transition">
+                            <button type="button" onClick={() => setMostrarSenha(!mostrarSenha)} className="text-white/70 hover:text-white transition shrink-0">
                                 {mostrarSenha ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
                         </div>
@@ -187,7 +186,7 @@ export default function LoginPage() {
                     </button>
                 </div>
 
-                <div className="mt-auto pt-6 flex justify-center">
+                <div className="pt-6 flex justify-center">
                     <div className="w-[120px] h-[4px] bg-white rounded-full" />
                 </div>
             </div>
