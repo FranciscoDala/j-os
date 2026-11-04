@@ -59,8 +59,8 @@ export default function LoginPage() {
 
             {/* FORÇA A LETRA GRANDE POR CIMA DO globals.css */}
             <style>{`
-                .login-input input { font-size: 18px !important; }
-                .login-input input::placeholder { font-size: 18px !important; }
+                .login-input input { font-size: 17px !important; line-height: 1 !important; }
+                .login-input input::placeholder { font-size: 17px !important; line-height: 1 !important; }
                 @keyframes slideIn { from { transform: translateX(100%); opacity:0 } to { transform: translateX(0); opacity:1 } }
             `}</style>
 
@@ -76,9 +76,9 @@ export default function LoginPage() {
 
             {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* CARD GLASS - FORÇADO COM INLINE STYLE, NÃO SÓ TAILWIND */}
+            {/* CARD GLASS */}
             <div
-                className="relative z-10 w-full max-w-[400px] rounded-[36px] flex flex-col px-6 pt-7 pb-6 my-auto"
+                className="relative z-10 w-full max-w-[400px] rounded-[32px] flex flex-col px-5 pt-5 pb-4 my-auto"
                 style={{
                     background: "rgba(255, 255, 255, 0.35)",
                     backdropFilter: "blur(20px) saturate(180%)",
@@ -93,62 +93,67 @@ export default function LoginPage() {
                     <img
                         src="/kitanda.png"
                         alt="Kitanda"
-                        className="w-[240px] h-auto object-contain drop-shadow-sm"
+                        className="w-[200px] h-auto object-contain drop-shadow-sm"
                     />
                 </div>
 
-                <form onSubmit={handleLogin} className="mt-6 space-y-3 login-input">
-                    {/* EMAIL - 18px FORÇADO */}
+                <form onSubmit={handleLogin} className="mt-4 space-y-2 login-input">
+                    {/* EMAIL - MAIS BAIXO / MAIS JUNTO */}
                     <div
-                        className="flex items-center gap-3 rounded-full px-5 h-[60px] transition"
+                        className="flex items-center gap-2.5 rounded-full pl-4 pr-4 h-[48px] transition"
                         style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(0,0,0,0.08)" }}
                     >
-                        <i className="fa-solid fa-envelope text-black/50 text-[19px] w-5 text-center shrink-0"></i>
+                        <i className="fa-solid fa-envelope text-black/50 text-[16px] w-5 text-center shrink-0 leading-none"></i>
                         <input
                             type="email"
                             placeholder="Email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="flex-1 bg-transparent outline-none text-black"
-                            style={{ fontSize: "18px" }}
+                            className="flex-1 bg-transparent outline-none text-black py-0"
+                            style={{ fontSize: "17px", height: "100%" }}
                             required
                         />
                     </div>
 
-                    {/* SENHA - 18px FORÇADO */}
+                    {/* SENHA - MAIS BAIXO / MAIS JUNTO + OLHO ALINHADO */}
                     <div
-                        className="flex items-center gap-3 rounded-full px-5 h-[60px] transition"
+                        className="flex items-center gap-2.5 rounded-full pl-4 pr-2 h-[48px] transition"
                         style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(0,0,0,0.08)" }}
                     >
-                        <i className="fa-solid fa-lock text-[#f5a623] text-[19px] w-5 text-center shrink-0"></i>
+                        <i className="fa-solid fa-lock text-[#f5a623] text-[16px] w-5 text-center shrink-0 leading-none"></i>
                         <input
                             type={mostrarSenha ? "text" : "password"}
                             placeholder="Senha"
                             value={senha}
                             onChange={(e) => setSenha(e.target.value)}
-                            className="flex-1 bg-transparent outline-none text-black"
-                            style={{ fontSize: "18px" }}
+                            className="flex-1 bg-transparent outline-none text-black py-0 min-w-0"
+                            style={{ fontSize: "17px", height: "100%" }}
                             required
                         />
-                        <button type="button" onClick={() => setMostrarSenha(!mostrarSenha)} className="text-black/50 hover:text-black transition shrink-0 w-6 text-center">
-                            <i className={`fa-solid ${mostrarSenha ? "fa-eye-slash" : "fa-eye"} text-[19px]`}></i>
+                        {/* OLHO - AGORA CENTRADO, COM ÁREA PRÓPRIA, NÃO ENCOSTADO NA BORDA */}
+                        <button
+                            type="button"
+                            onClick={() => setMostrarSenha(!mostrarSenha)}
+                            className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full text-black/50 hover:text-black hover:bg-black/5 transition"
+                        >
+                            <i className={`fa-solid ${mostrarSenha ? "fa-eye-slash" : "fa-eye"} text-[16px] leading-none`}></i>
                         </button>
                     </div>
 
-                    {/* BOTÃO - Entrar / só spinner */}
+                    {/* BOTÃO - MAIS BAIXO */}
                     <button
                         disabled={loading}
-                        className="w-full h-[56px] !mt-5 rounded-full bg-gradient-to-b from-[#ffe680] to-[#f5b800] text-black font-bold text-[18px] shadow-lg active:scale-[0.98] transition disabled:opacity-70 flex items-center justify-center gap-2"
+                        className="w-full h-[48px] !mt-3 rounded-full bg-gradient-to-b from-[#ffe680] to-[#f5b800] text-black font-bold text-[17px] shadow-lg active:scale-[0.98] transition disabled:opacity-70 flex items-center justify-center gap-2"
                     >
                         {loading ? (
-                            <i className="fa-solid fa-spinner fa-spin text-[22px]"></i>
+                            <i className="fa-solid fa-spinner fa-spin text-[20px]"></i>
                         ) : (
                             "Entrar"
                         )}
                     </button>
                 </form>
 
-                <div className="pt-5 flex justify-center">
+                <div className="pt-3 flex justify-center">
                     <div className="w-[120px] h-[4px] bg-black/20 rounded-full" />
                 </div>
             </div>
