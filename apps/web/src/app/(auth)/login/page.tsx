@@ -80,10 +80,8 @@ export default function LoginPage() {
             <div
                 className="relative z-10 w-full max-w-[400px] rounded-[32px] flex flex-col px-5 pt-5 pb-4 my-auto"
                 style={{
-                    background: "rgba(255, 255, 255, 0.35)",
-                    backdropFilter: "blur(20px) saturate(180%)",
-                    WebkitBackdropFilter: "blur(20px) saturate(180%)",
-                    border: "1px solid rgba(255, 255, 255, 0.65)",
+                    background: "#ffffff",
+                    border: "1px solid rgba(0, 0, 0, 0.08)",
                     boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
                 }}
             >
@@ -103,14 +101,14 @@ export default function LoginPage() {
                         className="flex items-center gap-2.5 rounded-full pl-4 pr-4 h-[48px] transition"
                         style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(0,0,0,0.08)" }}
                     >
-                        <i className="fa-solid fa-envelope text-black/50 text-[16px] w-5 text-center shrink-0 leading-none"></i>
+                        <i className="fa-solid fa-user text-black/50 text-[16px] w-5 text-center shrink-0 leading-none"></i>
                         <input
                             type="email"
                             placeholder="Email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             className="flex-1 bg-transparent outline-none text-black py-0"
-                            style={{ fontSize: "17px", height: "100%" }}
+                            style={{ fontSize: "15px", height: "100%" }}
                             required
                         />
                     </div>
@@ -120,14 +118,14 @@ export default function LoginPage() {
                         className="flex items-center gap-2.5 rounded-full pl-4 pr-2 h-[48px] transition"
                         style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(0,0,0,0.08)" }}
                     >
-                        <i className="fa-solid fa-lock text-[#f5a623] text-[16px] w-5 text-center shrink-0 leading-none"></i>
+                        <i className="fa-solid fa-lock text-black/50 text-[16px] w-5 text-center shrink-0 leading-none"></i>
                         <input
                             type={mostrarSenha ? "text" : "password"}
                             placeholder="Senha"
                             value={senha}
                             onChange={(e) => setSenha(e.target.value)}
                             className="flex-1 bg-transparent outline-none text-black py-0 min-w-0"
-                            style={{ fontSize: "17px", height: "100%" }}
+                            style={{ fontSize: "15px", height: "100%" }}
                             required
                         />
                         {/* OLHO - AGORA CENTRADO, COM ÁREA PRÓPRIA, NÃO ENCOSTADO NA BORDA */}
