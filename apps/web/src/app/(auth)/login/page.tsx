@@ -99,17 +99,17 @@ export default function LoginPage() {
                 {/* LOGO */}
                 <div className="flex flex-col items-center shrink-0">
                     <img
-                        src="/kitanda-name.png"
+                        src="/kitanda.png"
                         alt="Kitanda"
-                        className="w-[300px] h-auto object-contain drop-shadow-sm"
+                        className="w-[250px] h-auto object-contain drop-shadow-sm"
                     />
                 </div>
 
                 <form onSubmit={handleLogin} className="mt-4 space-y-2 login-input" autoComplete="off">
                     {/* EMAIL - TRANSPARENTE */}
                     <div
-                        className="flex items-center gap-2.0 rounded-full pl-4 pr-4 h-[40px] transition focus-within:border-[#f5a623]"
-                        style={{ background: "transparent", border: "2px solid rgba(0,0,0,0.15)" }}
+                        className="flex items-center gap-2.5 rounded-full pl-4 pr-4 h-[45px] transition focus-within:border-[#f5a623]"
+                        style={{ background: "transparent", border: "1px solid rgba(0,0,0,0.15)" }}
                     >
                         <i className="fa-solid fa-user text-black/50 text-[16px] w-5 text-center shrink-0 leading-none"></i>
                         <input
@@ -118,7 +118,7 @@ export default function LoginPage() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             className="flex-1 bg-transparent outline-none text-black py-0"
-                            style={{ fontSize: "17px", height: "100%", background: "transparent" }}
+                            style={{ fontSize: "15px", height: "100%", background: "transparent" }}
                             autoComplete="off"
                             required
                         />
@@ -126,7 +126,7 @@ export default function LoginPage() {
 
                     {/* SENHA - TRANSPARENTE + OLHO ALINHADO */}
                     <div
-                        className="flex items-center gap-2.5 rounded-full pl-4 pr-2 h-[48px] transition focus-within:border-[#f5a623]"
+                        className="flex items-center gap-2.5 rounded-full pl-4 pr-2 h-[45px] transition focus-within:border-[#f5a623]"
                         style={{ background: "transparent", border: "1px solid rgba(0,0,0,0.15)" }}
                     >
                         <i className="fa-solid fa-lock text-black/50 text-[16px] w-5 text-center shrink-0 leading-none"></i>
@@ -136,7 +136,7 @@ export default function LoginPage() {
                             value={senha}
                             onChange={(e) => setSenha(e.target.value)}
                             className="flex-1 bg-transparent outline-none text-black py-0 min-w-0"
-                            style={{ fontSize: "17px", height: "100%", background: "transparent" }}
+                            style={{ fontSize: "15px", height: "100%", background: "transparent" }}
                             autoComplete="new-password"
                             required
                         />
