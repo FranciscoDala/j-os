@@ -99,7 +99,7 @@ export default function LoginPage() {
                 {/* LOGO */}
                 <div className="flex flex-col items-center shrink-0">
                     <img
-                        src="/kitanda.png"
+                        src="/kitanda-name.png"
                         alt="Kitanda"
                         className="w-[300px] h-auto object-contain drop-shadow-sm"
                     />
@@ -108,8 +108,8 @@ export default function LoginPage() {
                 <form onSubmit={handleLogin} className="mt-4 space-y-2 login-input" autoComplete="off">
                     {/* EMAIL - TRANSPARENTE */}
                     <div
-                        className="flex items-center gap-2.5 rounded-full pl-4 pr-4 h-[48px] transition focus-within:border-[#f5a623]"
-                        style={{ background: "transparent", border: "1px solid rgba(0,0,0,0.15)" }}
+                        className="flex items-center gap-2.0 rounded-full pl-4 pr-4 h-[40px] transition focus-within:border-[#f5a623]"
+                        style={{ background: "transparent", border: "2px solid rgba(0,0,0,0.15)" }}
                     >
                         <i className="fa-solid fa-user text-black/50 text-[16px] w-5 text-center shrink-0 leading-none"></i>
                         <input
