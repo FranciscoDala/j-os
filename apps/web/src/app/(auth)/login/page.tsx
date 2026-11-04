@@ -57,6 +57,13 @@ export default function LoginPage() {
             {/* FONT AWESOME */}
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
 
+            {/* FORÇA A LETRA GRANDE POR CIMA DO globals.css */}
+            <style>{`
+                .login-input input { font-size: 18px !important; }
+                .login-input input::placeholder { font-size: 18px !important; }
+                @keyframes slideIn { from { transform: translateX(100%); opacity:0 } to { transform: translateX(0); opacity:1 } }
+            `}</style>
+
             {/* BACKGROUND */}
             <div className="fixed inset-0 z-0">
                 <img
@@ -64,15 +71,24 @@ export default function LoginPage() {
                     alt=""
                     className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-black/40" />
+                <div className="absolute inset-0 bg-black/30" />
             </div>
 
             {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* CARD GLASS - BRANCO TRANSPARENTE COM BLUR */}
-            <div className="relative z-10 w-full max-w-[400px] bg-white/70 backdrop-blur-xl backdrop-saturate-150 border border-white/60 rounded-[36px] flex flex-col px-6 pt-7 pb-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)] my-auto">
+            {/* CARD GLASS - FORÇADO COM INLINE STYLE, NÃO SÓ TAILWIND */}
+            <div
+                className="relative z-10 w-full max-w-[400px] rounded-[36px] flex flex-col px-6 pt-7 pb-6 my-auto"
+                style={{
+                    background: "rgba(255, 255, 255, 0.35)",
+                    backdropFilter: "blur(20px) saturate(180%)",
+                    WebkitBackdropFilter: "blur(20px) saturate(180%)",
+                    border: "1px solid rgba(255, 255, 255, 0.65)",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+                }}
+            >
 
-                {/* LOGO - SEM CÍRCULO, SÓ A LOGO GRANDE */}
+                {/* LOGO */}
                 <div className="flex flex-col items-center shrink-0">
                     <img
                         src="/kitanda.png"
@@ -81,43 +97,51 @@ export default function LoginPage() {
                     />
                 </div>
 
-                <form onSubmit={handleLogin} className="mt-6 space-y-3">
-                    {/* EMAIL - LETRA 16px PARA NÃO FAZER ZOOM NO CELULAR */}
-                    <div className="flex items-center gap-3 bg-white/85 border border-black/10 rounded-full px-5 h-[56px] focus-within:border-[#f5a623] focus-within:ring-2 focus-within:ring-[#f5a623]/30 transition">
-                        <i className="fa-solid fa-envelope text-black/50 text-[17px] w-5 text-center shrink-0"></i>
+                <form onSubmit={handleLogin} className="mt-6 space-y-3 login-input">
+                    {/* EMAIL - 18px FORÇADO */}
+                    <div
+                        className="flex items-center gap-3 rounded-full px-5 h-[60px] transition"
+                        style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(0,0,0,0.08)" }}
+                    >
+                        <i className="fa-solid fa-envelope text-black/50 text-[19px] w-5 text-center shrink-0"></i>
                         <input
                             type="email"
                             placeholder="Email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="flex-1 bg-transparent outline-none text-black text-[16px] placeholder:text-black/50 placeholder:text-[16px]"
+                            className="flex-1 bg-transparent outline-none text-black"
+                            style={{ fontSize: "18px" }}
                             required
                         />
                     </div>
 
-                    {/* SENHA - LETRA 16px PARA NÃO FAZER ZOOM NO CELULAR */}
-                    <div className="flex items-center gap-3 bg-white/85 border border-black/10 rounded-full px-5 h-[56px] focus-within:border-[#f5a623] focus-within:ring-2 focus-within:ring-[#f5a623]/30 transition">
-                        <i className="fa-solid fa-lock text-[#f5a623] text-[17px] w-5 text-center shrink-0"></i>
+                    {/* SENHA - 18px FORÇADO */}
+                    <div
+                        className="flex items-center gap-3 rounded-full px-5 h-[60px] transition"
+                        style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(0,0,0,0.08)" }}
+                    >
+                        <i className="fa-solid fa-lock text-[#f5a623] text-[19px] w-5 text-center shrink-0"></i>
                         <input
                             type={mostrarSenha ? "text" : "password"}
                             placeholder="Senha"
                             value={senha}
                             onChange={(e) => setSenha(e.target.value)}
-                            className="flex-1 bg-transparent outline-none text-black text-[16px] placeholder:text-black/50 placeholder:text-[16px]"
+                            className="flex-1 bg-transparent outline-none text-black"
+                            style={{ fontSize: "18px" }}
                             required
                         />
                         <button type="button" onClick={() => setMostrarSenha(!mostrarSenha)} className="text-black/50 hover:text-black transition shrink-0 w-6 text-center">
-                            <i className={`fa-solid ${mostrarSenha ? "fa-eye-slash" : "fa-eye"} text-[17px]`}></i>
+                            <i className={`fa-solid ${mostrarSenha ? "fa-eye-slash" : "fa-eye"} text-[19px]`}></i>
                         </button>
                     </div>
 
-                    {/* BOTÃO */}
+                    {/* BOTÃO - Entrar / só spinner */}
                     <button
                         disabled={loading}
-                        className="w-full h-[54px] !mt-5 rounded-full bg-gradient-to-b from-[#ffe680] to-[#f5b800] text-black font-bold text-[17px] shadow-lg active:scale-[0.98] transition disabled:opacity-70 flex items-center justify-center gap-2"
+                        className="w-full h-[56px] !mt-5 rounded-full bg-gradient-to-b from-[#ffe680] to-[#f5b800] text-black font-bold text-[18px] shadow-lg active:scale-[0.98] transition disabled:opacity-70 flex items-center justify-center gap-2"
                     >
                         {loading ? (
-                            <i className="fa-solid fa-spinner fa-spin text-[20px]"></i>
+                            <i className="fa-solid fa-spinner fa-spin text-[22px]"></i>
                         ) : (
                             "Entrar"
                         )}
@@ -128,7 +152,6 @@ export default function LoginPage() {
                     <div className="w-[120px] h-[4px] bg-black/20 rounded-full" />
                 </div>
             </div>
-            <style>{`@keyframes slideIn { from { transform: translateX(100%); opacity:0 } to { transform: translateX(0); opacity:1 } }`}</style>
         </div>
     );
 }
