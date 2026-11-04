@@ -57,62 +57,60 @@ export default function LoginPage() {
             {/* FONT AWESOME */}
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
 
-            {/* BACKGROUND - CORRIGIDO: /bg/1.jpg + z-0, NÃO -z-10 */}
+            {/* BACKGROUND */}
             <div className="fixed inset-0 z-0">
                 <img
                     src="/bg/1.jpeg"
                     alt=""
                     className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-black/50" />
+                <div className="absolute inset-0 bg-black/40" />
             </div>
 
             {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* CARD BRANCO - z-10 para ficar POR CIMA da imagem */}
-            <div className="relative z-10 w-full max-w-[400px] bg-white rounded-[36px] flex flex-col px-6 pt-6 pb-6 shadow-2xl my-auto">
+            {/* CARD GLASS - BRANCO TRANSPARENTE COM BLUR */}
+            <div className="relative z-10 w-full max-w-[400px] bg-white/70 backdrop-blur-xl backdrop-saturate-150 border border-white/60 rounded-[36px] flex flex-col px-6 pt-7 pb-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)] my-auto">
 
-                {/* LOGO - CORRIGIDO: /kitanda.png minúsculo */}
                 {/* LOGO - SEM CÍRCULO, SÓ A LOGO GRANDE */}
                 <div className="flex flex-col items-center shrink-0">
                     <img
                         src="/kitanda.png"
                         alt="Kitanda"
-                        className="w-[240px] h-auto object-contain"
+                        className="w-[240px] h-auto object-contain drop-shadow-sm"
                     />
                 </div>
 
-                <form onSubmit={handleLogin} className="mt-5 space-y-2.5">
-                    {/* EMAIL */}
-                    <div className="flex items-center gap-3 bg-[#F2F2F2] border border-black/10 rounded-full px-4 h-[48px] focus-within:border-[#f5a623]">
-                        <i className="fa-solid fa-envelope text-black/50 text-[15px] w-4 text-center shrink-0"></i>
+                <form onSubmit={handleLogin} className="mt-6 space-y-3">
+                    {/* EMAIL - LETRA 16px PARA NÃO FAZER ZOOM NO CELULAR */}
+                    <div className="flex items-center gap-3 bg-white/85 border border-black/10 rounded-full px-5 h-[56px] focus-within:border-[#f5a623] focus-within:ring-2 focus-within:ring-[#f5a623]/30 transition">
+                        <i className="fa-solid fa-envelope text-black/50 text-[17px] w-5 text-center shrink-0"></i>
                         <input
                             type="email"
                             placeholder="Email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="flex-1 bg-transparent outline-none text-black text-sm placeholder:text-black/50"
+                            className="flex-1 bg-transparent outline-none text-black text-[16px] placeholder:text-black/50 placeholder:text-[16px]"
                             required
                         />
                     </div>
 
-                    {/* SENHA */}
-                    <div className="flex items-center gap-3 bg-[#F2F2F2] border border-black/10 rounded-full px-4 h-[48px] focus-within:border-[#f5a623]">
-                        <i className="fa-solid fa-lock text-[#f5a623] text-[15px] w-4 text-center shrink-0"></i>
+                    {/* SENHA - LETRA 16px PARA NÃO FAZER ZOOM NO CELULAR */}
+                    <div className="flex items-center gap-3 bg-white/85 border border-black/10 rounded-full px-5 h-[56px] focus-within:border-[#f5a623] focus-within:ring-2 focus-within:ring-[#f5a623]/30 transition">
+                        <i className="fa-solid fa-lock text-[#f5a623] text-[17px] w-5 text-center shrink-0"></i>
                         <input
                             type={mostrarSenha ? "text" : "password"}
                             placeholder="Senha"
                             value={senha}
                             onChange={(e) => setSenha(e.target.value)}
-                            className="flex-1 bg-transparent outline-none text-black text-sm placeholder:text-black/50"
+                            className="flex-1 bg-transparent outline-none text-black text-[16px] placeholder:text-black/50 placeholder:text-[16px]"
                             required
                         />
-                        <button type="button" onClick={() => setMostrarSenha(!mostrarSenha)} className="text-black/50 hover:text-black transition shrink-0 w-5 text-center">
-                            <i className={`fa-solid ${mostrarSenha ? "fa-eye-slash" : "fa-eye"} text-[15px]`}></i>
+                        <button type="button" onClick={() => setMostrarSenha(!mostrarSenha)} className="text-black/50 hover:text-black transition shrink-0 w-6 text-center">
+                            <i className={`fa-solid ${mostrarSenha ? "fa-eye-slash" : "fa-eye"} text-[17px]`}></i>
                         </button>
                     </div>
 
-                    {/* BOTÃO */}
                     {/* BOTÃO */}
                     <button
                         disabled={loading}
