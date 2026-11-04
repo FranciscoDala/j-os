@@ -297,7 +297,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
 
     return (
         <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId, role, can, pedidosCount, setPedidosCount, stockAlerts, setStockAlerts }}>
-            <div className="relative h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-0 md:p-[14px] md:gap-[14px]" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
+            <div className="relative h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-0 md:p-[14px] md:gap-[14px]">
                 {/* BACKGROUND IMAGE */}
                 <img src={BG_IMAGE} alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
                 <div className="pointer-events-none absolute inset-0 bg-[#EDEBE6]/85" />

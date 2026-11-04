@@ -79,7 +79,7 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile
 
     if (isMobile) {
         return (
-            <div className="w-full flex flex-col h-full" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
+            <div className="w-full flex flex-col h-full">
                 <div className="flex items-center gap-3 px-2 mb-4">
                     <LogoTopo size="w-12 h-12" />
                     <div className="leading-none">
@@ -108,7 +108,7 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile
     }
 
     return (
-        <aside className="w-[68px] h-[calc(100dvh-28px)] bg-transparent rounded-[28px] flex flex-col items-center py-4 shrink-0" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
+        <aside className="w-[68px] h-[calc(100dvh-28px)] bg-transparent rounded-[28px] flex flex-col items-center py-4 shrink-0">
             {/* LOGO NO TOPO */}
             <LogoTopo size="w-10 h-10" />
 

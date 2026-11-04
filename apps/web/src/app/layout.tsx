@@ -1,9 +1,17 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
+import { Montserrat } from "next/font/google";
 import { Toaster } from "sonner";
 import { RealtimeProvider } from "@/components/dashboard/RealtimeProvider";
 import { SearchProvider } from "@/features/search/context";
 import { EmpresaProvider } from "@/components/dashboard/empresaContext";
+
+const montserrat = Montserrat({
+    subsets: ["latin"],
+    weight: ["400", "500", "600", "700", "800", "900"],
+    variable: "--font-montserrat",
+    display: "swap",
+});
 
 export const metadata: Metadata = {
     title: {
@@ -43,13 +51,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
-        <html lang="pt">
-            <head>
-                <link rel="preconnect" href="https://fonts.googleapis.com" />
-                <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-                <link href="https://fonts.googleapis.com/css2?family=Zalando+Sans+Expanded:ital,wght@0,200..900;1,200..900&display=swap" rel="stylesheet" />
-            </head>
-            <body style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
+        <html lang="pt" className={montserrat.variable}>
+            <body className={`${montserrat.className} antialiased`}>
                 <EmpresaProvider>
                     <SearchProvider>
                         <RealtimeProvider>
@@ -63,7 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     closeButton={false}
                     toastOptions={{
                         style: {
-                            fontFamily: '"Zalando Sans Expanded", sans-serif',
+                            fontFamily: "var(--font-montserrat), sans-serif",
                             borderRadius: '16px',
                             fontSize: '12px',
                             fontWeight: '600',
