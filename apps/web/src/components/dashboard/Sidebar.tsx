@@ -62,8 +62,8 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile
 
     const showConfig = CAN_CONFIG.includes(userRole);
 
-    // LOGO NO TOPO - substitui o círculo preto de pontinhos
-    const LogoTopo = ({ size = "w-11 h-11" }: { size?: string }) => (
+    // LOGO NO TOPO
+    const LogoTopo = ({ size = "w-12 h-12" }: { size?: string }) => (
         <button
             onClick={() => setActiveTab('home')}
             title={empresa?.nome_fantasia || "Início"}
@@ -72,7 +72,7 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile
             {empresaLogo ? (
                 <img src={empresaLogo} className="w-full h-full object-cover" alt="logo empresa" />
             ) : (
-                <span className="text-[14px] font-black text-black">{empresa?.nome_fantasia?.[0] || "J"}</span>
+                <span className="text-[15px] font-black text-black">{empresa?.nome_fantasia?.[0] || "J"}</span>
             )}
         </button>
     );
@@ -81,7 +81,7 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile
         return (
             <div className="w-full flex flex-col h-full" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
                 <div className="flex items-center gap-3 px-2 mb-4">
-                    <LogoTopo size="w-11 h-11" />
+                    <LogoTopo size="w-12 h-12" />
                     <div className="leading-none">
                         <p className="text-[12px] font-black truncate">{empresa?.nome_fantasia || "Empresa"}</p>
                         <p className="text-[10px] text-zinc-500">{empresa?.nif || ""}</p>
@@ -91,8 +91,8 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile
                     {filteredTabs.map(({ id, label, icon: Icon }: any) => {
                         const active = activeTab === id;
                         return (
-                            <button key={id} onClick={() => setActiveTab(id)} className={`w-full flex items-center gap-3 px-4 h-[52px] rounded-full text-[13px] font-bold transition-all ${active ? 'bg-black text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)]' : 'bg-white text-[#1E1E1E] border border-black/5 shadow-[0_1px_6px_rgba(0,0,0,0.04)]'}`}>
-                                <span className={`w-10 h-10 rounded-full flex items-center justify-center ${active ? 'bg-white/15' : 'bg-[#F5F2ED]'}`}><Icon size={20} strokeWidth={2} /></span>
+                            <button key={id} onClick={() => setActiveTab(id)} className={`w-full flex items-center gap-3 px-4 h-[56px] rounded-full text-[13px] font-bold transition-all ${active ? 'bg-black text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)]' : 'bg-white text-[#1E1E1E] border border-black/5 shadow-[0_1px_6px_rgba(0,0,0,0.04)]'}`}>
+                                <span className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${active ? 'bg-white/15' : 'bg-[#F5F2ED]'}`}><Icon size={24} strokeWidth={2} /></span>
                                 <span className="flex-1 text-left">{label}</span>
                                 {id === 'pedidos' && pedidosCount > 0 && <span className={`min-w-[22px] h-[22px] px-1.5 text-[11px] font-black rounded-full flex items-center justify-center ${active ? 'bg-white text-black' : 'bg-red-500 text-white'}`}>{pedidosCount > 9 ? "9+" : pedidosCount}</span>}
                             </button>
@@ -100,8 +100,8 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile
                     })}
                 </div>
                 <div className="mt-4 pt-4 border-t border-black/10 flex flex-col gap-2">
-                    {showConfig && <button onClick={onOpenConfig} className="w-full flex items-center gap-3 px-4 h-[48px] rounded-full bg-white text-[#1E1E1E] text-[13px] font-bold border border-black/5"><Settings size={18} /> Configurações</button>}
-                    <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 h-[48px] rounded-full bg-white text-[#E53E3E] text-[13px] font-bold border border-black/5 hover:bg-[#FCE8E8]"><Power size={18} strokeWidth={2.5} /> Sair</button>
+                    {showConfig && <button onClick={onOpenConfig} className="w-full flex items-center gap-3 px-4 h-[52px] rounded-full bg-white text-[#1E1E1E] text-[13px] font-bold border border-black/5"><Settings size={22} strokeWidth={2} /> Configurações</button>}
+                    <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 h-[52px] rounded-full bg-white text-[#E53E3E] text-[13px] font-bold border border-black/5 hover:bg-[#FCE8E8]"><Power size={22} strokeWidth={2.5} /> Sair</button>
                 </div>
             </div>
         )
@@ -109,22 +109,22 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile
 
     return (
         <aside className="w-[68px] h-[calc(100dvh-28px)] bg-white rounded-[28px] flex flex-col items-center py-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)] shrink-0" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
-            {/* LOGO NO TOPO - no lugar do círculo preto */}
-            <LogoTopo size="w-11 h-11" />
+            {/* LOGO NO TOPO */}
+            <LogoTopo size="w-12 h-12" />
 
-            <div className="flex-1 flex flex-col items-center gap-2 mt-6">
+            <div className="flex-1 flex flex-col items-center gap-2 mt-5">
                 {filteredTabs.filter((t: any) => t.id !== 'home').map(({ id, icon: Icon }: any) => (
-                    <button key={id} onClick={() => setActiveTab(id)} className={`relative w-11 h-11 rounded-full flex items-center justify-center transition ${activeTab === id ? 'bg-black text-white shadow-[0_4px_12px_rgba(0,0,0,0.2)]' : 'text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED]'}`}>
-                        <Icon size={20} strokeWidth={2} />
+                    <button key={id} onClick={() => setActiveTab(id)} className={`relative w-12 h-12 rounded-full flex items-center justify-center transition ${activeTab === id ? 'bg-black text-white shadow-[0_4px_12px_rgba(0,0,0,0.2)]' : 'text-[#A8A8A8] hover:text-[#1E1E1E] hover:bg-[#F5F2ED]'}`}>
+                        <Icon size={24} strokeWidth={2} />
                         {id === 'pedidos' && pedidosCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-[4px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-[2px] border-white">{pedidosCount > 9 ? "9+" : pedidosCount}</span>}
                     </button>
                 ))}
             </div>
             <div className="flex flex-col items-center gap-2">
                 <div className="w-6 h-[1px] bg-[#EDEBE6] my-1" />
-                {showConfig && <button onClick={onOpenConfig} className="w-11 h-11 rounded-full flex items-center justify-center bg-[#F5F2ED] text-[#1E1E1E] hover:bg-black hover:text-white transition"><Settings size={18} strokeWidth={2} /></button>}
+                {showConfig && <button onClick={onOpenConfig} className="w-12 h-12 rounded-full flex items-center justify-center bg-[#F5F2ED] text-[#1E1E1E] hover:bg-black hover:text-white transition"><Settings size={22} strokeWidth={2} /></button>}
                 {/* SAIR - ícone OFF vermelho */}
-                <button onClick={onLogout} title="Sair" className="w-11 h-11 rounded-full flex items-center justify-center text-[#E53E3E] hover:bg-[#FCE8E8] hover:text-red-600 transition active:scale-95"><Power size={20} strokeWidth={2.5} /></button>
+                <button onClick={onLogout} title="Sair" className="w-12 h-12 rounded-full flex items-center justify-center text-[#E53E3E] hover:bg-[#FCE8E8] hover:text-red-600 transition active:scale-95"><Power size={24} strokeWidth={2.5} /></button>
             </div>
         </aside>
     );
