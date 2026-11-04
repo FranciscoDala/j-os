@@ -108,7 +108,7 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile
     }
 
     return (
-        <aside className="w-[68px] h-[calc(100dvh-28px)] bg-transparent rounded-[28px] flex flex-col items-center py-4 shrink-0">
+        <aside className="w-[68px] h-[calc(100dvh-28px)] bg-white/80 backdrop-blur-xl border border-black/5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] rounded-[28px] flex flex-col items-center py-4 shrink-0">
             {/* LOGO NO TOPO */}
             <LogoTopo size="w-10 h-10" />
 
