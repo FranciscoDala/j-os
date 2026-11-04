@@ -24,3 +24,14 @@ apps/web/node_modules/
 .DS_Store
 .idea/
 .vscode/
+
+# AGT - Certificados e chaves (NUNCA subir privada)
+**/certs/
+**/keys/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Exceção: permite subir só a pública de exemplo
+!**/certs/agt_publica.pem.example
