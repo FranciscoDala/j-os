@@ -129,7 +129,7 @@ export default function LoginPage() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             className="flex-1 bg-transparent outline-none text-black py-0"
-                            style={{ fontSize: "17px", height: "100%", background: "transparent" }}
+                            style={{ fontSize: "13px", height: "100%", background: "transparent" }}
                             autoComplete="off"
                             required
                         />
@@ -147,7 +147,7 @@ export default function LoginPage() {
                             value={senha}
                             onChange={(e) => setSenha(e.target.value)}
                             className="flex-1 bg-transparent outline-none text-black py-0 min-w-0"
-                            style={{ fontSize: "17px", height: "100%", background: "transparent" }}
+                            style={{ fontSize: "13px", height: "100%", background: "transparent" }}
                             autoComplete="new-password"
                             required
                         />
