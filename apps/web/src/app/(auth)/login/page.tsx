@@ -163,7 +163,7 @@ export default function LoginPage() {
                     {/* BOTÃO - SPINNER CSS PURO QUE GIRA */}
                     <button
                         disabled={loading}
-                        className="w-full h-[48px] !mt-3 rounded-full bg-gradient-to-b from-[#ffe680] to-[#f5b800] text-black font-bold text-[17px] shadow-lg active:scale-[0.98] transition disabled:opacity-70 flex items-center justify-center gap-2"
+                        className="w-full h-[45px] !mt-3 rounded-full bg-gradient-to-b from-[#ffe680] to-[#f5b800] text-black font-bold text-[13px] shadow-lg active:scale-[0.98] transition disabled:opacity-70 flex items-center justify-center gap-2"
                     >
                         {loading ? (
                             <span className="kitanda-spinner"></span>
