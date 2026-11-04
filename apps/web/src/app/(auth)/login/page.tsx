@@ -57,10 +57,10 @@ export default function LoginPage() {
             {/* FONT AWESOME */}
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
 
-            {/* BACKGROUND COM IMAGEM - RESTAURANTE / COMIDA */}
-            <div className="fixed inset-0 -z-10">
+            {/* BACKGROUND - CORRIGIDO: /bg/1.jpg + z-0, NÃO -z-10 */}
+            <div className="fixed inset-0 z-0">
                 <img
-                    src="bg/1.jpg"
+                    src="/bg/1.jpg"
                     alt=""
                     className="w-full h-full object-cover"
                 />
@@ -69,14 +69,14 @@ export default function LoginPage() {
 
             {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* CARD BRANCO - NÃO PRETO */}
-            <div className="w-full max-w-[400px] bg-white rounded-[36px] flex flex-col px-6 pt-6 pb-6 shadow-2xl my-auto">
+            {/* CARD BRANCO - z-10 para ficar POR CIMA da imagem */}
+            <div className="relative z-10 w-full max-w-[400px] bg-white rounded-[36px] flex flex-col px-6 pt-6 pb-6 shadow-2xl my-auto">
 
-                {/* LOGO */}
+                {/* LOGO - CORRIGIDO: /kitanda.png minúsculo */}
                 <div className="flex flex-col items-center shrink-0">
                     <div className="w-[140px] h-[140px] rounded-full overflow-hidden bg-[#f5a623] flex items-center justify-center p-4">
                         <img
-                            src="/Kitanda.png"
+                            src="/kitanda.png"
                             alt="Kitanda"
                             className="w-full h-full object-contain"
                         />
