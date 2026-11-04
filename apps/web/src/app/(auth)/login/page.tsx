@@ -60,7 +60,7 @@ export default function LoginPage() {
             {/* BACKGROUND - CORRIGIDO: /bg/1.jpg + z-0, NÃO -z-10 */}
             <div className="fixed inset-0 z-0">
                 <img
-                    src="/bg/1.jpg"
+                    src="/bg/1.jpeg"
                     alt=""
                     className="w-full h-full object-cover"
                 />
@@ -73,14 +73,13 @@ export default function LoginPage() {
             <div className="relative z-10 w-full max-w-[400px] bg-white rounded-[36px] flex flex-col px-6 pt-6 pb-6 shadow-2xl my-auto">
 
                 {/* LOGO - CORRIGIDO: /kitanda.png minúsculo */}
+                {/* LOGO - SEM CÍRCULO, SÓ A LOGO GRANDE */}
                 <div className="flex flex-col items-center shrink-0">
-                    <div className="w-[140px] h-[140px] rounded-full overflow-hidden bg-[#f5a623] flex items-center justify-center p-4">
-                        <img
-                            src="/kitanda.png"
-                            alt="Kitanda"
-                            className="w-full h-full object-contain"
-                        />
-                    </div>
+                    <img
+                        src="/kitanda.png"
+                        alt="Kitanda"
+                        className="w-[240px] h-auto object-contain"
+                    />
                 </div>
 
                 <form onSubmit={handleLogin} className="mt-5 space-y-2.5">
