@@ -14,7 +14,7 @@ import { getCaixaStatus } from "@/lib/api";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "") + "/api/v1";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://j-os.onrender.com").replace(/\/$/, "");
-const BG_IMAGE = "/bg/2.jpeg";
+const BG_IMAGE = "/bg/2.jpg";
 type Toast = { id: string; msg: string; type: "success" | "error" | "info" | "warning" };
 type Ctx = { activeTab: string; setActiveTab: (t: string) => void; user: any; moduleId: ModuleId; role: string; can: (p: string) => boolean; pedidosCount: number; setPedidosCount: (n: number) => void; stockAlerts: number; setStockAlerts: (n: number) => void; };
 const DashboardCtx = createContext<Ctx>(null as any);
