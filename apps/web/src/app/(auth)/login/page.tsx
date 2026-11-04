@@ -88,7 +88,7 @@ export default function LoginPage() {
             {/* BACKGROUND */}
             <div className="fixed inset-0 z-0">
                 <img
-                    src="/bg/2.jpg"
+                    src="/bg/2.webp"
                     alt=""
                     className="w-full h-full object-cover"
                 />
