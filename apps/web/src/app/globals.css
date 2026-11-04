@@ -9,10 +9,10 @@ body {
     min-height: 100%;
     background: #5A8AD4;
     font-family: "Zalando Sans Expanded", sans-serif;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: auto;
-    scrollbar-width: none;
+    --overflow-x: hidden;
+    --overflow-y: auto;
+    --overscroll-behavior: auto;
+    --scrollbar-width: none;
     -ms-overflow-style: none;
 }
 
