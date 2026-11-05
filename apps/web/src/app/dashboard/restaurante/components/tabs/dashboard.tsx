@@ -31,12 +31,19 @@ function buildPath(points: number[], w: number, h: number, pad = 6) {
     }).join(" ");
 }
 
-function Spark({ data, color, w = 88, h = 28 }: { data: number[]; color: string; w?: number; h?: number }) {
-    const d = buildPath(data.length ? data : [0, 0], w, h);
+// ===== BARRINHAS IGUAL AO PRINT DO BITCOIN =====
+function BarSpark({ data, color }: { data: number[]; color: string }) {
+    const vals = data.length ? data : [10, 18, 12, 22, 14, 26, 18, 30];
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const range = max - min || 1;
     return (
-        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0">
-            <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <div className="flex items-end gap-[3px] h-[28px] shrink-0">
+            {vals.slice(-9).map((v, i) => {
+                const h = 7 + ((v - min) / range) * 21; // 7px a 28px igual ao print
+                return <div key={i} className="w-[5px] rounded-[3px]" style={{ height: `${h}px`, background: color, opacity: i === vals.slice(-9).length - 1 ? 1 : 0.85 }} />;
+            })}
+        </div>
     );
 }
 
@@ -78,7 +85,6 @@ export function HomeTab({ user }: { user: any }) {
 
     useEffect(() => {
         const getData = (e: any) => e.detail?.data || e.detail;
-
         const onExtrato = (e: any) => {
             const m = getData(e);
             if (!m) return;
@@ -96,15 +102,11 @@ export function HomeTab({ user }: { user: any }) {
                 watchlist: s.watchlist + 1,
             }));
         };
-
         const onFull = () => load();
-
         const eventsIncremental = ["caixa:extrato", "venda:nova", "venda:fechada", "venda:update"] as const;
         const eventsFull = ["caixa:update", "caixa:atualizado", "caixa.updated", "dashboard:refresh", "stats.updated", "entidade:created", "entidade:update"] as const;
-
         eventsIncremental.forEach(ev => window.addEventListener(ev as any, onExtrato));
         eventsFull.forEach(ev => window.addEventListener(ev as any, onFull));
-
         return () => {
             eventsIncremental.forEach(ev => window.removeEventListener(ev as any, onExtrato));
             eventsFull.forEach(ev => window.removeEventListener(ev as any, onFull));
@@ -117,7 +119,6 @@ export function HomeTab({ user }: { user: any }) {
         return n.toLocaleString('pt-PT', { minimumFractionDigits: 2 });
     };
 
-    // ---- Série dinâmica a partir dos movimentos reais ----
     const series = useMemo(() => {
         const sorted = [...movs].sort((a, b) => new Date(a.created_at || a.data || 0).getTime() - new Date(b.created_at || b.data || 0).getTime());
         const now = new Date();
@@ -128,7 +129,6 @@ export function HomeTab({ user }: { user: any }) {
             return !isNaN(d.getTime()) ? d >= cutoff : true;
         });
         const base = filtered.length ? filtered : sorted;
-        // Valor acumulado para o gráfico grande ficar igual ao do print (linha a subir/descer)
         let acc = 0;
         const values = base.map((m: any) => {
             acc += Number(m.valor ?? m.total_venda ?? m.total ?? 0);
@@ -145,11 +145,10 @@ export function HomeTab({ user }: { user: any }) {
     const firstVal = series.values[0] || 0;
     const variation = firstVal !== 0 ? ((lastVal - firstVal) / Math.abs(firstVal)) * 100 : 0;
 
-    // Mini gráficos dos 4 cards - usam fatias reais da série
-    const spark1 = series.values.slice(-8);
-    const spark2 = series.values.slice(-8).map((v) => Math.abs(v));
-    const spark3 = series.values.slice(-8);
-    const spark4 = series.values.slice(-8).map((v) => Math.abs(v) * 0.6);
+    const spark1 = series.values.slice(-9);
+    const spark2 = series.values.slice(-9).map((v) => Math.abs(v));
+    const spark3 = series.values.slice(-9);
+    const spark4 = series.values.slice(-9).map((v) => Math.abs(v) * 0.6);
 
     const W = 640, H = 240, PAD = 8;
     const min = Math.min(...series.values);
@@ -158,47 +157,41 @@ export function HomeTab({ user }: { user: any }) {
     const bigPath = buildPath(series.values, W, H, PAD);
     const areaPath = series.values.length > 1 ? `${bigPath} L${W - PAD},${H - PAD} L${PAD},${H - PAD} Z` : "";
 
+    // Cards com cores igual ao print: laranja, azul, roxo, azul claro
     const topCards = [
-        { label: "Caixa Atual", value: `Kz ${fmt(stats.caixaAtual)}`, pct: `+ ${Math.abs(variation).toFixed(2)}%`, icon: "Kz", bg: "#FFF3D6", color: "#E8A020", spark: spark1, sparkColor: "#E8A020" },
-        { label: "Faturamento", value: `Kz ${fmt(stats.faturamento)}`, pct: `+ ${(stats.watchlist ? (stats.faturamento / Math.max(stats.watchlist, 1) / 100).toFixed(2) : "0.00")}%`, icon: "$", bg: "#E8F1FF", color: "#3B82F6", spark: spark2, sparkColor: "#3B82F6" },
-        { label: "Vendas Hoje", value: `${stats.vendasHoje}`, pct: `+ ${stats.vendasHoje}%`, icon: "◈", bg: "#EDE9FE", color: "#8B5CF6", spark: spark3, sparkColor: "#8B5CF6" },
-        { label: "Saídas", value: `Kz ${fmt(stats.pending)}`, pct: `+ ${(stats.pending ? 7.55 : 0).toFixed(2)}%`, icon: "⇄", bg: "#E0F2FE", color: "#0284C7", spark: spark4, sparkColor: "#F97316" },
+        { label: "Caixa Atual", value: `Kz ${fmt(stats.caixaAtual)}`, pct: `Increase ${Math.abs(variation).toFixed(2)}%`, icon: "₿", bg: "#F7931A", color: "#F7931A", spark: spark1 },
+        { label: "Faturamento", value: `Kz ${fmt(stats.faturamento)}`, pct: `Increase ${(stats.watchlist ? (stats.faturamento / Math.max(stats.watchlist, 1) / 100).toFixed(2) : "0.00")}%`, icon: "Ξ", bg: "#627EEA", color: "#627EEA", spark: spark2 },
+        { label: "Vendas Hoje", value: `${stats.vendasHoje}`, pct: `Increase ${stats.vendasHoje}%`, icon: "◈", bg: "#8B5CF6", color: "#8B5CF6", spark: spark3 },
+        { label: "Saídas", value: `Kz ${fmt(stats.pending)}`, pct: `Increase 7.55%`, icon: "⇄", bg: "#00A8E8", color: "#00A8E8", spark: spark4 },
     ];
 
     return (
         <div className="flex flex-col gap-[14px] w-full min-w-0 pb-6" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
-
-
-
-            {/* ===== 4 CARDS TOPO - igual print ===== */}
+            {/* ===== 4 CARDS - ESTILO BITCOIN DO PRINT ===== */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[14px]">
                 {topCards.map((c) => (
-                    <div key={c.label} className="bg-white rounded-[20px] p-4 shadow-[0_2px_16px_rgba(0,0,0,0.04)] border border-black/[0.03] h-[100px] flex flex-col justify-between overflow-hidden">
+                    <div key={c.label} className="bg-white rounded-[20px] p-4 shadow-[0_2px_16px_rgba(0,0,0,0.04)] border border-black/[0.03] h-[118px] flex flex-col justify-between overflow-hidden">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-[12px] text-[#8A8A8A] font-medium">{c.label}</p>
                                 <p className="text-[20px] font-bold mt-1 text-[#111] tracking-tight leading-none">{loading ? "..." : c.value}</p>
                             </div>
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-black shrink-0" style={{ background: c.bg, color: c.color }}>{c.icon}</div>
+                            {/* Ícone redondo igual ao do Bitcoin */}
+                            <div className="w-[32px] h-[32px] rounded-full flex items-center justify-center text-[16px] font-black text-white shrink-0" style={{ background: c.bg }}>{c.icon}</div>
                         </div>
                         <div className="flex items-end justify-between gap-2">
-                            <div>
+                            <div className="leading-tight">
                                 <p className="text-[10px] text-[#9A9A9A]">• $0,00</p>
-                                <p className="text-[10px] font-bold text-[#111]">Increase {c.pct}</p>
+                                <p className="text-[11px] font-bold text-[#111] mt-[2px]">{c.pct}</p>
                             </div>
-                            <Spark data={c.spark} color={c.sparkColor} w={92} h={30} />
+                            <BarSpark data={c.spark} color={c.color} />
                         </div>
                     </div>
                 ))}
             </div>
 
-
-
-
-
-            {/* ===== GRÁFICO GRANDE + STAKING ===== */}
+            {/* ===== GRÁFICO GRANDE + STAKING - igual antes ===== */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-[14px]">
-                {/* Gráfico grande */}
                 <div className="lg:col-span-2 bg-white rounded-[20px] p-5 shadow-[0_2px_16px_rgba(0,0,0,0.04)] border border-black/[0.03]">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -217,8 +210,6 @@ export function HomeTab({ user }: { user: any }) {
                             ))}
                         </div>
                     </div>
-
-                    {/* Y axis + Chart */}
                     <div className="relative mt-4 flex gap-2">
                         <div className="flex flex-col justify-between text-[10px] text-[#9A9A9A] py-1 h-[240px] shrink-0">
                             <span>$20k</span><span>$15k</span><span>$10k</span><span>$5k</span><span>$0</span>
@@ -260,36 +251,30 @@ export function HomeTab({ user }: { user: any }) {
                     </div>
                 </div>
 
-                {/* Staking / Caixa - igual print */}
                 <div className="bg-white rounded-[20px] p-5 shadow-[0_2px_16px_rgba(0,0,0,0.04)] border border-black/[0.03] flex flex-col">
                     <div className="flex items-center justify-between">
                         <p className="text-[13px] font-bold text-[#111]">You&apos;re staking</p>
                         <span className="text-[11px] text-[#9A9A9A]">⌄</span>
                     </div>
-
                     <div className="mt-4 flex items-end gap-1.5">
                         <p className="text-[28px] font-bold text-[#111] leading-none">{loading ? "..." : fmt(stats.caixaAtual)}</p>
                         <span className="text-[11px] font-bold text-[#111] mb-0.5">TRX</span>
                         <span className="ml-auto w-6 h-6 rounded-full bg-[#FFE5E5] flex items-center justify-center text-[11px]">🔴</span>
                     </div>
                     <p className="text-[11px] text-[#9A9A9A] mt-1">Kz {fmt(stats.faturamento)}</p>
-
                     <div className="flex items-center justify-between mt-3">
                         <p className="text-[11px] text-[#9A9A9A]">Balance: {stats.watchlist}</p>
                     </div>
-
                     <div className="flex gap-2 mt-4">
                         {["25%", "50%", "75%", "Max"].map((v, i) => (
                             <button key={v} className={`flex-1 h-8 rounded-full text-[11px] font-bold border ${i === 3 ? "bg-black text-white border-black" : "bg-white text-[#111] border-black/10"}`}>{v}</button>
                         ))}
                     </div>
-
                     <div className="mt-5 flex flex-col gap-3 text-[12px]">
                         <div className="flex justify-between"><span className="text-[#9A9A9A]">Protocol</span><span className="font-bold">Caixa Atual</span></div>
                         <div className="flex justify-between"><span className="text-[#9A9A9A]">App</span><span className="font-bold">Kitanda OS</span></div>
                         <div className="flex justify-between"><span className="text-[#9A9A9A]">Transaction Fee</span><span className="font-bold">0.00 Kz / $0.00</span></div>
                     </div>
-
                     <div className="mt-auto pt-5">
                         <p className="text-[11px] text-[#9A9A9A]">To receive</p>
                         <div className="flex items-center justify-between mt-1">
