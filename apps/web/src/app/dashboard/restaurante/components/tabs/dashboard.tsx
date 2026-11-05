@@ -167,10 +167,13 @@ export function HomeTab({ user }: { user: any }) {
 
     return (
         <div className="flex flex-col gap-[14px] w-full min-w-0 pb-6" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
+
+
+
             {/* ===== 4 CARDS TOPO - igual print ===== */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[14px]">
                 {topCards.map((c) => (
-                    <div key={c.label} className="bg-white rounded-[20px] p-4 shadow-[0_2px_16px_rgba(0,0,0,0.04)] border border-black/[0.03] h-[118px] flex flex-col justify-between overflow-hidden">
+                    <div key={c.label} className="bg-white rounded-[20px] p-4 shadow-[0_2px_16px_rgba(0,0,0,0.04)] border border-black/[0.03] h-[128px] flex flex-col justify-between overflow-hidden">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-[12px] text-[#8A8A8A] font-medium">{c.label}</p>
@@ -188,6 +191,10 @@ export function HomeTab({ user }: { user: any }) {
                     </div>
                 ))}
             </div>
+
+
+
+
 
             {/* ===== GRÁFICO GRANDE + STAKING ===== */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-[14px]">
