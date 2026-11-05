@@ -18,31 +18,52 @@ async function apiFetch(path: string) {
 
 type Period = "1D" | "1W" | "1M" | "1Y";
 
-function buildPath(points: number[], w: number, h: number, pad = 6) {
-    if (points.length < 2) return "";
-    const min = Math.min(...points);
-    const max = Math.max(...points);
-    const range = max - min || 1;
-    const stepX = (w - pad * 2) / (points.length - 1);
-    return points.map((p, i) => {
-        const x = pad + i * stepX;
-        const y = pad + (1 - (p - min) / range) * (h - pad * 2);
-        return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(" ");
-}
-
-// ===== BARRINHAS IGUAL AO PRINT DO BITCOIN =====
 function BarSpark({ data, color }: { data: number[]; color: string }) {
-    const vals = data.length ? data : [10, 18, 12, 22, 14, 26, 18, 30];
+    const vals = data.length ? data : [0, 0, 0, 0, 0, 0, 0, 0];
     const min = Math.min(...vals);
     const max = Math.max(...vals);
     const range = max - min || 1;
     return (
-        <div className="flex items-end gap-[3px] h-[28px] shrink-0">
+        <div className="flex items-end gap-[3px] h-[24px] shrink-0">
             {vals.slice(-9).map((v, i) => {
-                const h = 7 + ((v - min) / range) * 21; // 7px a 28px igual ao print
-                return <div key={i} className="w-[5px] rounded-[3px]" style={{ height: `${h}px`, background: color, opacity: i === vals.slice(-9).length - 1 ? 1 : 0.85 }} />;
+                const h = 6 + ((v - min) / range) * 18;
+                return <div key={i} className="w-[5px] rounded-[3px]" style={{ height: `${h}px`, background: color }} />;
             })}
+        </div>
+    );
+}
+
+function BigBarChart({ values, labels, fmt }: { values: number[]; labels: string[]; fmt: (v: number) => string }) {
+    const vals = values.length ? values : [0, 0, 0, 0, 0, 0, 0];
+    const max = Math.max(...vals.map((v) => Math.abs(v))) || 1;
+    const lastIdx = vals.length - 1;
+    return (
+        <div className="mt-6">
+            <div className="flex items-end justify-between gap-2 sm:gap-3 h-[190px]">
+                {vals.map((v, i) => {
+                    const hPct = Math.max(8, (Math.abs(v) / max) * 100);
+                    const isToday = i === lastIdx;
+                    return (
+                        <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-2 min-w-0 group cursor-pointer">
+                            <p className={`text-[10px] sm:text-[11px] font-bold whitespace-nowrap ${isToday ? "text-[#FF4D2E]" : "text-[#111]"}`}>
+                                {fmt(v)}
+                            </p>
+                            <div
+                                className="w-full max-w-[44px] rounded-t-[10px] rounded-b-[4px] transition-all group-hover:opacity-80"
+                                style={{ height: `${hPct}%`, background: isToday ? "#FF4D2E" : "#E8E8E8", minHeight: "18px" }}
+                            />
+                            <p className={`text-[10px] font-medium whitespace-nowrap ${isToday ? "text-[#111] font-bold" : "text-[#9A9A9A]"}`}>
+                                {labels[i] || `Dia ${i + 1}`}
+                            </p>
+                        </div>
+                    );
+                })}
+            </div>
+            <div className="flex items-center gap-4 mt-4 pt-3 border-t border-black/5">
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-[3px] bg-[#FF4D2E]" /><span className="text-[11px] text-[#9A9A9A]">Hoje</span></div>
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-[3px] bg-[#E8E8E8]" /><span className="text-[11px] text-[#9A9A9A]">Outros dias</span></div>
+                <span className="ml-auto text-[11px] text-[#9A9A9A]">Barra mais alta = vendeu mais</span>
+            </div>
         </div>
     );
 }
@@ -52,7 +73,6 @@ export function HomeTab({ user }: { user: any }) {
     const [loading, setLoading] = useState(true);
     const [movs, setMovs] = useState<any[]>([]);
     const [period, setPeriod] = useState<Period>("1W");
-    const [hover, setHover] = useState<{ i: number; x: number; y: number } | null>(null);
     const mountedRef = useRef(true);
 
     const load = useCallback(async () => {
@@ -129,126 +149,92 @@ export function HomeTab({ user }: { user: any }) {
             return !isNaN(d.getTime()) ? d >= cutoff : true;
         });
         const base = filtered.length ? filtered : sorted;
-        let acc = 0;
-        const values = base.map((m: any) => {
-            acc += Number(m.valor ?? m.total_venda ?? m.total ?? 0);
-            return acc;
-        });
-        const labels = base.map((m: any) => {
+        const byDay = new Map<string, { total: number; label: string }>();
+        base.forEach((m: any) => {
             const d = new Date(m.created_at || m.data || Date.now());
-            return isNaN(d.getTime()) ? "" : d.toLocaleDateString("pt-PT", { day: "2-digit", month: "short" });
+            const key = isNaN(d.getTime()) ? "Hoje" : d.toISOString().slice(0, 10);
+            const label = isNaN(d.getTime()) ? "Hoje" : d.toLocaleDateString("pt-PT", { day: "2-digit", month: "short" });
+            const cur = byDay.get(key) || { total: 0, label };
+            cur.total += Number(m.valor ?? m.total_venda ?? m.total ?? 0);
+            byDay.set(key, cur);
         });
-        return { values: values.length ? values : [0, 0, 0, 0, 0], labels };
+        const grouped = Array.from(byDay.values());
+        const maxBars = period === "1D" ? 7 : period === "1W" ? 7 : period === "1M" ? 10 : 12;
+        let values = grouped.map((g) => g.total);
+        let labels = grouped.map((g) => g.label);
+        if (values.length > maxBars) {
+            const chunk = Math.ceil(values.length / maxBars);
+            const nv: number[] = [];
+            const nl: string[] = [];
+            for (let i = 0; i < values.length; i += chunk) {
+                nv.push(values.slice(i, i + chunk).reduce((a, b) => a + b, 0));
+                nl.push(labels[i]);
+            }
+            values = nv;
+            labels = nl;
+        }
+        if (!values.length) { values = [0, 0, 0, 0, 0, 0, 0]; labels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Hoje"]; }
+        return { values, labels, rawValues: base.map((m: any) => Number(m.valor ?? m.total_venda ?? m.total ?? 0)) };
     }, [movs, period]);
 
     const lastVal = series.values[series.values.length - 1] || 0;
     const firstVal = series.values[0] || 0;
     const variation = firstVal !== 0 ? ((lastVal - firstVal) / Math.abs(firstVal)) * 100 : 0;
 
-    const spark1 = series.values.slice(-9);
-    const spark2 = series.values.slice(-9).map((v) => Math.abs(v));
-    const spark3 = series.values.slice(-9);
-    const spark4 = series.values.slice(-9).map((v) => Math.abs(v) * 0.6);
+    const spark1 = series.rawValues.slice(-9);
+    const spark2 = series.rawValues.slice(-9).map((v) => Math.abs(v));
+    const spark3 = series.rawValues.slice(-9);
+    const spark4 = series.rawValues.slice(-9).map((v) => Math.abs(v) * 0.6);
 
-    const W = 640, H = 240, PAD = 8;
-    const min = Math.min(...series.values);
-    const max = Math.max(...series.values);
-    const range = max - min || 1;
-    const bigPath = buildPath(series.values, W, H, PAD);
-    const areaPath = series.values.length > 1 ? `${bigPath} L${W - PAD},${H - PAD} L${PAD},${H - PAD} Z` : "";
-
-    // Cards com cores igual ao print: laranja, azul, roxo, azul claro
     const topCards = [
-        { label: "Caixa Atual", value: `Kz ${fmt(stats.caixaAtual)}`, pct: `Increase ${Math.abs(variation).toFixed(2)}%`, icon: "₿", bg: "#F7931A", color: "#F7931A", spark: spark1 },
-        { label: "Faturamento", value: `Kz ${fmt(stats.faturamento)}`, pct: `Increase ${(stats.watchlist ? (stats.faturamento / Math.max(stats.watchlist, 1) / 100).toFixed(2) : "0.00")}%`, icon: "Ξ", bg: "#627EEA", color: "#627EEA", spark: spark2 },
-        { label: "Vendas Hoje", value: `${stats.vendasHoje}`, pct: `Increase ${stats.vendasHoje}%`, icon: "◈", bg: "#8B5CF6", color: "#8B5CF6", spark: spark3 },
-        { label: "Saídas", value: `Kz ${fmt(stats.pending)}`, pct: `Increase 7.55%`, icon: "⇄", bg: "#00A8E8", color: "#00A8E8", spark: spark4 },
+        { label: "Caixa Atual", value: `Kz ${fmt(stats.caixaAtual)}`, pct: `Increase ${Math.abs(variation).toFixed(2)}%`, icon: "₿", bg: "#F7931A", spark: spark1 },
+        { label: "Faturamento", value: `Kz ${fmt(stats.faturamento)}`, pct: `Increase ${(stats.watchlist ? (stats.faturamento / Math.max(stats.watchlist, 1) / 100).toFixed(2) : "0.00")}%`, icon: "Ξ", bg: "#627EEA", spark: spark2 },
+        { label: "Vendas Hoje", value: `${stats.vendasHoje}`, pct: `Increase ${stats.vendasHoje}%`, icon: "◈", bg: "#8B5CF6", spark: spark3 },
+        { label: "Saídas", value: `Kz ${fmt(stats.pending)}`, pct: `Increase ${(stats.pending ? 7.55 : 0).toFixed(2)}%`, icon: "⇄", bg: "#00A8E8", spark: spark4 },
     ];
 
     return (
         <div className="flex flex-col gap-[14px] w-full min-w-0 pb-6" style={{ fontFamily: '"Zalando Sans Expanded", sans-serif' }}>
-            {/* ===== 4 CARDS - ESTILO BITCOIN DO PRINT ===== */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[14px]">
                 {topCards.map((c) => (
-                    <div key={c.label} className="bg-white rounded-[20px] p-4 shadow-[0_2px_16px_rgba(0,0,0,0.04)] border border-black/[0.03] h-[118px] flex flex-col justify-between overflow-hidden">
+                    <div key={c.label} className="bg-white rounded-[20px] p-4 shadow-[0_2px_16px_rgba(0,0,0,0.04)] border border-black/[0.03] h-[100px] flex flex-col justify-between overflow-hidden">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-[12px] text-[#8A8A8A] font-medium">{c.label}</p>
                                 <p className="text-[20px] font-bold mt-1 text-[#111] tracking-tight leading-none">{loading ? "..." : c.value}</p>
                             </div>
-                            {/* Ícone redondo igual ao do Bitcoin */}
-                            <div className="w-[32px] h-[32px] rounded-full flex items-center justify-center text-[16px] font-black text-white shrink-0" style={{ background: c.bg }}>{c.icon}</div>
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[15px] font-black text-white shrink-0" style={{ background: c.bg }}>{c.icon}</div>
                         </div>
                         <div className="flex items-end justify-between gap-2">
                             <div className="leading-tight">
                                 <p className="text-[10px] text-[#9A9A9A]">• $0,00</p>
                                 <p className="text-[11px] font-bold text-[#111] mt-[2px]">{c.pct}</p>
                             </div>
-                            <BarSpark data={c.spark} color={c.color} />
+                            <BarSpark data={c.spark} color={c.bg} />
                         </div>
                     </div>
                 ))}
             </div>
 
-            {/* ===== GRÁFICO GRANDE + STAKING - igual antes ===== */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-[14px]">
                 <div className="lg:col-span-2 bg-white rounded-[20px] p-5 shadow-[0_2px_16px_rgba(0,0,0,0.04)] border border-black/[0.03]">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <div className="flex items-center gap-1.5">
                                 <span className="w-6 h-6 rounded-full bg-[#FFF3D6] flex items-center justify-center text-[12px] font-black text-[#E8A020]">Kz</span>
-                                <p className="text-[13px] font-bold text-[#111]">Caixa (Kz)</p>
+                                <p className="text-[13px] font-bold text-[#111]">Vendas por dia</p>
                                 <span className="text-[11px] text-[#9A9A9A]">⌄</span>
                             </div>
-                            <p className="text-[26px] font-bold text-[#111] tracking-tight mt-2 leading-none">{loading ? "..." : `$${fmt(stats.caixaAtual)}`} <span className="text-[13px] font-bold text-[#111]">+{Math.abs(variation).toFixed(1)}%</span></p>
+                            <p className="text-[26px] font-bold text-[#111] tracking-tight mt-2 leading-none">{loading ? "..." : `Kz ${fmt(stats.caixaAtual)}`} <span className="text-[13px] font-bold text-[#111]">+{Math.abs(variation).toFixed(1)}%</span></p>
+                            <p className="text-[11px] text-[#9A9A9A] mt-1">Quanto vendeste em cada dia</p>
                         </div>
                         <div className="flex items-center gap-1 bg-[#F5F5F5] rounded-full p-1">
-                            <button className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] text-[#9A9A9A]">📊</button>
-                            <button className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] text-[#9A9A9A]">📈</button>
                             {(["1D", "1W", "1M", "1Y"] as Period[]).map((p) => (
                                 <button key={p} onClick={() => setPeriod(p)} className={`h-7 px-2.5 rounded-full text-[11px] font-bold transition ${period === p ? "bg-black text-white" : "text-[#111]"}`}>{p}</button>
                             ))}
                         </div>
                     </div>
-                    <div className="relative mt-4 flex gap-2">
-                        <div className="flex flex-col justify-between text-[10px] text-[#9A9A9A] py-1 h-[240px] shrink-0">
-                            <span>$20k</span><span>$15k</span><span>$10k</span><span>$5k</span><span>$0</span>
-                        </div>
-                        <div className="flex-1 relative min-w-0">
-                            <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[240px] overflow-visible" preserveAspectRatio="none"
-                                onMouseMove={(e) => {
-                                    const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
-                                    const x = e.clientX - rect.left;
-                                    const idx = Math.round(((x / rect.width) * (series.values.length - 1)));
-                                    const clamped = Math.max(0, Math.min(series.values.length - 1, idx));
-                                    const px = PAD + (clamped / Math.max(series.values.length - 1, 1)) * (W - PAD * 2);
-                                    const py = PAD + (1 - (series.values[clamped] - min) / range) * (H - PAD * 2);
-                                    setHover({ i: clamped, x: px, y: py });
-                                }}
-                                onMouseLeave={() => setHover(null)}
-                            >
-                                <defs>
-                                    <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#F97316" stopOpacity="0.18" />
-                                        <stop offset="100%" stopColor="#F97316" stopOpacity="0" />
-                                    </linearGradient>
-                                </defs>
-                                <path d={areaPath} fill="url(#areaFill)" />
-                                <path d={bigPath} fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-                                {hover && <g><line x1={hover.x} y1={0} x2={hover.x} y2={H} stroke="#E5E5E5" strokeDasharray="3 3" /><circle cx={hover.x} cy={hover.y} r="4" fill="#F97316" stroke="white" strokeWidth="2" /></g>}
-                            </svg>
-                            {hover && (
-                                <div className="absolute pointer-events-none bg-white shadow-[0_8px_24px_rgba(0,0,0,0.12)] rounded-[12px] px-3 py-2 border border-black/5 z-10" style={{ left: Math.min(hover.x, W - 140), top: Math.max(hover.y - 60, 0) }}>
-                                    <p className="text-[10px] text-[#9A9A9A]">{series.labels[hover.i] || "Hoje"}</p>
-                                    <div className="flex justify-between gap-4 text-[11px] mt-0.5"><span className="text-[#9A9A9A]">Price</span><span className="font-bold">Kz {fmt(series.values[hover.i] || 0)}</span></div>
-                                    <div className="flex justify-between gap-4 text-[11px]"><span className="text-[#9A9A9A]">Vol.24h</span><span className="font-bold">Kz {fmt(stats.faturamento)}</span></div>
-                                </div>
-                            )}
-                            <div className="flex justify-between text-[10px] text-[#9A9A9A] mt-2 px-1">
-                                <span>Jan 25</span><span>Jan 24</span><span>Jan 27</span><span>Jan 28</span><span>Jan 30</span><span>Jan 31</span>
-                            </div>
-                        </div>
-                    </div>
+                    <BigBarChart values={series.values} labels={series.labels} fmt={fmt} />
                 </div>
 
                 <div className="bg-white rounded-[20px] p-5 shadow-[0_2px_16px_rgba(0,0,0,0.04)] border border-black/[0.03] flex flex-col">
