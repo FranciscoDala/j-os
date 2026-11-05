@@ -79,7 +79,7 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile
 
     if (isMobile) {
         return (
-            <div className="w-full flex flex-col h-full">
+            <div className="w-full flex flex-col h-full bg-white">
                 <div className="flex items-center gap-3 px-2 mb-4">
                     <LogoTopo size="w-12 h-12" />
                     <div className="leading-none">
@@ -91,40 +91,43 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, role, can, isMobile
                     {filteredTabs.map(({ id, label, icon: Icon }: any) => {
                         const active = activeTab === id;
                         return (
-                            <button key={id} onClick={() => setActiveTab(id)} className={`w-full flex items-center gap-3 px-4 h-[56px] rounded-full text-[13px] font-bold transition-all ${active ? 'bg-white text-black shadow-[0_4px_12px_rgba(0,0,0,0.12)]' : 'bg-transparent text-black border border-black/10'}`}>
-                                <span className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${active ? 'bg-black/5' : 'bg-white/60'}`}><Icon size={24} strokeWidth={2} className="text-black" /></span>
+                            <button key={id} onClick={() => setActiveTab(id)} className={`w-full flex items-center gap-3 px-4 h-[56px] rounded-full text-[13px] font-bold transition-all ${active ? 'bg-black text-white shadow-[0_4px_12px_rgba(0,0,0,0.12)]' : 'bg-transparent text-black border border-black/10'}`}>
+                                <span className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${active ? 'bg-white/20' : 'bg-black/5'}`}><Icon size={24} strokeWidth={2} className={active ? "text-white" : "text-black"} /></span>
                                 <span className="flex-1 text-left">{label}</span>
-                                {id === 'pedidos' && pedidosCount > 0 && <span className={`min-w-[22px] h-[22px] px-1.5 text-[11px] font-black rounded-full flex items-center justify-center ${active ? 'bg-black text-white' : 'bg-red-500 text-white'}`}>{pedidosCount > 9 ? "9+" : pedidosCount}</span>}
+                                {id === 'pedidos' && pedidosCount > 0 && <span className={`min-w-[22px] h-[22px] px-1.5 text-[11px] font-black rounded-full flex items-center justify-center ${active ? 'bg-white text-black' : 'bg-red-500 text-white'}`}>{pedidosCount > 9 ? "9+" : pedidosCount}</span>}
                             </button>
                         )
                     })}
                 </div>
                 <div className="mt-4 pt-4 border-t border-black/10 flex flex-col gap-2">
-                    {showConfig && <button onClick={onOpenConfig} className="w-full flex items-center gap-3 px-4 h-[52px] rounded-full bg-white/70 text-black text-[13px] font-bold border border-black/10"><Settings size={22} strokeWidth={2} className="text-black" /> Configurações</button>}
-                    <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 h-[52px] rounded-full bg-white/70 text-black text-[13px] font-bold border border-black/10 hover:bg-white"><Power size={22} strokeWidth={2.5} className="text-black" /> Sair</button>
+                    {showConfig && <button onClick={onOpenConfig} className="w-full flex items-center gap-3 px-4 h-[52px] rounded-full bg-white text-black text-[13px] font-bold border border-black/10"><Settings size={22} strokeWidth={2} className="text-black" /> Configurações</button>}
+                    <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 h-[52px] rounded-full bg-white text-black text-[13px] font-bold border border-black/10 hover:bg-black/5"><Power size={22} strokeWidth={2.5} className="text-black" /> Sair</button>
                 </div>
             </div>
         )
     }
 
     return (
-        <aside className="w-[68px] h-[calc(100dvh-28px)] bg-white/80 backdrop-blur-xl border border-black/5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] rounded-[28px] flex flex-col items-center py-4 shrink-0">
+        <aside className="w-[76px] h-[100dvh] bg-white border-r border-black/5 flex flex-col items-center py-4 shrink-0 z-20">
             {/* LOGO NO TOPO */}
-            <LogoTopo size="w-10 h-10" />
+            <LogoTopo size="w-11 h-11" />
 
-            <div className="flex-1 flex flex-col items-center gap-2 mt-5">
-                {filteredTabs.filter((t: any) => t.id !== 'home').map(({ id, icon: Icon }: any) => (
-                    <button key={id} onClick={() => setActiveTab(id)} className={`relative w-12 h-12 rounded-full flex items-center justify-center transition ${activeTab === id ? 'bg-white text-black shadow-[0_4px_12px_rgba(0,0,0,0.15)]' : 'text-black hover:bg-white/60'}`}>
-                        <Icon size={24} strokeWidth={2} className="text-black" />
-                        {id === 'pedidos' && pedidosCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-[4px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-[2px] border-white">{pedidosCount > 9 ? "9+" : pedidosCount}</span>}
-                    </button>
-                ))}
+            <div className="flex-1 flex flex-col items-center gap-1.5 mt-6">
+                {filteredTabs.filter((t: any) => t.id !== 'home').map(({ id, icon: Icon }: any) => {
+                    const isActive = activeTab === id;
+                    return (
+                        <button key={id} onClick={() => setActiveTab(id)} className={`relative w-12 h-12 rounded-full flex items-center justify-center transition ${isActive ? 'bg-black text-white shadow-[0_4px_12px_rgba(0,0,0,0.2)]' : 'text-black hover:bg-black/5'}`}>
+                            <Icon size={22} strokeWidth={2} className={isActive ? "text-white" : "text-black"} />
+                            {id === 'pedidos' && pedidosCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-[4px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-[2px] border-white">{pedidosCount > 9 ? "9+" : pedidosCount}</span>}
+                        </button>
+                    );
+                })}
             </div>
             <div className="flex flex-col items-center gap-2">
-                <div className="w-6 h-[1px] bg-black/20 my-1" />
-                {showConfig && <button onClick={onOpenConfig} className="w-12 h-12 rounded-full flex items-center justify-center bg-white/70 text-black hover:bg-white transition"><Settings size={22} strokeWidth={2} className="text-black" /></button>}
+                <div className="w-6 h-[1px] bg-black/10 my-1" />
+                {showConfig && <button onClick={onOpenConfig} className="w-12 h-12 rounded-full flex items-center justify-center bg-white text-black hover:bg-black/5 transition border border-black/5"><Settings size={22} strokeWidth={2} className="text-black" /></button>}
                 {/* SAIR - ícone OFF preto */}
-                <button onClick={onLogout} title="Sair" className="w-12 h-12 rounded-full flex items-center justify-center text-black hover:bg-white/70 transition active:scale-95"><Power size={24} strokeWidth={2.5} className="text-black" /></button>
+                <button onClick={onLogout} title="Sair" className="w-12 h-12 rounded-full flex items-center justify-center text-black hover:bg-black/5 transition active:scale-95"><Power size={22} strokeWidth={2.5} className="text-black" /></button>
             </div>
         </aside>
     );
