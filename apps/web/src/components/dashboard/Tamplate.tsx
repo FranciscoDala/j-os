@@ -297,7 +297,7 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
 
     return (
         <DashboardCtx.Provider value={{ activeTab, setActiveTab, user, moduleId, role, can, pedidosCount, setPedidosCount, stockAlerts, setStockAlerts }}>
-            <div className="relative h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-0 md:p-[14px] md:gap-[14px]">
+            <div className="relative h-[100dvh] w-screen overflow-hidden bg-[#EDEBE6] flex p-0 md:p-[14px] md:gap-[14px] font-archivo-narrow" style={{ fontFamily: "var(--font-archivo-narrow), 'Archivo Narrow', sans-serif" }}>
                 {/* BACKGROUND IMAGE */}
                 <img src={BG_IMAGE} alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
                 <div className="pointer-events-none absolute inset-0 bg-[#EDEBE6]/85" />
@@ -359,7 +359,21 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
                 </div>
             </div>
             {empresaData && <ModalEmpresa open={showConfig} initialData={empresaData} saving={savingEmpresa} onClose={() => setShowConfig(false)} onSave={handleSaveEmpresa} />}
-            <style jsx global>{`html,body{height:100%;overflow:hidden;background:#EDEBE6;scrollbar-width:none}::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
+            <style jsx global>{`
+                html, body {
+                    height: 100%;
+                    overflow: hidden;
+                    background: #EDEBE6;
+                    scrollbar-width: none;
+                    font-family: var(--font-archivo-narrow), "Archivo Narrow", sans-serif !important;
+                }
+                /* Força todos os filhos do dashboard a herdar a Archivo Narrow */
+                div, p, h1, h2, h3, h4, h5, h6, span, a, button, input, select, textarea, label, td, th, li {
+                    font-family: inherit;
+                }
+                ::-webkit-scrollbar { display: none; }
+                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
         </DashboardCtx.Provider>
     );
 }
