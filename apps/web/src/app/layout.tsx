@@ -1,15 +1,15 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import { Montserrat } from "next/font/google";
+import { DM_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { RealtimeProvider } from "@/components/dashboard/RealtimeProvider";
 import { SearchProvider } from "@/features/search/context";
 import { EmpresaProvider } from "@/components/dashboard/empresaContext";
 
-const montserrat = Montserrat({
+const dmSans = DM_Sans({
     subsets: ["latin"],
-    weight: ["400", "500", "600", "700", "800", "900"],
-    variable: "--font-montserrat",
+    weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"],
+    variable: "--font-dm-sans",
     display: "swap",
 });
 
@@ -51,8 +51,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
-        <html lang="pt" className={montserrat.variable}>
-            <body className={`${montserrat.className} antialiased`}>
+        <html lang="pt" className={dmSans.variable}>
+            <body className={`${dmSans.className} antialiased`}>
                 <EmpresaProvider>
                     <SearchProvider>
                         <RealtimeProvider>
@@ -66,7 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     closeButton={false}
                     toastOptions={{
                         style: {
-                            fontFamily: "var(--font-montserrat), sans-serif",
+                            fontFamily: "var(--font-dm-sans), sans-serif",
                             borderRadius: '16px',
                             fontSize: '12px',
                             fontWeight: '600',
