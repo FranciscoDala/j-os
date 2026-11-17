@@ -8,12 +8,19 @@ body {
     padding: 0;
     min-height: 100%;
     background: #5A8AD4;
-    font-family: var(--font-dm-sans), "DM Sans", sans-serif;
+    font-family: var(--font-montserrat), "Montserrat", sans-serif;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: auto;
     scrollbar-width: none;
     -ms-overflow-style: none;
+}
+
+/* FONTE ARCHIVO NARROW - VIA LINK DO GOOGLE FONTS */
+.font-archivo-narrow {
+    font-family: "Archivo Narrow", sans-serif;
+    font-optical-sizing: auto;
+    font-style: normal;
 }
 
 /* ESCONDE A BARRA MAS DEIXA ROLAR */

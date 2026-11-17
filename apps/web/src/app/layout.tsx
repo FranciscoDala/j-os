@@ -1,15 +1,15 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import { DM_Sans } from "next/font/google";
+import { Montserrat } from "next/font/google";
 import { Toaster } from "sonner";
 import { RealtimeProvider } from "@/components/dashboard/RealtimeProvider";
 import { SearchProvider } from "@/features/search/context";
 import { EmpresaProvider } from "@/components/dashboard/empresaContext";
 
-const dmSans = DM_Sans({
+const montserrat = Montserrat({
     subsets: ["latin"],
-    weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"],
-    variable: "--font-dm-sans",
+    weight: ["400", "500", "600", "700", "800", "900"],
+    variable: "--font-montserrat",
     display: "swap",
 });
 
@@ -51,8 +51,13 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
-        <html lang="pt" className={dmSans.variable}>
-            <body className={`${dmSans.className} antialiased`}>
+        <html lang="pt" className={montserrat.variable}>
+            <head>
+                <link rel="preconnect" href="https://fonts.googleapis.com" />
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+                <link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet" />
+            </head>
+            <body className={`${montserrat.className} antialiased`}>
                 <EmpresaProvider>
                     <SearchProvider>
                         <RealtimeProvider>
@@ -66,7 +71,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     closeButton={false}
                     toastOptions={{
                         style: {
-                            fontFamily: "var(--font-dm-sans), sans-serif",
+                            fontFamily: "var(--font-montserrat), sans-serif",
                             borderRadius: '16px',
                             fontSize: '12px',
                             fontWeight: '600',
